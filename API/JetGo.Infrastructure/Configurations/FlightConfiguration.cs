@@ -1,6 +1,7 @@
 using JetGo.Domain.Entities;
 using JetGo.Domain.Enums;
 using JetGo.Infrastructure.Configurations.Common;
+using JetGo.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -43,5 +44,7 @@ public sealed class FlightConfiguration : AuditableEntityConfiguration<Flight>
             .WithOne(x => x.Flight)
             .HasForeignKey(x => x.FlightId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasData(JetGoSeedData.Flights);
     }
 }

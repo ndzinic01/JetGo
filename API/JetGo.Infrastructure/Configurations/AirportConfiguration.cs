@@ -1,5 +1,6 @@
 using JetGo.Domain.Entities;
 using JetGo.Infrastructure.Configurations.Common;
+using JetGo.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -32,5 +33,7 @@ public sealed class AirportConfiguration : AuditableEntityConfiguration<Airport>
             .WithOne(x => x.ArrivalAirport)
             .HasForeignKey(x => x.ArrivalAirportId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasData(JetGoSeedData.Airports);
     }
 }

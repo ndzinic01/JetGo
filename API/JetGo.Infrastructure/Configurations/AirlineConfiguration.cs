@@ -1,5 +1,6 @@
 using JetGo.Domain.Entities;
 using JetGo.Infrastructure.Configurations.Common;
+using JetGo.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,5 +18,7 @@ public sealed class AirlineConfiguration : AuditableEntityConfiguration<Airline>
 
         builder.HasIndex(x => x.Name).IsUnique();
         builder.HasIndex(x => x.Code).IsUnique();
+
+        builder.HasData(JetGoSeedData.Airlines);
     }
 }
