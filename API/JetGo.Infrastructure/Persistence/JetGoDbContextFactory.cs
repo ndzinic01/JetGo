@@ -15,7 +15,7 @@ public sealed class JetGoDbContextFactory : IDesignTimeDbContextFactory<JetGoDbC
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<JetGoDbContext>();
-        optionsBuilder.UseSqlServer(connectionString);
+        optionsBuilder.UseSqlServer(connectionString, sqlOptions => sqlOptions.EnableRetryOnFailure());
 
         return new JetGoDbContext(optionsBuilder.Options);
     }
