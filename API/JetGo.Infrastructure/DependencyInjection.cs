@@ -90,6 +90,8 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IDestinationService, DestinationService>();
+        services.AddScoped<IFlightService, FlightService>();
         services.AddScoped<IdentityDataSeeder>();
 
         return services;
