@@ -396,6 +396,30 @@ internal static class JetGoSeedData
         (5, StandardSeatNumbers),
         (6, StandardSeatNumbers));
 
+    internal static NewsArticle[] NewsArticles { get; } =
+    [
+        new NewsArticle
+        {
+            Id = 1,
+            Title = "JetGo uvodi novu liniju Sarajevo - Bec",
+            Content = "Od maja 2026. godine dostupna je nova linija iz Sarajeva prema Becu sa vise termina tokom sedmice.",
+            ImageUrl = "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1200&q=80",
+            IsPublished = true,
+            PublishedAtUtc = Utc(2026, 4, 20, 9, 0),
+            CreatedAtUtc = SeedTimestampUtc
+        },
+        new NewsArticle
+        {
+            Id = 2,
+            Title = "Savjeti za brzi check-in prije putovanja",
+            Content = "Pripremite pasos, provjerite vrijeme polaska i dodjite na aerodrom najmanje dva sata prije medjunarodnog leta.",
+            ImageUrl = "https://images.unsplash.com/photo-1529074963764-98f45c47344b?auto=format&fit=crop&w=1200&q=80",
+            IsPublished = true,
+            PublishedAtUtc = Utc(2026, 4, 22, 14, 30),
+            CreatedAtUtc = SeedTimestampUtc
+        }
+    ];
+
     private static DateTime Utc(int year, int month, int day, int hour, int minute)
     {
         return new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Utc);
