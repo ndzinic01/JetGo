@@ -13,10 +13,15 @@ public sealed class ReservationConfiguration : AuditableEntityConfiguration<Rese
     {
         builder.ToTable("Reservations");
 
+        builder.Property(x => x.ReservationCode).IsRequired().HasMaxLength(30);
         builder.Property(x => x.UserId).IsRequired().HasMaxLength(450);
         builder.Property(x => x.Currency).IsRequired().HasMaxLength(3);
         builder.Property(x => x.TotalAmount).HasPrecision(18, 2);
         builder.Property(x => x.Status).HasConversion<int>();
+        builder.Property(x => x.StatusChangedByUserId).HasMaxLength(450);
+        builder.Property(x => x.StatusReason).HasMaxLength(500);
+
+        builder.HasIndex(x => x.ReservationCode).IsUnique();
 
         builder.HasOne<AppUser>()
             .WithMany(x => x.Reservations)

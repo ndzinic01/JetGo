@@ -92,6 +92,8 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IDestinationService, DestinationService>();
         services.AddScoped<IFlightService, FlightService>();
+        services.AddScoped<ReservationStateMachine>();
+        services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IdentityDataSeeder>();
 
         return services;

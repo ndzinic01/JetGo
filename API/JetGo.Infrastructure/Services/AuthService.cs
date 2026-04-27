@@ -75,38 +75,43 @@ public sealed class AuthService : IAuthService
             EmailConfirmed = true
         };
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
 
-        var createResult = await _userManager.CreateAsync(user, request.Password);
-
-        if (!createResult.Succeeded)
+        return await executionStrategy.ExecuteAsync(async () =>
         {
-            throw CreateValidationException(createResult.Errors);
-        }
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        var addToRoleResult = await _userManager.AddToRoleAsync(user, RoleNames.User);
+            var createResult = await _userManager.CreateAsync(user, request.Password);
 
-        if (!addToRoleResult.Succeeded)
-        {
-            throw CreateValidationException(addToRoleResult.Errors);
-        }
+            if (!createResult.Succeeded)
+            {
+                throw CreateValidationException(createResult.Errors);
+            }
 
-        var userProfile = new UserProfile
-        {
-            UserId = user.Id,
-            FirstName = request.FirstName.Trim(),
-            LastName = request.LastName.Trim(),
-            Email = normalizedEmail,
-            PhoneNumber = request.PhoneNumber?.Trim()
-        };
+            var addToRoleResult = await _userManager.AddToRoleAsync(user, RoleNames.User);
 
-        await _dbContext.UserProfiles.AddAsync(userProfile, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            if (!addToRoleResult.Succeeded)
+            {
+                throw CreateValidationException(addToRoleResult.Errors);
+            }
 
-        _logger.LogInformation("Registered new user {Username}.", normalizedUsername);
+            var userProfile = new UserProfile
+            {
+                UserId = user.Id,
+                FirstName = request.FirstName.Trim(),
+                LastName = request.LastName.Trim(),
+                Email = normalizedEmail,
+                PhoneNumber = request.PhoneNumber?.Trim()
+            };
 
-        return await BuildAuthResponseAsync(user, cancellationToken);
+            await _dbContext.UserProfiles.AddAsync(userProfile, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            _logger.LogInformation("Registered new user {Username}.", normalizedUsername);
+
+            return await BuildAuthResponseAsync(user, cancellationToken);
+        });
     }
 
     public async Task LogoutAsync(CancellationToken cancellationToken = default)

@@ -112,7 +112,12 @@ public sealed class FlightService : IFlightService
                 AvailableSeats = x.AvailableSeats,
                 TotalSeats = x.TotalSeats,
                 ReservedSeats = x.TotalSeats - x.AvailableSeats,
-                Status = x.Status
+                Status = x.Status,
+                AvailableSeatNumbers = x.Seats
+                    .Where(s => !s.IsReserved)
+                    .OrderBy(s => s.SeatNumber)
+                    .Select(s => s.SeatNumber)
+                    .ToArray()
             })
             .SingleOrDefaultAsync(cancellationToken);
 

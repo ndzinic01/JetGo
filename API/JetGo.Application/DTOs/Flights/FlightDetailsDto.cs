@@ -36,4 +36,6 @@ public sealed class FlightDetailsDto
     public int ReservedSeats { get; init; }
 
     public FlightStatus Status { get; init; }
+
+    public IReadOnlyCollection<string> AvailableSeatNumbers { get; init; } = Array.Empty<string>();
 }
