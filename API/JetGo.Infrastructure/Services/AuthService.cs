@@ -11,6 +11,7 @@ using JetGo.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace JetGo.Infrastructure.Services;
@@ -21,6 +22,7 @@ public sealed class AuthService : IAuthService
     private readonly JetGoDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly JwtTokenGenerator _jwtTokenGenerator;
+    private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -28,12 +30,14 @@ public sealed class AuthService : IAuthService
         JetGoDbContext dbContext,
         IHttpContextAccessor httpContextAccessor,
         JwtTokenGenerator jwtTokenGenerator,
+        IHostEnvironment hostEnvironment,
         ILogger<AuthService> logger)
     {
         _userManager = userManager;
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _hostEnvironment = hostEnvironment;
         _logger = logger;
     }
 
@@ -157,6 +161,53 @@ public sealed class AuthService : IAuthService
         return await BuildUserDtoAsync(user, cancellationToken);
     }
 
+    public async Task<PasswordResetResponseDto> RequestPasswordResetAsync(RequestPasswordResetRequest request, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var user = await _userManager.FindByEmailAsync(normalizedEmail);
+
+        if (user is null)
+        {
+            return CreateGenericPasswordResetResponse();
+        }
+
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+        _logger.LogInformation("Password reset token generated for user {UserId}.", user.Id);
+
+        return new PasswordResetResponseDto
+        {
+            Message = "Ako korisnik sa ovom email adresom postoji, instrukcije za reset lozinke su pripremljene.",
+            DebugResetToken = _hostEnvironment.IsDevelopment() ? resetToken : null,
+            ExpiresAtUtc = _hostEnvironment.IsDevelopment() ? DateTime.UtcNow.AddMinutes(15) : null
+        };
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var user = await _userManager.FindByEmailAsync(normalizedEmail);
+
+        if (user is null)
+        {
+            throw new ValidationException(
+                "Reset podaci nisu validni.",
+                new Dictionary<string, string[]>
+                {
+                    ["email"] = ["Korisnik sa navedenom email adresom nije pronadjen."]
+                });
+        }
+
+        var resetResult = await _userManager.ResetPasswordAsync(user, request.Token, request.NewPassword);
+
+        if (!resetResult.Succeeded)
+        {
+            throw CreateValidationException(resetResult.Errors);
+        }
+
+        _logger.LogInformation("Password reset completed for user {UserId}.", user.Id);
+    }
+
     private async Task<AuthResponseDto> BuildAuthResponseAsync(AppUser user, CancellationToken cancellationToken)
     {
         var roles = (await _userManager.GetRolesAsync(user)).ToArray();
@@ -223,5 +274,13 @@ public sealed class AuthService : IAuthService
             {
                 ["auth"] = errorMessages
             });
+    }
+
+    private static PasswordResetResponseDto CreateGenericPasswordResetResponse()
+    {
+        return new PasswordResetResponseDto
+        {
+            Message = "Ako korisnik sa ovom email adresom postoji, instrukcije za reset lozinke su pripremljene."
+        };
     }
 }

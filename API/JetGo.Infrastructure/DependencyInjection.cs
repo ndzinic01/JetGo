@@ -6,6 +6,7 @@ using JetGo.Infrastructure.Identity;
 using JetGo.Infrastructure.Persistence;
 using JetGo.Infrastructure.Seed;
 using JetGo.Infrastructure.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,11 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<JetGoDbContext>()
             .AddSignInManager()
             .AddDefaultTokenProviders();
+
+        services.Configure<DataProtectionTokenProviderOptions>(options =>
+        {
+            options.TokenLifespan = TimeSpan.FromMinutes(15);
+        });
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key));
 
@@ -90,6 +96,7 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IDestinationService, DestinationService>();
         services.AddScoped<IFlightService, FlightService>();
         services.AddScoped<INotificationService, NotificationService>();

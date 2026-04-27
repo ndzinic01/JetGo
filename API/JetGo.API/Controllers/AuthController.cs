@@ -36,6 +36,24 @@ public sealed class AuthController : ControllerBase
         return Ok(response);
     }
 
+    [HttpPost("request-password-reset")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(PasswordResetResponseDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PasswordResetResponseDto>> RequestPasswordReset([FromBody] RequestPasswordResetRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _authService.RequestPasswordResetAsync(request, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        await _authService.ResetPasswordAsync(request, cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
