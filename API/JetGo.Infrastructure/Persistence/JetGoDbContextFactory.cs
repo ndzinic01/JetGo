@@ -1,3 +1,4 @@
+using JetGo.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -7,6 +8,8 @@ public sealed class JetGoDbContextFactory : IDesignTimeDbContextFactory<JetGoDbC
 {
     public JetGoDbContext CreateDbContext(string[] args)
     {
+        DotEnvLoader.LoadNearest(Directory.GetCurrentDirectory());
+
         var connectionString = Environment.GetEnvironmentVariable("JETGO_CONNECTION_STRING");
 
         if (string.IsNullOrWhiteSpace(connectionString))

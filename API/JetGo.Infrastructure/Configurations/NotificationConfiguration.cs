@@ -1,6 +1,7 @@
 using JetGo.Domain.Entities;
 using JetGo.Domain.Enums;
 using JetGo.Infrastructure.Configurations.Common;
+using JetGo.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -16,5 +17,10 @@ public sealed class NotificationConfiguration : AuditableEntityConfiguration<Not
         builder.Property(x => x.Title).IsRequired().HasMaxLength(200);
         builder.Property(x => x.Body).IsRequired().HasMaxLength(2000);
         builder.Property(x => x.Status).HasConversion<int>();
+
+        builder.HasOne<AppUser>()
+            .WithMany(x => x.Notifications)
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

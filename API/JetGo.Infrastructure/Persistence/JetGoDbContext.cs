@@ -1,9 +1,12 @@
 using JetGo.Domain.Entities;
+using JetGo.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace JetGo.Infrastructure.Persistence;
 
-public sealed class JetGoDbContext : DbContext
+public sealed class JetGoDbContext : IdentityDbContext<AppUser, IdentityRole, string>
 {
     public JetGoDbContext(DbContextOptions<JetGoDbContext> options)
         : base(options)
@@ -22,13 +25,14 @@ public sealed class JetGoDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReservationItem> ReservationItems => Set<ReservationItem>();
+    public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
     public DbSet<SearchHistory> SearchHistories => Set<SearchHistory>();
     public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(JetGoDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(JetGoDbContext).Assembly);
     }
 }

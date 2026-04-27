@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\JetGo.Domain\JetGo.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

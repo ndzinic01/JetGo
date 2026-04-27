@@ -1,5 +1,6 @@
 using JetGo.Domain.Entities;
 using JetGo.Infrastructure.Configurations.Common;
+using JetGo.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,5 +21,10 @@ public sealed class UserProfileConfiguration : AuditableEntityConfiguration<User
 
         builder.HasIndex(x => x.UserId).IsUnique();
         builder.HasIndex(x => x.Email).IsUnique();
+
+        builder.HasOne<AppUser>()
+            .WithOne(x => x.UserProfile)
+            .HasForeignKey<UserProfile>(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

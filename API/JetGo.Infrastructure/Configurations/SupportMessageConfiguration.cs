@@ -1,5 +1,6 @@
 using JetGo.Domain.Entities;
 using JetGo.Infrastructure.Configurations.Common;
+using JetGo.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -15,5 +16,10 @@ public sealed class SupportMessageConfiguration : AuditableEntityConfiguration<S
         builder.Property(x => x.Subject).IsRequired().HasMaxLength(200);
         builder.Property(x => x.Message).IsRequired().HasMaxLength(4000);
         builder.Property(x => x.AdminReply).HasMaxLength(4000);
+
+        builder.HasOne<AppUser>()
+            .WithMany(x => x.SupportMessages)
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
