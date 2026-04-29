@@ -17,6 +17,7 @@ public sealed class PaymentConfiguration : AuditableEntityConfiguration<Payment>
         builder.Property(x => x.Amount).HasPrecision(18, 2);
         builder.Property(x => x.Currency).IsRequired().HasMaxLength(3);
         builder.Property(x => x.Status).HasConversion<int>();
+        builder.Property(x => x.StatusReason).HasMaxLength(500);
 
         builder.HasIndex(x => x.ReservationId).IsUnique();
 

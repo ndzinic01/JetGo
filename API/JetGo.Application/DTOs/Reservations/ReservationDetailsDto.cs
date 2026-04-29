@@ -28,6 +28,12 @@ public sealed class ReservationDetailsDto
 
     public string Currency { get; init; } = "BAM";
 
+    public int? PaymentId { get; init; }
+
+    public PaymentStatus? PaymentStatus { get; init; }
+
+    public bool IsPaid { get; init; }
+
     public DateTime CreatedAtUtc { get; init; }
 
     public DateTime? StatusChangedAtUtc { get; init; }
@@ -45,4 +51,8 @@ public sealed class ReservationDetailsDto
     public bool CanBeConfirmed { get; set; }
 
     public bool CanBeCompleted { get; set; }
+
+    public bool CanInitiatePayment { get; set; }
+
+    public bool CanBeRefunded { get; set; }
 }

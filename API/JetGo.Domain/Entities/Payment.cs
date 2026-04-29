@@ -20,4 +20,8 @@ public sealed class Payment : AuditableEntity
     public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
 
     public DateTime? PaidAtUtc { get; set; }
+
+    public DateTime? RefundedAtUtc { get; set; }
+
+    public string? StatusReason { get; set; }
 }

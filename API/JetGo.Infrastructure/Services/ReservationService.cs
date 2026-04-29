@@ -194,6 +194,8 @@ public sealed class ReservationService : IReservationService
         reservation.CanBeCancelled = _stateMachine.CanCancel(reservation.Status);
         reservation.CanBeConfirmed = isAdmin && _stateMachine.CanConfirm(reservation.Status);
         reservation.CanBeCompleted = isAdmin && _stateMachine.CanComplete(reservation.Status);
+        reservation.CanInitiatePayment = reservation.Status == ReservationStatus.Confirmed && !reservation.IsPaid;
+        reservation.CanBeRefunded = isAdmin && reservation.PaymentStatus == PaymentStatus.Paid && reservation.Status != ReservationStatus.Completed;
 
         return reservation;
     }
@@ -340,6 +342,9 @@ public sealed class ReservationService : IReservationService
                 Status = x.Status,
                 TotalAmount = x.TotalAmount,
                 Currency = x.Currency,
+                PaymentId = x.Payment != null ? x.Payment.Id : null,
+                PaymentStatus = x.Payment != null ? x.Payment.Status : null,
+                IsPaid = x.Payment != null && x.Payment.Status == PaymentStatus.Paid,
                 SeatsCount = x.Items.Count,
                 CreatedAtUtc = x.CreatedAtUtc,
                 CustomerName = _dbContext.UserProfiles
@@ -417,6 +422,9 @@ public sealed class ReservationService : IReservationService
                 Status = x.Status,
                 TotalAmount = x.TotalAmount,
                 Currency = x.Currency,
+                PaymentId = x.Payment != null ? x.Payment.Id : null,
+                PaymentStatus = x.Payment != null ? x.Payment.Status : null,
+                IsPaid = x.Payment != null && x.Payment.Status == PaymentStatus.Paid,
                 CreatedAtUtc = x.CreatedAtUtc,
                 StatusChangedAtUtc = x.StatusChangedAtUtc,
                 StatusChangedByUserId = x.StatusChangedByUserId,

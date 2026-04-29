@@ -26,6 +26,12 @@ public sealed class ReservationListItemDto
 
     public string Currency { get; init; } = "BAM";
 
+    public int? PaymentId { get; init; }
+
+    public PaymentStatus? PaymentStatus { get; init; }
+
+    public bool IsPaid { get; init; }
+
     public int SeatsCount { get; init; }
 
     public DateTime CreatedAtUtc { get; init; }
