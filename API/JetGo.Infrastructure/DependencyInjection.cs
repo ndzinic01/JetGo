@@ -1,7 +1,9 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using JetGo.Application.Configuration;
+using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Contracts.Services;
+using JetGo.Infrastructure.Messaging;
 using JetGo.Infrastructure.Identity;
 using JetGo.Infrastructure.Persistence;
 using JetGo.Infrastructure.Seed;
@@ -20,9 +22,12 @@ public static class DependencyInjection
     public static IServiceCollection AddJetGoInfrastructure(
         this IServiceCollection services,
         string connectionString,
-        JwtSettings jwtSettings)
+        JwtSettings jwtSettings,
+        RabbitMqSettings rabbitMqSettings,
+        bool includeWebSecurity = true)
     {
         services.AddSingleton(jwtSettings);
+        services.AddSingleton(rabbitMqSettings);
 
         services.AddDbContext<JetGoDbContext>(options =>
             options.UseSqlServer(connectionString, sqlOptions => sqlOptions.EnableRetryOnFailure()));
@@ -46,54 +51,60 @@ public static class DependencyInjection
             options.TokenLifespan = TimeSpan.FromMinutes(15);
         });
 
-        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key));
+        if (includeWebSecurity)
+        {
+            var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key));
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
-            {
-                options.RequireHttpsMetadata = false;
-                options.SaveToken = false;
-                options.TokenValidationParameters = new TokenValidationParameters
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
                 {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtSettings.Issuer,
-                    ValidAudience = jwtSettings.Audience,
-                    IssuerSigningKey = signingKey,
-                    ClockSkew = TimeSpan.Zero
-                };
-
-                options.Events = new JwtBearerEvents
-                {
-                    OnTokenValidated = async context =>
+                    options.RequireHttpsMetadata = false;
+                    options.SaveToken = false;
+                    options.TokenValidationParameters = new TokenValidationParameters
                     {
-                        var jwtId = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = jwtSettings.Issuer,
+                        ValidAudience = jwtSettings.Audience,
+                        IssuerSigningKey = signingKey,
+                        ClockSkew = TimeSpan.Zero
+                    };
 
-                        if (string.IsNullOrWhiteSpace(jwtId))
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnTokenValidated = async context =>
                         {
-                            context.Fail("Token ne sadrzi JTI identifikator.");
-                            return;
+                            var jwtId = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+
+                            if (string.IsNullOrWhiteSpace(jwtId))
+                            {
+                                context.Fail("Token ne sadrzi JTI identifikator.");
+                                return;
+                            }
+
+                            var dbContext = context.HttpContext.RequestServices.GetRequiredService<JetGoDbContext>();
+                            var isRevoked = await dbContext.RevokedTokens
+                                .AsNoTracking()
+                                .AnyAsync(
+                                    x => x.JwtId == jwtId && x.ExpiresAtUtc > DateTime.UtcNow,
+                                    context.HttpContext.RequestAborted);
+
+                            if (isRevoked)
+                            {
+                                context.Fail("Token je opozvan.");
+                            }
                         }
+                    };
+                });
 
-                        var dbContext = context.HttpContext.RequestServices.GetRequiredService<JetGoDbContext>();
-                        var isRevoked = await dbContext.RevokedTokens
-                            .AsNoTracking()
-                            .AnyAsync(
-                                x => x.JwtId == jwtId && x.ExpiresAtUtc > DateTime.UtcNow,
-                                context.HttpContext.RequestAborted);
+            services.AddAuthorization();
+        }
 
-                        if (isRevoked)
-                        {
-                            context.Fail("Token je opozvan.");
-                        }
-                    }
-                };
-            });
-
-        services.AddAuthorization();
         services.AddHttpContextAccessor();
+        services.AddSingleton<IRabbitMqPersistentConnection, RabbitMqPersistentConnection>();
+        services.AddScoped<INotificationEventPublisher, RabbitMqNotificationEventPublisher>();
         services.AddScoped<JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IProfileService, ProfileService>();
@@ -106,6 +117,21 @@ public static class DependencyInjection
         services.AddScoped<ReservationStateMachine>();
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IdentityDataSeeder>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddJetGoWorkerInfrastructure(
+        this IServiceCollection services,
+        string connectionString,
+        RabbitMqSettings rabbitMqSettings)
+    {
+        services.AddSingleton(rabbitMqSettings);
+
+        services.AddDbContext<JetGoDbContext>(options =>
+            options.UseSqlServer(connectionString, sqlOptions => sqlOptions.EnableRetryOnFailure()));
+
+        services.AddSingleton<IRabbitMqPersistentConnection, RabbitMqPersistentConnection>();
 
         return services;
     }

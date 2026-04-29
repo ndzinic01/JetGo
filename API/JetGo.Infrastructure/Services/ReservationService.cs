@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using JetGo.Application.Constants;
+using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.Reservations;
 using JetGo.Application.Exceptions;
+using JetGo.Application.Messaging.Notifications;
 using JetGo.Application.Requests.Reservations;
 using JetGo.Domain.Entities;
 using JetGo.Domain.Enums;
@@ -20,17 +22,20 @@ public sealed class ReservationService : IReservationService
     private readonly JetGoDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ReservationStateMachine _stateMachine;
+    private readonly INotificationEventPublisher _notificationEventPublisher;
     private readonly ILogger<ReservationService> _logger;
 
     public ReservationService(
         JetGoDbContext dbContext,
         IHttpContextAccessor httpContextAccessor,
         ReservationStateMachine stateMachine,
+        INotificationEventPublisher notificationEventPublisher,
         ILogger<ReservationService> logger)
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
         _stateMachine = stateMachine;
+        _notificationEventPublisher = notificationEventPublisher;
         _logger = logger;
     }
 
@@ -146,13 +151,13 @@ public sealed class ReservationService : IReservationService
         flight.AvailableSeats -= selectedSeats.Count;
 
         await _dbContext.Reservations.AddAsync(reservation, cancellationToken);
-        await AddNotificationAsync(
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
             currentUserId,
             "Rezervacija kreirana",
             $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je uspjesno kreirana i ceka potvrdu.",
+            nowUtc,
             cancellationToken);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Reservation {ReservationCode} created for user {UserId}.", reservation.ReservationCode, currentUserId);
 
@@ -216,13 +221,13 @@ public sealed class ReservationService : IReservationService
 
         _stateMachine.Confirm(reservation, actorUserId, request.Reason, nowUtc);
 
-        await AddNotificationAsync(
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
             reservation.UserId,
             "Rezervacija potvrdjena",
             $"Rezervacija {reservation.ReservationCode} je potvrdjena.",
+            nowUtc,
             cancellationToken);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Reservation {ReservationCode} confirmed by {UserId}.", reservation.ReservationCode, actorUserId);
 
@@ -272,13 +277,13 @@ public sealed class ReservationService : IReservationService
 
         reservation.Flight.AvailableSeats += reservation.Items.Count;
 
-        await AddNotificationAsync(
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
             reservation.UserId,
             "Rezervacija otkazana",
             $"Rezervacija {reservation.ReservationCode} je otkazana. Razlog: {request.Reason.Trim()}",
+            nowUtc,
             cancellationToken);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Reservation {ReservationCode} cancelled by {UserId}.", reservation.ReservationCode, actorUserId);
 
@@ -302,13 +307,13 @@ public sealed class ReservationService : IReservationService
 
         _stateMachine.Complete(reservation, actorUserId, request.Reason, nowUtc);
 
-        await AddNotificationAsync(
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
             reservation.UserId,
             "Rezervacija zavrsena",
             $"Rezervacija {reservation.ReservationCode} je oznacena kao zavrsena.",
+            nowUtc,
             cancellationToken);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Reservation {ReservationCode} completed by {UserId}.", reservation.ReservationCode, actorUserId);
 
@@ -457,14 +462,33 @@ public sealed class ReservationService : IReservationService
             });
     }
 
-    private async Task AddNotificationAsync(string userId, string title, string body, CancellationToken cancellationToken)
+    private async Task PublishNotificationSafelyAsync(
+        string userId,
+        string title,
+        string body,
+        DateTime occurredAtUtc,
+        CancellationToken cancellationToken)
     {
-        await _dbContext.Notifications.AddAsync(new Notification
+        var message = new NotificationRequestedMessage
         {
             UserId = userId,
             Title = title,
-            Body = body
-        }, cancellationToken);
+            Body = body,
+            OccurredAtUtc = occurredAtUtc
+        };
+
+        try
+        {
+            await _notificationEventPublisher.PublishAsync(message, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to publish notification event {Title} for user {UserId}.",
+                title,
+                userId);
+        }
     }
 
     private static string[] NormalizeSeatNumbers(IEnumerable<string> seatNumbers)

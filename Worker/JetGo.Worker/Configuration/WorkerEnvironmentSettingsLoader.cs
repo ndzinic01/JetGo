@@ -1,22 +1,15 @@
 using JetGo.Application.Configuration;
 using JetGo.Infrastructure.Configuration;
 
-namespace JetGo.API.Configuration;
+namespace JetGo.Worker.Configuration;
 
-internal static class ApiEnvironmentSettingsLoader
+internal static class WorkerEnvironmentSettingsLoader
 {
-    public static ApiEnvironmentSettings Load()
+    public static WorkerEnvironmentSettings Load()
     {
-        return new ApiEnvironmentSettings
+        return new WorkerEnvironmentSettings
         {
             ConnectionString = EnvironmentVariableReader.GetRequired("JETGO_CONNECTION_STRING"),
-            Jwt = new JwtSettings
-            {
-                Issuer = EnvironmentVariableReader.GetRequired("JETGO_JWT_ISSUER"),
-                Audience = EnvironmentVariableReader.GetRequired("JETGO_JWT_AUDIENCE"),
-                Key = EnvironmentVariableReader.GetRequired("JETGO_JWT_KEY"),
-                ExpiryMinutes = EnvironmentVariableReader.GetRequiredInt("JETGO_JWT_EXPIRY_MINUTES")
-            },
             RabbitMq = new RabbitMqSettings
             {
                 Host = EnvironmentVariableReader.GetRequired("JETGO_RABBITMQ_HOST"),

@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using JetGo.Application.Constants;
+using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.Payments;
 using JetGo.Application.Exceptions;
+using JetGo.Application.Messaging.Notifications;
 using JetGo.Application.Requests.Payments;
 using JetGo.Domain.Entities;
 using JetGo.Domain.Enums;
@@ -21,15 +23,18 @@ public sealed class PaymentService : IPaymentService
 
     private readonly JetGoDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly INotificationEventPublisher _notificationEventPublisher;
     private readonly ILogger<PaymentService> _logger;
 
     public PaymentService(
         JetGoDbContext dbContext,
         IHttpContextAccessor httpContextAccessor,
+        INotificationEventPublisher notificationEventPublisher,
         ILogger<PaymentService> logger)
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
+        _notificationEventPublisher = notificationEventPublisher;
         _logger = logger;
     }
 
@@ -187,13 +192,13 @@ public sealed class PaymentService : IPaymentService
             : request.Reason.Trim();
         payment.UpdatedAtUtc = nowUtc;
 
-        await AddNotificationAsync(
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
             payment.Reservation.UserId,
             "Placanje potvrdjeno",
             $"Placanje za rezervaciju {payment.Reservation.ReservationCode} je uspjesno evidentirano.",
+            nowUtc,
             cancellationToken);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Payment {PaymentId} confirmed for reservation {ReservationId}.", payment.Id, payment.ReservationId);
 
@@ -245,13 +250,13 @@ public sealed class PaymentService : IPaymentService
         payment.StatusReason = request.Reason.Trim();
         payment.UpdatedAtUtc = nowUtc;
 
-        await AddNotificationAsync(
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
             payment.Reservation.UserId,
             "Placanje refundirano",
             $"Placanje za rezervaciju {payment.Reservation.ReservationCode} je refundirano. Razlog: {request.Reason.Trim()}",
+            nowUtc,
             cancellationToken);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Payment {PaymentId} refunded for reservation {ReservationId}.", payment.Id, payment.ReservationId);
 
@@ -433,14 +438,33 @@ public sealed class PaymentService : IPaymentService
         }
     }
 
-    private async Task AddNotificationAsync(string userId, string title, string body, CancellationToken cancellationToken)
+    private async Task PublishNotificationSafelyAsync(
+        string userId,
+        string title,
+        string body,
+        DateTime occurredAtUtc,
+        CancellationToken cancellationToken)
     {
-        await _dbContext.Notifications.AddAsync(new Notification
+        var message = new NotificationRequestedMessage
         {
             UserId = userId,
             Title = title,
-            Body = body
-        }, cancellationToken);
+            Body = body,
+            OccurredAtUtc = occurredAtUtc
+        };
+
+        try
+        {
+            await _notificationEventPublisher.PublishAsync(message, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to publish notification event {Title} for user {UserId}.",
+                title,
+                userId);
+        }
     }
 
     private string GetRequiredCurrentUserId()

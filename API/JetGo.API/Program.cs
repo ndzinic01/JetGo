@@ -62,7 +62,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-builder.Services.AddJetGoInfrastructure(environmentSettings.ConnectionString, environmentSettings.Jwt);
+builder.Services.AddJetGoInfrastructure(environmentSettings.ConnectionString, environmentSettings.Jwt, environmentSettings.RabbitMq);
 
 var app = builder.Build();
 

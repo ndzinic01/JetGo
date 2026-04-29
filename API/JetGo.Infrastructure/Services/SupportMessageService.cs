@@ -1,12 +1,13 @@
 using System.Security.Claims;
 using JetGo.Application.Constants;
+using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.SupportMessages;
 using JetGo.Application.Exceptions;
+using JetGo.Application.Messaging.Notifications;
 using JetGo.Application.Requests.SupportMessages;
 using JetGo.Domain.Entities;
-using JetGo.Domain.Enums;
 using JetGo.Infrastructure.Persistence;
 using JetGo.Infrastructure.Services.Common;
 using Microsoft.AspNetCore.Http;
@@ -19,15 +20,18 @@ public sealed class SupportMessageService : ISupportMessageService
 {
     private readonly JetGoDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly INotificationEventPublisher _notificationEventPublisher;
     private readonly ILogger<SupportMessageService> _logger;
 
     public SupportMessageService(
         JetGoDbContext dbContext,
         IHttpContextAccessor httpContextAccessor,
+        INotificationEventPublisher notificationEventPublisher,
         ILogger<SupportMessageService> logger)
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
+        _notificationEventPublisher = notificationEventPublisher;
         _logger = logger;
     }
 
@@ -117,15 +121,13 @@ public sealed class SupportMessageService : ISupportMessageService
         supportMessage.RepliedAtUtc = nowUtc;
         supportMessage.UpdatedAtUtc = nowUtc;
 
-        await _dbContext.Notifications.AddAsync(new Notification
-        {
-            UserId = supportMessage.UserId,
-            Title = "Odgovor na korisnicki upit",
-            Body = $"Administrator je odgovorio na upit '{supportMessage.Subject}'.",
-            Status = NotificationStatus.Unread
-        }, cancellationToken);
-
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
+            supportMessage.UserId,
+            "Odgovor na korisnicki upit",
+            $"Administrator je odgovorio na upit '{supportMessage.Subject}'.",
+            nowUtc,
+            cancellationToken);
 
         _logger.LogInformation("Support message {SupportMessageId} replied by admin {UserId}.", supportMessage.Id, actorUserId);
 
@@ -362,5 +364,34 @@ public sealed class SupportMessageService : ISupportMessageService
     {
         var httpContext = _httpContextAccessor.HttpContext ?? throw new UnauthorizedException("Prijava je obavezna za ovu akciju.");
         return httpContext.User.IsInRole(RoleNames.Admin);
+    }
+
+    private async Task PublishNotificationSafelyAsync(
+        string userId,
+        string title,
+        string body,
+        DateTime occurredAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var message = new NotificationRequestedMessage
+        {
+            UserId = userId,
+            Title = title,
+            Body = body,
+            OccurredAtUtc = occurredAtUtc
+        };
+
+        try
+        {
+            await _notificationEventPublisher.PublishAsync(message, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to publish notification event {Title} for user {UserId}.",
+                title,
+                userId);
+        }
     }
 }

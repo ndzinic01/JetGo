@@ -1,12 +1,10 @@
 using JetGo.Application.Configuration;
 
-namespace JetGo.API.Configuration;
+namespace JetGo.Worker.Configuration;
 
-internal sealed class ApiEnvironmentSettings
+internal sealed class WorkerEnvironmentSettings
 {
     public string ConnectionString { get; init; } = string.Empty;
-
-    public JwtSettings Jwt { get; init; } = new();
 
     public RabbitMqSettings RabbitMq { get; init; } = new();
 }
