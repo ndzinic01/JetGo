@@ -1,0 +1,17 @@
+.git
+.gitignore
+.vs
+**/bin
+**/obj
+**/.idea
+**/.vscode
+**/*.user
+**/*.suo
+**/*.dbmdl
+**/*.jfm
+**/node_modules
+.env
+.env-tajne.zip
+docs
+Desktop
+Mobile

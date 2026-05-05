@@ -1,0 +1,76 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU11-ubuntu-22.04
+    container_name: jetgo-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${JETGO_SQL_SA_PASSWORD}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - jetgo-sql-data:/var/opt/mssql
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.0.9-management
+    container_name: jetgo-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "${JETGO_RABBITMQ_DEFAULT_USER}"
+      RABBITMQ_DEFAULT_PASS: "${JETGO_RABBITMQ_DEFAULT_PASS}"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - jetgo-rabbitmq-data:/var/lib/rabbitmq
+    restart: unless-stopped
+
+  jetgo-api:
+    build:
+      context: .
+      dockerfile: API/JetGo.API/Dockerfile
+    container_name: jetgo-api
+    depends_on:
+      - sqlserver
+      - rabbitmq
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8080"
+      JETGO_CONNECTION_STRING: "Server=sqlserver,1433;Database=220035;User Id=sa;Password=${JETGO_SQL_SA_PASSWORD};Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=True"
+      JETGO_JWT_ISSUER: "${JETGO_JWT_ISSUER}"
+      JETGO_JWT_AUDIENCE: "${JETGO_JWT_AUDIENCE}"
+      JETGO_JWT_KEY: "${JETGO_JWT_KEY}"
+      JETGO_JWT_EXPIRY_MINUTES: "${JETGO_JWT_EXPIRY_MINUTES}"
+      JETGO_RABBITMQ_HOST: "rabbitmq"
+      JETGO_RABBITMQ_PORT: "5672"
+      JETGO_RABBITMQ_USERNAME: "${JETGO_RABBITMQ_DEFAULT_USER}"
+      JETGO_RABBITMQ_PASSWORD: "${JETGO_RABBITMQ_DEFAULT_PASS}"
+      JETGO_RABBITMQ_VIRTUAL_HOST: "/"
+      JETGO_RABBITMQ_NOTIFICATIONS_QUEUE: "${JETGO_RABBITMQ_NOTIFICATIONS_QUEUE}"
+    ports:
+      - "5000:8080"
+    restart: on-failure
+
+  jetgo-worker:
+    build:
+      context: .
+      dockerfile: Worker/JetGo.Worker/Dockerfile
+    container_name: jetgo-worker
+    depends_on:
+      - sqlserver
+      - rabbitmq
+      - jetgo-api
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      JETGO_CONNECTION_STRING: "Server=sqlserver,1433;Database=220035;User Id=sa;Password=${JETGO_SQL_SA_PASSWORD};Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=True"
+      JETGO_RABBITMQ_HOST: "rabbitmq"
+      JETGO_RABBITMQ_PORT: "5672"
+      JETGO_RABBITMQ_USERNAME: "${JETGO_RABBITMQ_DEFAULT_USER}"
+      JETGO_RABBITMQ_PASSWORD: "${JETGO_RABBITMQ_DEFAULT_PASS}"
+      JETGO_RABBITMQ_VIRTUAL_HOST: "/"
+      JETGO_RABBITMQ_NOTIFICATIONS_QUEUE: "${JETGO_RABBITMQ_NOTIFICATIONS_QUEUE}"
+    restart: on-failure
+
+volumes:
+  jetgo-sql-data:
+  jetgo-rabbitmq-data:
