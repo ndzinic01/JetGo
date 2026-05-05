@@ -111,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<IDestinationService, DestinationService>();
         services.AddScoped<IFlightService, FlightService>();
         services.AddScoped<IRecommendationService, RecommendationService>();
+        services.AddScoped<IReportService, ReportService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<INewsService, NewsService>();
         services.AddScoped<IPaymentService, PaymentService>();
