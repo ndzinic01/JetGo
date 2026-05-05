@@ -1,10 +1,13 @@
+using System.Security.Claims;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.Flights;
 using JetGo.Application.Exceptions;
 using JetGo.Application.Requests.Flights;
+using JetGo.Domain.Entities;
 using JetGo.Infrastructure.Persistence;
 using JetGo.Infrastructure.Services.Common;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace JetGo.Infrastructure.Services;
@@ -12,10 +15,12 @@ namespace JetGo.Infrastructure.Services;
 public sealed class FlightService : IFlightService
 {
     private readonly JetGoDbContext _dbContext;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public FlightService(JetGoDbContext dbContext)
+    public FlightService(JetGoDbContext dbContext, IHttpContextAccessor httpContextAccessor)
     {
         _dbContext = dbContext;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<PagedResponseDto<FlightListItemDto>> GetPagedAsync(FlightSearchRequest request, CancellationToken cancellationToken = default)
@@ -67,6 +72,8 @@ public sealed class FlightService : IFlightService
                 Status = x.Status
             })
             .ToListAsync(cancellationToken);
+
+        await TrackSearchHistoryAsync(request, cancellationToken);
 
         return PagedResponseBuilder.Build(items, request.Page, request.PageSize, totalCount);
     }
@@ -209,5 +216,127 @@ public sealed class FlightService : IFlightService
                     ["maxPrice"] = ["Maksimalna cijena mora biti veca ili jednaka minimalnoj cijeni."]
                 });
         }
+    }
+
+    private async Task TrackSearchHistoryAsync(FlightSearchRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Page != 1 || !HasRecommendationRelevantFilters(request))
+        {
+            return;
+        }
+
+        var userId = TryGetCurrentUserId();
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        var searchHistory = await BuildSearchHistoryAsync(userId, request, cancellationToken);
+
+        if (searchHistory is null)
+        {
+            return;
+        }
+
+        await _dbContext.SearchHistories.AddAsync(searchHistory, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<SearchHistory?> BuildSearchHistoryAsync(string userId, FlightSearchRequest request, CancellationToken cancellationToken)
+    {
+        int? destinationId = null;
+        string? searchTerm = string.IsNullOrWhiteSpace(request.SearchText)
+            ? null
+            : request.SearchText.Trim();
+
+        if (request.DepartureAirportId.HasValue && request.ArrivalAirportId.HasValue)
+        {
+            var destinationData = await _dbContext.Destinations
+                .AsNoTracking()
+                .Where(x =>
+                    x.DepartureAirportId == request.DepartureAirportId.Value &&
+                    x.ArrivalAirportId == request.ArrivalAirportId.Value)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.RouteCode
+                })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (destinationData is not null)
+            {
+                destinationId = destinationData.Id;
+                searchTerm = string.IsNullOrWhiteSpace(searchTerm)
+                    ? destinationData.RouteCode
+                    : $"{destinationData.RouteCode} {searchTerm}";
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(searchTerm) && request.DepartureAirportId.HasValue)
+        {
+            searchTerm = await _dbContext.Airports
+                .AsNoTracking()
+                .Where(x => x.Id == request.DepartureAirportId.Value)
+                .Select(x => x.IataCode)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(searchTerm) && request.ArrivalAirportId.HasValue)
+        {
+            searchTerm = await _dbContext.Airports
+                .AsNoTracking()
+                .Where(x => x.Id == request.ArrivalAirportId.Value)
+                .Select(x => x.IataCode)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(searchTerm) && request.AirlineId.HasValue)
+        {
+            searchTerm = await _dbContext.Airlines
+                .AsNoTracking()
+                .Where(x => x.Id == request.AirlineId.Value)
+                .Select(x => x.Code)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            return null;
+        }
+
+        return new SearchHistory
+        {
+            UserId = userId,
+            SearchTerm = Truncate(searchTerm.Trim(), 200),
+            DestinationId = destinationId
+        };
+    }
+
+    private string? TryGetCurrentUserId()
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+
+        if (httpContext is null)
+        {
+            return null;
+        }
+
+        return httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    private static bool HasRecommendationRelevantFilters(FlightSearchRequest request)
+    {
+        return !string.IsNullOrWhiteSpace(request.SearchText) ||
+               request.DepartureAirportId.HasValue ||
+               request.ArrivalAirportId.HasValue ||
+               request.AirlineId.HasValue;
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        return value.Length <= maxLength
+            ? value
+            : value[..maxLength];
     }
 }
