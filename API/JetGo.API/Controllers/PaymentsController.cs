@@ -54,7 +54,6 @@ public sealed class PaymentsController : ControllerBase
     }
 
     [HttpPost("{id:int}/confirm")]
-    [Authorize(Roles = RoleNames.Admin)]
     [ProducesResponseType(typeof(PaymentDetailsDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<PaymentDetailsDto>> Confirm(int id, [FromBody] ConfirmPaymentRequest request, CancellationToken cancellationToken)
     {

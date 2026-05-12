@@ -62,7 +62,11 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-builder.Services.AddJetGoInfrastructure(environmentSettings.ConnectionString, environmentSettings.Jwt, environmentSettings.RabbitMq);
+builder.Services.AddJetGoInfrastructure(
+    environmentSettings.ConnectionString,
+    environmentSettings.Jwt,
+    environmentSettings.RabbitMq,
+    environmentSettings.PayPal);
 
 var app = builder.Build();
 

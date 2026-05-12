@@ -9,4 +9,6 @@ internal sealed class ApiEnvironmentSettings
     public JwtSettings Jwt { get; init; } = new();
 
     public RabbitMqSettings RabbitMq { get; init; } = new();
+
+    public PayPalSettings PayPal { get; init; } = new();
 }

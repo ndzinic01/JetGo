@@ -25,6 +25,14 @@ internal static class ApiEnvironmentSettingsLoader
                 Password = EnvironmentVariableReader.GetRequired("JETGO_RABBITMQ_PASSWORD"),
                 VirtualHost = EnvironmentVariableReader.GetRequired("JETGO_RABBITMQ_VIRTUAL_HOST"),
                 NotificationsQueueName = EnvironmentVariableReader.GetRequired("JETGO_RABBITMQ_NOTIFICATIONS_QUEUE")
+            },
+            PayPal = new PayPalSettings
+            {
+                BaseUrl = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_BASE_URL") ?? "https://api-m.sandbox.paypal.com",
+                ClientId = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_CLIENT_ID") ?? string.Empty,
+                ClientSecret = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_CLIENT_SECRET") ?? string.Empty,
+                CurrencyCode = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_CURRENCY_CODE") ?? "EUR",
+                BamToCurrencyRate = EnvironmentVariableReader.GetOptionalDecimal("JETGO_PAYPAL_BAM_TO_CURRENCY_RATE", 1.95583m)
             }
         };
     }

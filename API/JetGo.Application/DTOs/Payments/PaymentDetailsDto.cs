@@ -18,6 +18,8 @@ public sealed class PaymentDetailsDto
 
     public string? ProviderReference { get; init; }
 
+    public string? ApprovalUrl { get; set; }
+
     public decimal Amount { get; init; }
 
     public string Currency { get; init; } = "BAM";

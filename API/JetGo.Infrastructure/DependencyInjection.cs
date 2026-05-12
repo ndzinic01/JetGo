@@ -5,6 +5,7 @@ using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Contracts.Services;
 using JetGo.Infrastructure.Messaging;
 using JetGo.Infrastructure.Identity;
+using JetGo.Infrastructure.Payments;
 using JetGo.Infrastructure.Persistence;
 using JetGo.Infrastructure.Seed;
 using JetGo.Infrastructure.Services;
@@ -24,10 +25,13 @@ public static class DependencyInjection
         string connectionString,
         JwtSettings jwtSettings,
         RabbitMqSettings rabbitMqSettings,
+        PayPalSettings payPalSettings,
         bool includeWebSecurity = true)
     {
         services.AddSingleton(jwtSettings);
         services.AddSingleton(rabbitMqSettings);
+        services.AddSingleton(payPalSettings);
+        services.AddMemoryCache();
 
         services.AddDbContext<JetGoDbContext>(options =>
             options.UseSqlServer(connectionString, sqlOptions => sqlOptions.EnableRetryOnFailure()));
@@ -103,6 +107,10 @@ public static class DependencyInjection
         }
 
         services.AddHttpContextAccessor();
+        services.AddHttpClient<PayPalCheckoutClient>(client =>
+        {
+            client.BaseAddress = new Uri(payPalSettings.BaseUrl);
+        });
         services.AddSingleton<IRabbitMqPersistentConnection, RabbitMqPersistentConnection>();
         services.AddScoped<INotificationEventPublisher, RabbitMqNotificationEventPublisher>();
         services.AddScoped<JwtTokenGenerator>();

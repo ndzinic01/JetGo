@@ -59,6 +59,8 @@ Minimalne vrijednosti koje moraju biti popunjene:
 - `JETGO_RABBITMQ_DEFAULT_USER`
 - `JETGO_RABBITMQ_DEFAULT_PASS`
 - `JETGO_RABBITMQ_NOTIFICATIONS_QUEUE`
+- `JETGO_PAYPAL_CLIENT_ID`
+- `JETGO_PAYPAL_CLIENT_SECRET`
 
 ## Pokretanje preko Dockera
 
@@ -121,10 +123,27 @@ Lokalne adrese:
 - `GET /api/Recommendations/flights`
 - `POST /api/Reservations`
 - `GET /api/Notifications`
+- `POST /api/Payments/reservations/{reservationId}/initialize`
+- `POST /api/Payments/{id}/confirm`
+- `POST /api/Payments/{id}/refund`
 - `GET /api/Reports/reservations.pdf`
 - `GET /api/Reports/payments.pdf`
 
 PDF report endpointi zahtijevaju `Admin` korisnika.
+
+## PayPal sandbox
+
+Backend podrzava PayPal sandbox create order, server-side capture i refund tok.
+
+Napomene:
+
+- PayPal standardno ne koristi `BAM` kao jednu od glavnih podrzanih REST payment valuta, pa backend koristi konfigurabilnu konverziju iz `BAM` u `EUR`
+- za to se koriste:
+  - `JETGO_PAYPAL_CURRENCY_CODE`
+  - `JETGO_PAYPAL_BAM_TO_CURRENCY_RATE`
+- `initialize` vraca PayPal approval URL
+- `confirm` radi server-side capture i backend tek tada oznacava placanje kao uspjesno
+- `refund` koristi stvarno naplaceni PayPal iznos evidentiran u payment zapisu
 
 ## RabbitMQ napomena
 
