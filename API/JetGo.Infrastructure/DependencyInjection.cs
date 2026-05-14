@@ -116,6 +116,10 @@ public static class DependencyInjection
         services.AddScoped<JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IProfileService, ProfileService>();
+        services.AddScoped<ICountryAdminService, CountryAdminService>();
+        services.AddScoped<ICityAdminService, CityAdminService>();
+        services.AddScoped<IAirportAdminService, AirportAdminService>();
+        services.AddScoped<IAirlineAdminService, AirlineAdminService>();
         services.AddScoped<IDestinationService, DestinationService>();
         services.AddScoped<IFlightService, FlightService>();
         services.AddScoped<IRecommendationService, RecommendationService>();
