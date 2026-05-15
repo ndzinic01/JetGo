@@ -1,6 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using JetGo.Application.Configuration;
+using JetGo.Application.Constants;
 using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Contracts.Services;
 using JetGo.Infrastructure.Messaging;
@@ -80,11 +82,13 @@ public static class DependencyInjection
                     {
                         OnTokenValidated = async context =>
                         {
+                            var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
                             var jwtId = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+                            var securityStamp = context.Principal?.FindFirst(JwtClaimTypes.SecurityStamp)?.Value;
 
-                            if (string.IsNullOrWhiteSpace(jwtId))
+                            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(jwtId) || string.IsNullOrWhiteSpace(securityStamp))
                             {
-                                context.Fail("Token ne sadrzi JTI identifikator.");
+                                context.Fail("Token ne sadrzi potrebne sigurnosne podatke.");
                                 return;
                             }
 
@@ -98,6 +102,28 @@ public static class DependencyInjection
                             if (isRevoked)
                             {
                                 context.Fail("Token je opozvan.");
+                                return;
+                            }
+
+                            var user = await dbContext.Users
+                                .AsNoTracking()
+                                .SingleOrDefaultAsync(x => x.Id == userId, context.HttpContext.RequestAborted);
+
+                            if (user is null)
+                            {
+                                context.Fail("Korisnik za dati token vise ne postoji.");
+                                return;
+                            }
+
+                            if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
+                            {
+                                context.Fail("Korisnicki nalog nije aktivan.");
+                                return;
+                            }
+
+                            if (!string.Equals(user.SecurityStamp, securityStamp, StringComparison.Ordinal))
+                            {
+                                context.Fail("Token vise nije vazeci za trenutni sigurnosni kontekst korisnika.");
                             }
                         }
                     };

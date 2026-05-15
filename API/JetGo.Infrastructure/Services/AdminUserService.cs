@@ -254,6 +254,16 @@ public sealed class AdminUserService : IAdminUserService
                 }
             }
 
+            if (rolesToAdd.Length > 0 || rolesToRemove.Length > 0)
+            {
+                var securityStampResult = await _userManager.UpdateSecurityStampAsync(user);
+
+                if (!securityStampResult.Succeeded)
+                {
+                    throw CreateValidationException(securityStampResult.Errors);
+                }
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -287,6 +297,13 @@ public sealed class AdminUserService : IAdminUserService
         if (!result.Succeeded)
         {
             throw CreateValidationException(result.Errors);
+        }
+
+        var securityStampResult = await _userManager.UpdateSecurityStampAsync(user);
+
+        if (!securityStampResult.Succeeded)
+        {
+            throw CreateValidationException(securityStampResult.Errors);
         }
 
         _logger.LogInformation("Admin changed activation status for user {UserId} to {IsActive}.", user.Id, request.IsActive);

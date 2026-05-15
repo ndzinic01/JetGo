@@ -46,6 +46,11 @@ public sealed class AuthService : IAuthService
         var normalizedUsername = request.Username.Trim();
         var user = await _userManager.FindByNameAsync(normalizedUsername);
 
+        if (user is not null && await _userManager.IsLockedOutAsync(user))
+        {
+            throw new UnauthorizedException("Korisnicki nalog nije aktivan. Obratite se administratoru.");
+        }
+
         if (user is null || !await _userManager.CheckPasswordAsync(user, request.Password))
         {
             throw new UnauthorizedException("Korisnicko ime ili lozinka nisu ispravni.");
@@ -258,7 +263,17 @@ public sealed class AuthService : IAuthService
         var user = await _userManager.Users
             .SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
-        return user ?? throw new NotFoundException("Korisnik nije pronadjen.");
+        if (user is null)
+        {
+            throw new NotFoundException("Korisnik nije pronadjen.");
+        }
+
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            throw new ForbiddenException("Korisnicki nalog nije aktivan.");
+        }
+
+        return user;
     }
 
     private static ValidationException CreateValidationException(IEnumerable<IdentityError> errors)
