@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
 import '../auth/auth_controller.dart';
+import 'flight_details_screen.dart';
 import 'mobile_data_service.dart';
+import 'mobile_display.dart';
 import 'mobile_models.dart';
+import 'reservation_details_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.authController, super.key});
@@ -96,6 +99,36 @@ class _HomeScreenState extends State<HomeScreen> {
       _currentIndex = index;
     });
     _loadCurrentTab();
+  }
+
+  Future<void> _openFlightDetails(MobileFlight flight) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => FlightDetailsScreen(
+          token: _token,
+          flightId: flight.id,
+        ),
+      ),
+    );
+
+    if (changed == true && mounted) {
+      await _loadCurrentTab();
+    }
+  }
+
+  Future<void> _openReservationDetails(MobileReservation reservation) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ReservationDetailsScreen(
+          token: _token,
+          reservationId: reservation.id,
+        ),
+      ),
+    );
+
+    if (changed == true && mounted) {
+      await _loadCurrentTab();
+    }
   }
 
   @override
@@ -254,49 +287,57 @@ class _HomeScreenState extends State<HomeScreen> {
       itemCount: _reservations.length,
       itemBuilder: (context, index) {
         final reservation = _reservations[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        reservation.reservationCode,
-                        style: Theme.of(context).textTheme.titleMedium,
+        return InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _openReservationDetails(reservation),
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          reservation.reservationCode,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       ),
-                    ),
-                    _StatusChip(
-                      label: _reservationStatusLabel(reservation.status),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${reservation.flightNumber} • ${reservation.routeCode}',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${reservation.departureAirportCode} -> ${reservation.arrivalAirportCode}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Polazak: ${_formatDateTime(reservation.departureAtUtc)}',
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Ukupno: ${_formatMoney(reservation.totalAmount, reservation.currency)} • Sjedišta: ${reservation.seatsCount}',
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  reservation.isPaid ? 'Placanje evidentirano' : 'Placanje jos nije evidentirano',
-                ),
-              ],
+                      _StatusChip(
+                        label: MobileDisplay.reservationStatusLabel(
+                          reservation.status,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${reservation.flightNumber} - ${reservation.routeCode}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${reservation.departureAirportCode} -> ${reservation.arrivalAirportCode}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Polazak: ${MobileDisplay.formatDateTime(reservation.departureAtUtc)}',
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ukupno: ${MobileDisplay.formatMoney(reservation.totalAmount, reservation.currency)} - Sjedista: ${reservation.seatsCount}',
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    reservation.isPaid
+                        ? 'Placanje evidentirano'
+                        : 'Placanje jos nije evidentirano',
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -338,10 +379,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Objavljeno: ${_formatDateTime(article.publishedAtUtc)}',
+                  'Objavljeno: ${MobileDisplay.formatDateTime(article.publishedAtUtc)}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                if (article.imageUrl != null && article.imageUrl!.trim().isNotEmpty) ...[
+                if (article.imageUrl != null &&
+                    article.imageUrl!.trim().isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
                     article.imageUrl!,
@@ -388,9 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     CircleAvatar(
                       radius: 26,
-                      child: Text(
-                        _initials(profile.fullName),
-                      ),
+                      child: Text(MobileDisplay.initials(profile.fullName)),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -422,101 +462,51 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFlightCard(MobileFlight flight) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${flight.flightNumber} • ${flight.routeCode}',
-                    style: Theme.of(context).textTheme.titleMedium,
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _openFlightDetails(flight),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${flight.flightNumber} - ${flight.routeCode}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-                ),
-                _StatusChip(label: _flightStatusLabel(flight.status)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${flight.departureAirport.cityName} (${flight.departureAirport.iataCode}) -> ${flight.arrivalAirport.cityName} (${flight.arrivalAirport.iataCode})',
-            ),
-            const SizedBox(height: 4),
-            Text('${flight.airline.name} • ${flight.airline.code}'),
-            const SizedBox(height: 8),
-            Text('Polazak: ${_formatDateTime(flight.departureAtUtc)}'),
-            Text('Dolazak: ${_formatDateTime(flight.arrivalAtUtc)}'),
-            const SizedBox(height: 8),
-            Text(
-              '${_formatMoney(flight.basePrice, flight.currency)} • Slobodna sjedišta ${flight.availableSeats}/${flight.totalSeats}',
-            ),
-          ],
+                  _StatusChip(
+                    label: MobileDisplay.flightStatusLabel(flight.status),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${flight.departureAirport.cityName} (${flight.departureAirport.iataCode}) -> ${flight.arrivalAirport.cityName} (${flight.arrivalAirport.iataCode})',
+              ),
+              const SizedBox(height: 4),
+              Text('${flight.airline.name} - ${flight.airline.code}'),
+              const SizedBox(height: 8),
+              Text(
+                'Polazak: ${MobileDisplay.formatDateTime(flight.departureAtUtc)}',
+              ),
+              Text(
+                'Dolazak: ${MobileDisplay.formatDateTime(flight.arrivalAtUtc)}',
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${MobileDisplay.formatMoney(flight.basePrice, flight.currency)} - Slobodna sjedista ${flight.availableSeats}/${flight.totalSeats}',
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  String _flightStatusLabel(int status) {
-    switch (status) {
-      case 1:
-        return 'Scheduled';
-      case 2:
-        return 'Delayed';
-      case 3:
-        return 'Cancelled';
-      case 4:
-        return 'Completed';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  String _reservationStatusLabel(int status) {
-    switch (status) {
-      case 1:
-        return 'Pending';
-      case 2:
-        return 'Confirmed';
-      case 3:
-        return 'Cancelled';
-      case 4:
-        return 'Completed';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  String _formatDateTime(DateTime value) {
-    final local = value.toLocal();
-    return '${_two(local.day)}.${_two(local.month)}.${local.year} ${_two(local.hour)}:${_two(local.minute)}';
-  }
-
-  String _formatMoney(double value, String currency) {
-    return '${value.toStringAsFixed(2)} $currency';
-  }
-
-  String _two(int value) => value.toString().padLeft(2, '0');
-
-  String _initials(String value) {
-    final parts = value
-        .split(' ')
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) {
-      return 'JG';
-    }
-
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-
-    return '${parts.first.substring(0, 1)}${parts.last.substring(0, 1)}'
-        .toUpperCase();
   }
 }
 

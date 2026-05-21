@@ -24,6 +24,18 @@ class MobileDataService {
     return _mapPagedResult(response, MobileFlight.fromJson);
   }
 
+  Future<MobileFlightDetails> fetchFlightDetails({
+    required String token,
+    required int flightId,
+  }) async {
+    final response = await _apiClient.getJson(
+      '/api/Flights/$flightId',
+      token: token,
+    );
+
+    return MobileFlightDetails.fromJson(response);
+  }
+
   Future<PagedResult<MobileReservation>> fetchMyReservations({
     required String token,
   }) async {
@@ -37,6 +49,35 @@ class MobileDataService {
     );
 
     return _mapPagedResult(response, MobileReservation.fromJson);
+  }
+
+  Future<MobileReservationDetails> fetchReservationDetails({
+    required String token,
+    required int reservationId,
+  }) async {
+    final response = await _apiClient.getJson(
+      '/api/Reservations/$reservationId',
+      token: token,
+    );
+
+    return MobileReservationDetails.fromJson(response);
+  }
+
+  Future<MobileReservationDetails> createReservation({
+    required String token,
+    required int flightId,
+    required List<String> seatNumbers,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/api/Reservations',
+      token: token,
+      body: <String, dynamic>{
+        'flightId': flightId,
+        'seatNumbers': seatNumbers,
+      },
+    );
+
+    return MobileReservationDetails.fromJson(response);
   }
 
   Future<PagedResult<NewsArticleSummary>> fetchNews({

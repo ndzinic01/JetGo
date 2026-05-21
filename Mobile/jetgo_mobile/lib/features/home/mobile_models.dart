@@ -128,6 +128,79 @@ class MobileFlight {
   }
 }
 
+class MobileFlightDetails {
+  MobileFlightDetails({
+    required this.id,
+    required this.destinationId,
+    required this.flightNumber,
+    required this.routeCode,
+    required this.airline,
+    required this.departureAirport,
+    required this.arrivalAirport,
+    required this.departureAtUtc,
+    required this.arrivalAtUtc,
+    required this.durationMinutes,
+    required this.basePrice,
+    required this.currency,
+    required this.availableSeats,
+    required this.totalSeats,
+    required this.reservedSeats,
+    required this.status,
+    required this.availableSeatNumbers,
+  });
+
+  final int id;
+  final int destinationId;
+  final String flightNumber;
+  final String routeCode;
+  final AirlineSummary airline;
+  final AirportSummary departureAirport;
+  final AirportSummary arrivalAirport;
+  final DateTime departureAtUtc;
+  final DateTime arrivalAtUtc;
+  final int durationMinutes;
+  final double basePrice;
+  final String currency;
+  final int availableSeats;
+  final int totalSeats;
+  final int reservedSeats;
+  final int status;
+  final List<String> availableSeatNumbers;
+
+  factory MobileFlightDetails.fromJson(Map<String, dynamic> json) {
+    return MobileFlightDetails(
+      id: json['id'] as int? ?? 0,
+      destinationId: json['destinationId'] as int? ?? 0,
+      flightNumber: json['flightNumber'] as String? ?? '',
+      routeCode: json['routeCode'] as String? ?? '',
+      airline: AirlineSummary.fromJson(
+        json['airline'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+      ),
+      departureAirport: AirportSummary.fromJson(
+        json['departureAirport'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
+      ),
+      arrivalAirport: AirportSummary.fromJson(
+        json['arrivalAirport'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
+      ),
+      departureAtUtc: DateTime.parse(json['departureAtUtc'] as String),
+      arrivalAtUtc: DateTime.parse(json['arrivalAtUtc'] as String),
+      durationMinutes: json['durationMinutes'] as int? ?? 0,
+      basePrice: (json['basePrice'] as num?)?.toDouble() ?? 0,
+      currency: json['currency'] as String? ?? '',
+      availableSeats: json['availableSeats'] as int? ?? 0,
+      totalSeats: json['totalSeats'] as int? ?? 0,
+      reservedSeats: json['reservedSeats'] as int? ?? 0,
+      status: json['status'] as int? ?? 0,
+      availableSeatNumbers:
+          ((json['availableSeatNumbers'] as List<dynamic>?) ?? const [])
+              .map((item) => item.toString())
+              .toList(),
+    );
+  }
+}
+
 class MobileReservation {
   MobileReservation({
     required this.id,
@@ -186,6 +259,144 @@ class MobileReservation {
       seatsCount: json['seatsCount'] as int? ?? 0,
       createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
       customerName: json['customerName'] as String?,
+    );
+  }
+}
+
+class MobileReservationCustomer {
+  MobileReservationCustomer({
+    required this.userId,
+    required this.username,
+    required this.fullName,
+    required this.email,
+  });
+
+  final String userId;
+  final String username;
+  final String fullName;
+  final String email;
+
+  factory MobileReservationCustomer.fromJson(Map<String, dynamic> json) {
+    return MobileReservationCustomer(
+      userId: json['userId'] as String? ?? '',
+      username: json['username'] as String? ?? '',
+      fullName: json['fullName'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+    );
+  }
+}
+
+class MobileReservationSeat {
+  MobileReservationSeat({
+    required this.flightSeatId,
+    required this.seatNumber,
+    required this.price,
+  });
+
+  final int flightSeatId;
+  final String seatNumber;
+  final double price;
+
+  factory MobileReservationSeat.fromJson(Map<String, dynamic> json) {
+    return MobileReservationSeat(
+      flightSeatId: json['flightSeatId'] as int? ?? 0,
+      seatNumber: json['seatNumber'] as String? ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+class MobileReservationDetails {
+  MobileReservationDetails({
+    required this.id,
+    required this.reservationCode,
+    required this.flightId,
+    required this.flightNumber,
+    required this.routeCode,
+    required this.departureAirportCode,
+    required this.arrivalAirportCode,
+    required this.departureAtUtc,
+    required this.arrivalAtUtc,
+    required this.status,
+    required this.totalAmount,
+    required this.currency,
+    required this.isPaid,
+    required this.createdAtUtc,
+    required this.customer,
+    required this.seats,
+    required this.canBeCancelled,
+    required this.canBeConfirmed,
+    required this.canBeCompleted,
+    required this.canInitiatePayment,
+    required this.canBeRefunded,
+    this.paymentId,
+    this.paymentStatus,
+    this.statusChangedAtUtc,
+    this.statusChangedByUserId,
+    this.statusReason,
+  });
+
+  final int id;
+  final String reservationCode;
+  final int flightId;
+  final String flightNumber;
+  final String routeCode;
+  final String departureAirportCode;
+  final String arrivalAirportCode;
+  final DateTime departureAtUtc;
+  final DateTime arrivalAtUtc;
+  final int status;
+  final double totalAmount;
+  final String currency;
+  final int? paymentId;
+  final int? paymentStatus;
+  final bool isPaid;
+  final DateTime createdAtUtc;
+  final DateTime? statusChangedAtUtc;
+  final String? statusChangedByUserId;
+  final String? statusReason;
+  final MobileReservationCustomer customer;
+  final List<MobileReservationSeat> seats;
+  final bool canBeCancelled;
+  final bool canBeConfirmed;
+  final bool canBeCompleted;
+  final bool canInitiatePayment;
+  final bool canBeRefunded;
+
+  factory MobileReservationDetails.fromJson(Map<String, dynamic> json) {
+    return MobileReservationDetails(
+      id: json['id'] as int? ?? 0,
+      reservationCode: json['reservationCode'] as String? ?? '',
+      flightId: json['flightId'] as int? ?? 0,
+      flightNumber: json['flightNumber'] as String? ?? '',
+      routeCode: json['routeCode'] as String? ?? '',
+      departureAirportCode: json['departureAirportCode'] as String? ?? '',
+      arrivalAirportCode: json['arrivalAirportCode'] as String? ?? '',
+      departureAtUtc: DateTime.parse(json['departureAtUtc'] as String),
+      arrivalAtUtc: DateTime.parse(json['arrivalAtUtc'] as String),
+      status: json['status'] as int? ?? 0,
+      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
+      currency: json['currency'] as String? ?? '',
+      paymentId: json['paymentId'] as int?,
+      paymentStatus: json['paymentStatus'] as int?,
+      isPaid: json['isPaid'] as bool? ?? false,
+      createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
+      statusChangedAtUtc: json['statusChangedAtUtc'] == null
+          ? null
+          : DateTime.parse(json['statusChangedAtUtc'] as String),
+      statusChangedByUserId: json['statusChangedByUserId'] as String?,
+      statusReason: json['statusReason'] as String?,
+      customer: MobileReservationCustomer.fromJson(
+        json['customer'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+      ),
+      seats: ((json['seats'] as List<dynamic>?) ?? const [])
+          .map((item) => MobileReservationSeat.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      canBeCancelled: json['canBeCancelled'] as bool? ?? false,
+      canBeConfirmed: json['canBeConfirmed'] as bool? ?? false,
+      canBeCompleted: json['canBeCompleted'] as bool? ?? false,
+      canInitiatePayment: json['canInitiatePayment'] as bool? ?? false,
+      canBeRefunded: json['canBeRefunded'] as bool? ?? false,
     );
   }
 }
