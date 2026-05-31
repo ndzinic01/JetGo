@@ -56,7 +56,9 @@ public sealed class PayPalCheckoutClient
                     {
                         user_action = "PAY_NOW",
                         shipping_preference = "NO_SHIPPING",
-                        brand_name = "JetGo"
+                        brand_name = "JetGo",
+                        return_url = _settings.ReturnUrl,
+                        cancel_url = _settings.CancelUrl
                     }
                 }
             },

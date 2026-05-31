@@ -14,6 +14,8 @@ public interface IPaymentService
 
     Task<PaymentDetailsDto> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
+    Task<PayPalPaymentDebugDto> GetPayPalDebugSnapshotAsync(int id, string? callbackToken, CancellationToken cancellationToken = default);
+
     Task<PaymentDetailsDto> ConfirmAsync(int id, ConfirmPaymentRequest request, CancellationToken cancellationToken = default);
 
     Task<PaymentDetailsDto> RefundAsync(int id, RefundPaymentRequest request, CancellationToken cancellationToken = default);

@@ -180,6 +180,71 @@ public sealed class PaymentService : IPaymentService
         return await GetByIdInternalAsync(id, null, cancellationToken);
     }
 
+    public async Task<PayPalPaymentDebugDto> GetPayPalDebugSnapshotAsync(int id, string? callbackToken, CancellationToken cancellationToken = default)
+    {
+        EnsureCurrentUserIsAdmin();
+        EnsurePayPalConfigured();
+
+        var payment = await _dbContext.Payments
+            .AsNoTracking()
+            .Include(x => x.Reservation)
+            .ThenInclude(x => x.Flight)
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (payment is null)
+        {
+            throw new NotFoundException($"Placanje sa ID vrijednoscu {id} nije pronadjeno.");
+        }
+
+        if (string.IsNullOrWhiteSpace(payment.ProviderReference))
+        {
+            throw new ConflictException("Placanje nema evidentiran provider reference za PayPal debug pregled.");
+        }
+
+        var order = await _payPalCheckoutClient.GetOrderAsync(payment.ProviderReference, cancellationToken);
+        var approvalUrl = GetApprovalUrl(order);
+        var normalizedCallbackToken = string.IsNullOrWhiteSpace(callbackToken)
+            ? null
+            : callbackToken.Trim();
+
+        return new PayPalPaymentDebugDto
+        {
+            PaymentId = payment.Id,
+            ReservationId = payment.ReservationId,
+            ReservationCode = payment.Reservation.ReservationCode,
+            FlightNumber = payment.Reservation.Flight.FlightNumber,
+            StoredProviderReference = payment.ProviderReference,
+            CallbackToken = normalizedCallbackToken,
+            CallbackTokenMatchesStoredReference =
+                normalizedCallbackToken is not null &&
+                string.Equals(normalizedCallbackToken, payment.ProviderReference, StringComparison.Ordinal),
+            PaymentStatus = payment.Status,
+            ReservationStatus = payment.Reservation.Status,
+            PayPalOrderId = order.Id,
+            PayPalOrderStatus = order.Status,
+            ApprovalUrl = approvalUrl,
+            Links = order.Links
+                .Select(x => new PayPalDebugLinkDto
+                {
+                    Rel = x.Rel,
+                    Method = x.Method,
+                    Href = x.Href
+                })
+                .ToArray(),
+            Captures = order.PurchaseUnits
+                .SelectMany(x => x.Payments?.Captures ?? [])
+                .Select(x => new PayPalDebugCaptureDto
+                {
+                    Id = x.Id,
+                    Status = x.Status,
+                    Amount = ParseAmount(x.Amount.Value),
+                    Currency = x.Amount.CurrencyCode,
+                    CreateTimeUtc = x.CreateTime?.ToUniversalTime()
+                })
+                .ToArray()
+        };
+    }
+
     public async Task<PaymentDetailsDto> ConfirmAsync(int id, ConfirmPaymentRequest request, CancellationToken cancellationToken = default)
     {
         EnsurePayPalConfigured();
@@ -512,7 +577,7 @@ public sealed class PaymentService : IPaymentService
             {
                 ["payment"] =
                 [
-                    "Postavite JETGO_PAYPAL_CLIENT_ID i JETGO_PAYPAL_CLIENT_SECRET u .env prije testiranja stvarnog placanja."
+                    "Postavite JETGO_PAYPAL_CLIENT_ID, JETGO_PAYPAL_CLIENT_SECRET, JETGO_PAYPAL_RETURN_URL i JETGO_PAYPAL_CANCEL_URL u .env prije testiranja stvarnog placanja."
                 ]
             });
     }

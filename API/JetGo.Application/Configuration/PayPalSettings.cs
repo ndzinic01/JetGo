@@ -8,11 +8,17 @@ public sealed class PayPalSettings
 
     public string ClientSecret { get; init; } = string.Empty;
 
+    public string ReturnUrl { get; init; } = string.Empty;
+
+    public string CancelUrl { get; init; } = string.Empty;
+
     public string CurrencyCode { get; init; } = "EUR";
 
     public decimal BamToCurrencyRate { get; init; } = 1.95583m;
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ClientId) &&
-        !string.IsNullOrWhiteSpace(ClientSecret);
+        !string.IsNullOrWhiteSpace(ClientSecret) &&
+        !string.IsNullOrWhiteSpace(ReturnUrl) &&
+        !string.IsNullOrWhiteSpace(CancelUrl);
 }

@@ -31,6 +31,8 @@ internal static class ApiEnvironmentSettingsLoader
                 BaseUrl = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_BASE_URL") ?? "https://api-m.sandbox.paypal.com",
                 ClientId = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_CLIENT_ID") ?? string.Empty,
                 ClientSecret = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_CLIENT_SECRET") ?? string.Empty,
+                ReturnUrl = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_RETURN_URL") ?? string.Empty,
+                CancelUrl = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_CANCEL_URL") ?? string.Empty,
                 CurrencyCode = EnvironmentVariableReader.GetOptional("JETGO_PAYPAL_CURRENCY_CODE") ?? "EUR",
                 BamToCurrencyRate = EnvironmentVariableReader.GetOptionalDecimal("JETGO_PAYPAL_BAM_TO_CURRENCY_RATE", 1.95583m)
             }

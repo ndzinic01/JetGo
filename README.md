@@ -61,6 +61,8 @@ Minimalne vrijednosti koje moraju biti popunjene:
 - `JETGO_RABBITMQ_NOTIFICATIONS_QUEUE`
 - `JETGO_PAYPAL_CLIENT_ID`
 - `JETGO_PAYPAL_CLIENT_SECRET`
+- `JETGO_PAYPAL_RETURN_URL`
+- `JETGO_PAYPAL_CANCEL_URL`
 
 ## Pokretanje preko Dockera
 
@@ -141,6 +143,9 @@ Napomene:
 - za to se koriste:
   - `JETGO_PAYPAL_CURRENCY_CODE`
   - `JETGO_PAYPAL_BAM_TO_CURRENCY_RATE`
+- redirect approval tok koristi:
+  - `JETGO_PAYPAL_RETURN_URL`
+  - `JETGO_PAYPAL_CANCEL_URL`
 - `initialize` vraca PayPal approval URL
 - `confirm` radi server-side capture i backend tek tada oznacava placanje kao uspjesno
 - `refund` koristi stvarno naplaceni PayPal iznos evidentiran u payment zapisu
