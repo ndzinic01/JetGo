@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
 import '../auth/auth_controller.dart';
+import '../flights_routes/flights_routes_section.dart';
 import '../reference_data/reference_data_section.dart';
 
 enum AdminSection {
@@ -197,15 +198,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           token: widget.authController.session!.accessToken,
         );
       case AdminSection.network:
-        return const _SectionPlaceholder(
-          title: 'Flights & Routes',
-          description:
-              'Sljedeci sloj ovdje su Destinations i Flights sa admin pregledima i formama.',
-          bullets: [
-            'Destinations list + routeCode pregled',
-            'Flights list sa statusima',
-            'Forma za create / edit leta',
-          ],
+        return FlightsRoutesSection(
+          token: widget.authController.session!.accessToken,
         );
       case AdminSection.reservations:
         return const _SectionPlaceholder(
