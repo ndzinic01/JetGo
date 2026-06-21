@@ -4,6 +4,7 @@ import '../../core/config/app_config.dart';
 import '../auth/auth_controller.dart';
 import '../flights_routes/flights_routes_section.dart';
 import '../reference_data/reference_data_section.dart';
+import '../reservations/reservations_section.dart';
 
 enum AdminSection {
   overview,
@@ -202,15 +203,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           token: widget.authController.session!.accessToken,
         );
       case AdminSection.reservations:
-        return const _SectionPlaceholder(
-          title: 'Reservations',
-          description:
-              'Backend vec ima rezervacijski workflow, pa je ovo spremno za admin pregled i filtriranje.',
-          bullets: [
-            'Statusi i sjedista',
-            'Pregled putnika i payment stanja',
-            'Brzi ulaz u detalje rezervacije',
-          ],
+        return ReservationsSection(
+          token: widget.authController.session!.accessToken,
         );
       case AdminSection.users:
         return const _SectionPlaceholder(
