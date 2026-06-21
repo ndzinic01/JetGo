@@ -5,6 +5,7 @@ import '../auth/auth_controller.dart';
 import '../flights_routes/flights_routes_section.dart';
 import '../reference_data/reference_data_section.dart';
 import '../reservations/reservations_section.dart';
+import '../users/users_section.dart';
 
 enum AdminSection {
   overview,
@@ -207,15 +208,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           token: widget.authController.session!.accessToken,
         );
       case AdminSection.users:
-        return const _SectionPlaceholder(
-          title: 'Users',
-          description:
-              'Na ovom mjestu cemo spojiti admin user management endpoint-e koje smo vec pripremili.',
-          bullets: [
-            'Pretraga korisnika',
-            'Aktivacija / deaktivacija',
-            'Role i reset lozinke',
-          ],
+        return UsersSection(
+          token: widget.authController.session!.accessToken,
+          currentUserId: widget.authController.session!.user.userId,
         );
       case AdminSection.support:
         return const _SectionPlaceholder(
