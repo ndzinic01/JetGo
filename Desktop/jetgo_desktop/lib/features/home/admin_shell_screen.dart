@@ -5,6 +5,7 @@ import '../auth/auth_controller.dart';
 import '../flights_routes/flights_routes_section.dart';
 import '../reference_data/reference_data_section.dart';
 import '../reservations/reservations_section.dart';
+import '../support/support_section.dart';
 import '../users/users_section.dart';
 
 enum AdminSection {
@@ -213,15 +214,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           currentUserId: widget.authController.session!.user.userId,
         );
       case AdminSection.support:
-        return const _SectionPlaceholder(
-          title: 'Support',
-          description:
-              'Support inbox ide ovdje kao desktop-friendly radna povrsina za admin odgovore.',
-          bullets: [
-            'Lista svih upita',
-            'Filter replied / pending',
-            'Detalji i admin reply',
-          ],
+        return SupportSection(
+          token: widget.authController.session!.accessToken,
         );
       case AdminSection.reports:
         return const _SectionPlaceholder(
