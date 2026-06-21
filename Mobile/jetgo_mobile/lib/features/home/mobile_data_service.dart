@@ -95,6 +95,95 @@ class MobileDataService {
     return _mapPagedResult(response, NewsArticleSummary.fromJson);
   }
 
+  Future<MobileNotificationSummary> fetchNotificationSummary({
+    required String token,
+  }) async {
+    final response = await _apiClient.getJson(
+      '/api/Notifications/summary',
+      token: token,
+    );
+
+    return MobileNotificationSummary.fromJson(response);
+  }
+
+  Future<PagedResult<MobileNotification>> fetchNotifications({
+    required String token,
+  }) async {
+    final response = await _apiClient.getJson(
+      '/api/Notifications',
+      token: token,
+      queryParameters: const <String, String>{
+        'page': '1',
+        'pageSize': '50',
+      },
+    );
+
+    return _mapPagedResult(response, MobileNotification.fromJson);
+  }
+
+  Future<void> markNotificationAsRead({
+    required String token,
+    required int notificationId,
+  }) async {
+    await _apiClient.postJson(
+      '/api/Notifications/$notificationId/read',
+      token: token,
+    );
+  }
+
+  Future<void> markAllNotificationsAsRead({
+    required String token,
+  }) async {
+    await _apiClient.postJson(
+      '/api/Notifications/read-all',
+      token: token,
+    );
+  }
+
+  Future<PagedResult<MobileSupportMessageSummary>> fetchSupportMessages({
+    required String token,
+  }) async {
+    final response = await _apiClient.getJson(
+      '/api/SupportMessages/my',
+      token: token,
+      queryParameters: const <String, String>{
+        'page': '1',
+        'pageSize': '50',
+      },
+    );
+
+    return _mapPagedResult(response, MobileSupportMessageSummary.fromJson);
+  }
+
+  Future<MobileSupportMessageDetails> fetchSupportMessageDetails({
+    required String token,
+    required int supportMessageId,
+  }) async {
+    final response = await _apiClient.getJson(
+      '/api/SupportMessages/$supportMessageId',
+      token: token,
+    );
+
+    return MobileSupportMessageDetails.fromJson(response);
+  }
+
+  Future<MobileSupportMessageDetails> createSupportMessage({
+    required String token,
+    required String subject,
+    required String message,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/api/SupportMessages',
+      token: token,
+      body: <String, dynamic>{
+        'subject': subject.trim(),
+        'message': message.trim(),
+      },
+    );
+
+    return MobileSupportMessageDetails.fromJson(response);
+  }
+
   Future<MobileProfile> fetchMyProfile({
     required String token,
   }) async {
@@ -104,6 +193,46 @@ class MobileDataService {
     );
 
     return MobileProfile.fromJson(response);
+  }
+
+  Future<MobileProfile> updateMyProfile({
+    required String token,
+    required String firstName,
+    required String lastName,
+    required String email,
+    String? phoneNumber,
+    String? imageUrl,
+  }) async {
+    final response = await _apiClient.putJson(
+      '/api/Profile/me',
+      token: token,
+      body: <String, dynamic>{
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'email': email.trim(),
+        'phoneNumber': phoneNumber?.trim(),
+        'imageUrl': imageUrl?.trim(),
+      },
+    );
+
+    return MobileProfile.fromJson(response);
+  }
+
+  Future<void> changePassword({
+    required String token,
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    await _apiClient.postJson(
+      '/api/Profile/change-password',
+      token: token,
+      body: <String, dynamic>{
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+        'confirmPassword': confirmPassword,
+      },
+    );
   }
 
   PagedResult<T> _mapPagedResult<T>(

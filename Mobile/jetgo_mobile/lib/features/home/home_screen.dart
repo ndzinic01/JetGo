@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
 import '../auth/auth_controller.dart';
+import 'change_password_screen.dart';
+import 'edit_profile_screen.dart';
 import 'flight_details_screen.dart';
 import 'mobile_data_service.dart';
 import 'mobile_display.dart';
 import 'mobile_models.dart';
+import 'notifications_screen.dart';
 import 'reservation_details_screen.dart';
+import 'support_messages_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.authController, super.key});
@@ -29,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MobileReservation> _reservations = const [];
   List<NewsArticleSummary> _news = const [];
   MobileProfile? _profile;
+  MobileNotificationSummary? _notificationSummary;
 
   String get _token => widget.authController.session?.accessToken ?? '';
 
@@ -76,6 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _profile = await _dataService.fetchMyProfile(token: _token);
           break;
       }
+
+      await _loadNotificationSummary(silent: true);
     } on ApiException catch (error) {
       _errorMessage = error.message;
     } catch (_) {
@@ -85,6 +92,27 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _loadNotificationSummary({bool silent = false}) async {
+    try {
+      final summary = await _dataService.fetchNotificationSummary(token: _token);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _notificationSummary = summary;
+      });
+    } catch (_) {
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notifikacije trenutno nisu dostupne.'),
+          ),
+        );
       }
     }
   }
@@ -131,15 +159,92 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openNotifications() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => NotificationsScreen(token: _token),
+      ),
+    );
+
+    if (mounted) {
+      await _loadNotificationSummary(silent: true);
+    }
+  }
+
+  Future<void> _openSupportMessages() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => SupportMessagesScreen(token: _token),
+      ),
+    );
+
+    if (mounted) {
+      await _loadNotificationSummary(silent: true);
+    }
+  }
+
+  Future<void> _openEditProfile() async {
+    final profile = _profile;
+    if (profile == null) {
+      return;
+    }
+
+    final updated = await Navigator.of(context).push<MobileProfile>(
+      MaterialPageRoute<MobileProfile>(
+        builder: (_) => EditProfileScreen(
+          token: _token,
+          profile: profile,
+        ),
+      ),
+    );
+
+    if (!mounted || updated == null) {
+      return;
+    }
+
+    setState(() {
+      _profile = updated;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profil je uspjesno azuriran.')),
+    );
+  }
+
+  Future<void> _openChangePassword() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ChangePasswordScreen(token: _token),
+      ),
+    );
+
+    if (!mounted || changed != true) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Lozinka je uspjesno promijenjena.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.authController.session?.user;
     final theme = Theme.of(context);
+    final notificationSummary = _notificationSummary;
+    final displayName = _profile?.fullName ?? user?.fullName ?? 'Dobrodosli';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('JetGo Mobile'),
         actions: [
+          IconButton(
+            tooltip: 'Notifikacije',
+            onPressed: _openNotifications,
+            icon: _NotificationBadgeIcon(
+              unreadCount: notificationSummary?.unreadCount ?? 0,
+            ),
+          ),
           IconButton(
             tooltip: 'Osvjezi',
             onPressed: _isLoading ? null : _loadCurrentTab,
@@ -162,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 user == null
                     ? 'Dobrodosli'
-                    : 'Prijavljeni ste kao ${user.fullName}',
+                    : 'Prijavljeni ste kao $displayName',
                 style: theme.textTheme.bodyMedium,
               ),
             ),
@@ -452,7 +557,53 @@ class _HomeScreenState extends State<HomeScreen> {
                 _InfoRow(label: 'Email', value: profile.email),
                 _InfoRow(label: 'Telefon', value: profile.phoneNumber ?? '-'),
                 _InfoRow(label: 'Role', value: profile.roles.join(', ')),
+                _InfoRow(
+                  label: 'Neprocitane notifikacije',
+                  value: (_notificationSummary?.unreadCount ?? 0).toString(),
+                ),
                 _InfoRow(label: 'Korisnik ID', value: profile.userId),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Brze akcije',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _openEditProfile,
+                      icon: const Icon(Icons.edit_rounded),
+                      label: const Text('Uredi profil'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _openChangePassword,
+                      icon: const Icon(Icons.lock_reset_rounded),
+                      label: const Text('Promijeni lozinku'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _openSupportMessages,
+                      icon: const Icon(Icons.support_agent_rounded),
+                      label: const Text('Podrska'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _openNotifications,
+                      icon: const Icon(Icons.notifications_rounded),
+                      label: const Text('Notifikacije'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -506,6 +657,42 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _NotificationBadgeIcon extends StatelessWidget {
+  const _NotificationBadgeIcon({required this.unreadCount});
+
+  final int unreadCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Icon(Icons.notifications_none_rounded),
+        if (unreadCount > 0)
+          Positioned(
+            right: -6,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.error,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              constraints: const BoxConstraints(minWidth: 18),
+              child: Text(
+                unreadCount > 99 ? '99+' : unreadCount.toString(),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onError,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -29,6 +29,17 @@ class MobileDisplay {
     }
   }
 
+  static String notificationStatusLabel(int status) {
+    switch (status) {
+      case 1:
+        return 'Unread';
+      case 2:
+        return 'Read';
+      default:
+        return 'Unknown';
+    }
+  }
+
   static String formatDateTime(DateTime value) {
     final local = value.toLocal();
     return '${_two(local.day)}.${_two(local.month)}.${local.year} ${_two(local.hour)}:${_two(local.minute)}';

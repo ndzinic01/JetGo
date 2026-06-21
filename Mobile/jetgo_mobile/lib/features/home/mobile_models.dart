@@ -468,3 +468,162 @@ class MobileProfile {
     );
   }
 }
+
+class MobileNotification {
+  MobileNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.status,
+    required this.createdAtUtc,
+    this.readAtUtc,
+  });
+
+  final int id;
+  final String title;
+  final String body;
+  final int status;
+  final DateTime createdAtUtc;
+  final DateTime? readAtUtc;
+
+  bool get isUnread => status == 1;
+
+  factory MobileNotification.fromJson(Map<String, dynamic> json) {
+    return MobileNotification(
+      id: json['id'] as int? ?? 0,
+      title: json['title'] as String? ?? '',
+      body: json['body'] as String? ?? '',
+      status: json['status'] as int? ?? 0,
+      createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
+      readAtUtc: json['readAtUtc'] == null
+          ? null
+          : DateTime.parse(json['readAtUtc'] as String),
+    );
+  }
+}
+
+class MobileNotificationSummary {
+  MobileNotificationSummary({
+    required this.totalCount,
+    required this.unreadCount,
+    this.latestCreatedAtUtc,
+  });
+
+  final int totalCount;
+  final int unreadCount;
+  final DateTime? latestCreatedAtUtc;
+
+  factory MobileNotificationSummary.fromJson(Map<String, dynamic> json) {
+    return MobileNotificationSummary(
+      totalCount: json['totalCount'] as int? ?? 0,
+      unreadCount: json['unreadCount'] as int? ?? 0,
+      latestCreatedAtUtc: json['latestCreatedAtUtc'] == null
+          ? null
+          : DateTime.parse(json['latestCreatedAtUtc'] as String),
+    );
+  }
+}
+
+class MobileSupportMessageSummary {
+  MobileSupportMessageSummary({
+    required this.id,
+    required this.subject,
+    required this.messagePreview,
+    required this.isReplied,
+    required this.createdAtUtc,
+    required this.customerName,
+    required this.customerEmail,
+    this.repliedAtUtc,
+  });
+
+  final int id;
+  final String subject;
+  final String messagePreview;
+  final bool isReplied;
+  final DateTime createdAtUtc;
+  final DateTime? repliedAtUtc;
+  final String customerName;
+  final String customerEmail;
+
+  factory MobileSupportMessageSummary.fromJson(Map<String, dynamic> json) {
+    return MobileSupportMessageSummary(
+      id: json['id'] as int? ?? 0,
+      subject: json['subject'] as String? ?? '',
+      messagePreview: json['messagePreview'] as String? ?? '',
+      isReplied: json['isReplied'] as bool? ?? false,
+      createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
+      repliedAtUtc: json['repliedAtUtc'] == null
+          ? null
+          : DateTime.parse(json['repliedAtUtc'] as String),
+      customerName: json['customerName'] as String? ?? '',
+      customerEmail: json['customerEmail'] as String? ?? '',
+    );
+  }
+}
+
+class MobileSupportMessageCustomer {
+  MobileSupportMessageCustomer({
+    required this.userId,
+    required this.username,
+    required this.fullName,
+    required this.email,
+  });
+
+  final String userId;
+  final String username;
+  final String fullName;
+  final String email;
+
+  factory MobileSupportMessageCustomer.fromJson(Map<String, dynamic> json) {
+    return MobileSupportMessageCustomer(
+      userId: json['userId'] as String? ?? '',
+      username: json['username'] as String? ?? '',
+      fullName: json['fullName'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+    );
+  }
+}
+
+class MobileSupportMessageDetails {
+  MobileSupportMessageDetails({
+    required this.id,
+    required this.subject,
+    required this.message,
+    required this.isReplied,
+    required this.createdAtUtc,
+    required this.customer,
+    this.adminReply,
+    this.updatedAtUtc,
+    this.repliedAtUtc,
+  });
+
+  final int id;
+  final String subject;
+  final String message;
+  final String? adminReply;
+  final bool isReplied;
+  final DateTime createdAtUtc;
+  final DateTime? updatedAtUtc;
+  final DateTime? repliedAtUtc;
+  final MobileSupportMessageCustomer customer;
+
+  factory MobileSupportMessageDetails.fromJson(Map<String, dynamic> json) {
+    return MobileSupportMessageDetails(
+      id: json['id'] as int? ?? 0,
+      subject: json['subject'] as String? ?? '',
+      message: json['message'] as String? ?? '',
+      adminReply: json['adminReply'] as String?,
+      isReplied: json['isReplied'] as bool? ?? false,
+      createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
+      updatedAtUtc: json['updatedAtUtc'] == null
+          ? null
+          : DateTime.parse(json['updatedAtUtc'] as String),
+      repliedAtUtc: json['repliedAtUtc'] == null
+          ? null
+          : DateTime.parse(json['repliedAtUtc'] as String),
+      customer: MobileSupportMessageCustomer.fromJson(
+        json['customer'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+      ),
+    );
+  }
+}
