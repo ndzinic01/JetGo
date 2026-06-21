@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
 import '../auth/auth_controller.dart';
+import '../reference_data/reference_data_section.dart';
 
 enum AdminSection {
   overview,
@@ -192,15 +193,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           roles: roles,
         );
       case AdminSection.referenceData:
-        return const _SectionPlaceholder(
-          title: 'Reference Data',
-          description:
-              'Ovdje cemo prvo vezati Countries, Cities, Airports i Airlines CRUD tabele.',
-          bullets: [
-            'Search i paginacija',
-            'Create / update / delete forme',
-            'Brzi pregled zavisnosti prije brisanja',
-          ],
+        return ReferenceDataSection(
+          token: widget.authController.session!.accessToken,
         );
       case AdminSection.network:
         return const _SectionPlaceholder(

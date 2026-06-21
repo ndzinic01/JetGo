@@ -58,6 +58,42 @@ class ApiClient {
     return <String, dynamic>{};
   }
 
+  Future<Map<String, dynamic>> putJson(
+    String path, {
+    String? token,
+    Map<String, dynamic>? body,
+  }) async {
+    final data = await _send(
+      'PUT',
+      path,
+      token: token,
+      body: body,
+    );
+
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    return <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> delete(
+    String path, {
+    String? token,
+  }) async {
+    final data = await _send(
+      'DELETE',
+      path,
+      token: token,
+    );
+
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    return <String, dynamic>{};
+  }
+
   Future<dynamic> _send(
     String method,
     String path, {
