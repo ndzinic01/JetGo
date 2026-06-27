@@ -115,6 +115,27 @@ public sealed class PayPalCheckoutClient
             });
     }
 
+    public async Task<PayPalCaptureResponse> GetCaptureAsync(string captureId, CancellationToken cancellationToken)
+    {
+        var accessToken = await GetAccessTokenAsync(cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/v2/payments/captures/{captureId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw CreateProviderException("Dohvat PayPal capture zapisa nije uspio.", payload);
+        }
+
+        return JsonSerializer.Deserialize<PayPalCaptureResponse>(payload, JsonSerializerOptions)
+            ?? throw new ValidationException("PayPal odgovor nije validan.", new Dictionary<string, string[]>
+            {
+                ["payment"] = ["PayPal nije vratio validan odgovor za dohvat capture zapisa."]
+            });
+    }
+
     public async Task<PayPalOrderResponse> CaptureOrderAsync(string orderId, string reservationCode, CancellationToken cancellationToken)
     {
         var accessToken = await GetAccessTokenAsync(cancellationToken);
@@ -245,6 +266,19 @@ public sealed class PayPalCheckoutClient
         public PayPalMoney Amount { get; init; } = new();
 
         public DateTime? CreateTime { get; init; }
+    }
+
+    public sealed class PayPalCaptureResponse
+    {
+        public string Id { get; init; } = string.Empty;
+
+        public string Status { get; init; } = string.Empty;
+
+        public PayPalMoney Amount { get; init; } = new();
+
+        public DateTime? CreateTime { get; init; }
+
+        public PayPalLink[] Links { get; init; } = [];
     }
 
     public sealed class PayPalLink

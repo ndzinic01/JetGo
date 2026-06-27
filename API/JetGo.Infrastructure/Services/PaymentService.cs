@@ -201,11 +201,57 @@ public sealed class PaymentService : IPaymentService
             throw new ConflictException("Placanje nema evidentiran provider reference za PayPal debug pregled.");
         }
 
-        var order = await _payPalCheckoutClient.GetOrderAsync(payment.ProviderReference, cancellationToken);
-        var approvalUrl = GetApprovalUrl(order);
         var normalizedCallbackToken = string.IsNullOrWhiteSpace(callbackToken)
             ? null
             : callbackToken.Trim();
+
+        if (payment.Status is PaymentStatus.Paid or PaymentStatus.Refunded)
+        {
+            var capture = await _payPalCheckoutClient.GetCaptureAsync(payment.ProviderReference, cancellationToken);
+
+            return new PayPalPaymentDebugDto
+            {
+                PaymentId = payment.Id,
+                ReservationId = payment.ReservationId,
+                ReservationCode = payment.Reservation.ReservationCode,
+                FlightNumber = payment.Reservation.Flight.FlightNumber,
+                StoredProviderReference = payment.ProviderReference,
+                CallbackToken = normalizedCallbackToken,
+                CallbackTokenMatchesStoredReference =
+                    normalizedCallbackToken is not null &&
+                    string.Equals(normalizedCallbackToken, payment.ProviderReference, StringComparison.Ordinal),
+                PaymentStatus = payment.Status,
+                ReservationStatus = payment.Reservation.Status,
+                PayPalResourceType = "Capture",
+                PayPalOrderId = capture.Id,
+                PayPalOrderStatus = capture.Status,
+                ApprovalUrl = null,
+                DebugNote =
+                    "Placanje je vec finalizovano, pa sacuvani provider reference sada pokazuje na PayPal capture zapis umjesto na originalni order token.",
+                Links = capture.Links
+                    .Select(x => new PayPalDebugLinkDto
+                    {
+                        Rel = x.Rel,
+                        Method = x.Method,
+                        Href = x.Href
+                    })
+                    .ToArray(),
+                Captures =
+                [
+                    new PayPalDebugCaptureDto
+                    {
+                        Id = capture.Id,
+                        Status = capture.Status,
+                        Amount = ParseAmount(capture.Amount.Value),
+                        Currency = capture.Amount.CurrencyCode,
+                        CreateTimeUtc = capture.CreateTime?.ToUniversalTime()
+                    }
+                ]
+            };
+        }
+
+        var order = await _payPalCheckoutClient.GetOrderAsync(payment.ProviderReference, cancellationToken);
+        var approvalUrl = GetApprovalUrl(order);
 
         return new PayPalPaymentDebugDto
         {
@@ -220,9 +266,11 @@ public sealed class PaymentService : IPaymentService
                 string.Equals(normalizedCallbackToken, payment.ProviderReference, StringComparison.Ordinal),
             PaymentStatus = payment.Status,
             ReservationStatus = payment.Reservation.Status,
+            PayPalResourceType = "Order",
             PayPalOrderId = order.Id,
             PayPalOrderStatus = order.Status,
             ApprovalUrl = approvalUrl,
+            DebugNote = null,
             Links = order.Links
                 .Select(x => new PayPalDebugLinkDto
                 {

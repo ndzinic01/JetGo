@@ -22,11 +22,15 @@ public sealed class PayPalPaymentDebugDto
 
     public ReservationStatus ReservationStatus { get; init; }
 
+    public string PayPalResourceType { get; init; } = "Order";
+
     public string PayPalOrderId { get; init; } = string.Empty;
 
     public string PayPalOrderStatus { get; init; } = string.Empty;
 
     public string? ApprovalUrl { get; init; }
+
+    public string? DebugNote { get; init; }
 
     public IReadOnlyCollection<PayPalDebugLinkDto> Links { get; init; } = Array.Empty<PayPalDebugLinkDto>();
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/app_config.dart';
 import '../auth/auth_controller.dart';
 import '../flights_routes/flights_routes_section.dart';
+import '../payments/payments_section.dart';
 import '../reference_data/reference_data_section.dart';
 import '../reservations/reservations_section.dart';
 import '../support/support_section.dart';
@@ -229,15 +230,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           ],
         );
       case AdminSection.payments:
-        return const _SectionPlaceholder(
-          title: 'Payments',
-          description:
-              'Payments pregled ostavljamo kao zaseban admin ekran kad zakljucamo ostatak desktop toka.',
-          bullets: [
-            'Payment statusi',
-            'Provider reference pregled',
-            'Refund istorija',
-          ],
+        return PaymentsSection(
+          token: widget.authController.session!.accessToken,
         );
     }
   }
