@@ -4,6 +4,18 @@ import 'dart:io';
 import '../config/app_config.dart';
 import 'api_exception.dart';
 
+class DownloadedFileResponse {
+  DownloadedFileResponse({
+    required this.fileName,
+    required this.contentType,
+    required this.bytes,
+  });
+
+  final String fileName;
+  final String contentType;
+  final List<int> bytes;
+}
+
 class ApiClient {
   ApiClient()
       : _httpClient = HttpClient()
@@ -94,6 +106,46 @@ class ApiClient {
     return <String, dynamic>{};
   }
 
+  Future<DownloadedFileResponse> downloadFile(
+    String path, {
+    String? token,
+    Map<String, String>? queryParameters,
+    String fallbackFileName = 'download.bin',
+  }) async {
+    final requestUri = _buildUri(path, queryParameters);
+    final request = await _httpClient.openUrl('GET', requestUri);
+
+    request.headers.set(HttpHeaders.acceptHeader, '*/*');
+
+    if (token != null && token.isNotEmpty) {
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+    }
+
+    final response = await request.close();
+    final bytes = <int>[];
+
+    await for (final chunk in response) {
+      bytes.addAll(chunk);
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final responseBody = utf8.decode(bytes, allowMalformed: true);
+      throw _buildApiException(response.statusCode, responseBody);
+    }
+
+    final contentDisposition = response.headers.value('content-disposition');
+    final fileName =
+        _extractFileName(contentDisposition) ?? fallbackFileName;
+    final contentType =
+        response.headers.contentType?.mimeType ?? 'application/octet-stream';
+
+    return DownloadedFileResponse(
+      fileName: fileName,
+      contentType: contentType,
+      bytes: bytes,
+    );
+  }
+
   Future<dynamic> _send(
     String method,
     String path, {
@@ -171,5 +223,27 @@ class ApiClient {
           ? 'Server je vratio gresku bez sadrzaja.'
           : responseBody,
     );
+  }
+
+  String? _extractFileName(String? contentDisposition) {
+    if (contentDisposition == null || contentDisposition.trim().isEmpty) {
+      return null;
+    }
+
+    final utf8Match = RegExp(
+      r"filename\*=UTF-8''([^;]+)",
+      caseSensitive: false,
+    ).firstMatch(contentDisposition);
+
+    if (utf8Match != null) {
+      return Uri.decodeComponent(utf8Match.group(1)!);
+    }
+
+    final plainMatch = RegExp(
+      r'filename="?([^";]+)"?',
+      caseSensitive: false,
+    ).firstMatch(contentDisposition);
+
+    return plainMatch?.group(1);
   }
 }

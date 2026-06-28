@@ -5,6 +5,7 @@ import '../auth/auth_controller.dart';
 import '../flights_routes/flights_routes_section.dart';
 import '../payments/payments_section.dart';
 import '../reference_data/reference_data_section.dart';
+import '../reports/reports_section.dart';
 import '../reservations/reservations_section.dart';
 import '../support/support_section.dart';
 import '../users/users_section.dart';
@@ -219,15 +220,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           token: widget.authController.session!.accessToken,
         );
       case AdminSection.reports:
-        return const _SectionPlaceholder(
-          title: 'Reports',
-          description:
-              'Reports modul ce koristiti postojece PDF backend endpoint-e za preuzimanje izvjestaja.',
-          bullets: [
-            'Reservations PDF',
-            'Payments PDF',
-            'Filter po datumu i statusu',
-          ],
+        return ReportsSection(
+          token: widget.authController.session!.accessToken,
         );
       case AdminSection.payments:
         return PaymentsSection(
@@ -502,52 +496,6 @@ class _OverviewCard extends StatelessWidget {
             Text(
               caption,
               style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionPlaceholder extends StatelessWidget {
-  const _SectionPlaceholder({
-    required this.title,
-    required this.description,
-    required this.bullets,
-  });
-
-  final String title;
-  final String description;
-  final List<String> bullets;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 12),
-            Text(description),
-            const SizedBox(height: 20),
-            ...bullets.map(
-              (bullet) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Icon(Icons.chevron_right_rounded, size: 18),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(bullet)),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
