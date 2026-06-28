@@ -401,6 +401,82 @@ class MobileReservationDetails {
   }
 }
 
+class MobilePaymentDetails {
+  MobilePaymentDetails({
+    required this.id,
+    required this.reservationId,
+    required this.reservationCode,
+    required this.flightNumber,
+    required this.routeCode,
+    required this.provider,
+    required this.amount,
+    required this.currency,
+    required this.status,
+    required this.isPaid,
+    required this.canBeConfirmed,
+    required this.canBeRefunded,
+    this.providerReference,
+    this.approvalUrl,
+    this.createdAtUtc,
+    this.updatedAtUtc,
+    this.paidAtUtc,
+    this.refundedAtUtc,
+    this.statusReason,
+  });
+
+  final int id;
+  final int reservationId;
+  final String reservationCode;
+  final String flightNumber;
+  final String routeCode;
+  final String provider;
+  final String? providerReference;
+  final String? approvalUrl;
+  final double amount;
+  final String currency;
+  final int status;
+  final bool isPaid;
+  final DateTime? createdAtUtc;
+  final DateTime? updatedAtUtc;
+  final DateTime? paidAtUtc;
+  final DateTime? refundedAtUtc;
+  final String? statusReason;
+  final bool canBeConfirmed;
+  final bool canBeRefunded;
+
+  factory MobilePaymentDetails.fromJson(Map<String, dynamic> json) {
+    return MobilePaymentDetails(
+      id: json['id'] as int? ?? 0,
+      reservationId: json['reservationId'] as int? ?? 0,
+      reservationCode: json['reservationCode'] as String? ?? '',
+      flightNumber: json['flightNumber'] as String? ?? '',
+      routeCode: json['routeCode'] as String? ?? '',
+      provider: json['provider'] as String? ?? '',
+      providerReference: json['providerReference'] as String?,
+      approvalUrl: json['approvalUrl'] as String?,
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      currency: json['currency'] as String? ?? 'BAM',
+      status: json['status'] as int? ?? 1,
+      isPaid: json['isPaid'] as bool? ?? false,
+      createdAtUtc: json['createdAtUtc'] == null
+          ? null
+          : DateTime.parse(json['createdAtUtc'] as String),
+      updatedAtUtc: json['updatedAtUtc'] == null
+          ? null
+          : DateTime.parse(json['updatedAtUtc'] as String),
+      paidAtUtc: json['paidAtUtc'] == null
+          ? null
+          : DateTime.parse(json['paidAtUtc'] as String),
+      refundedAtUtc: json['refundedAtUtc'] == null
+          ? null
+          : DateTime.parse(json['refundedAtUtc'] as String),
+      statusReason: json['statusReason'] as String?,
+      canBeConfirmed: json['canBeConfirmed'] as bool? ?? false,
+      canBeRefunded: json['canBeRefunded'] as bool? ?? false,
+    );
+  }
+}
+
 class NewsArticleSummary {
   NewsArticleSummary({
     required this.id,

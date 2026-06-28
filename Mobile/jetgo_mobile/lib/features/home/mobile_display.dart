@@ -40,6 +40,21 @@ class MobileDisplay {
     }
   }
 
+  static String paymentStatusLabel(int? status) {
+    switch (status) {
+      case 1:
+        return 'Pending';
+      case 2:
+        return 'Paid';
+      case 3:
+        return 'Failed';
+      case 4:
+        return 'Refunded';
+      default:
+        return 'Unknown';
+    }
+  }
+
   static String formatDateTime(DateTime value) {
     final local = value.toLocal();
     return '${_two(local.day)}.${_two(local.month)}.${local.year} ${_two(local.hour)}:${_two(local.minute)}';

@@ -80,6 +80,31 @@ class MobileDataService {
     return MobileReservationDetails.fromJson(response);
   }
 
+  Future<MobilePaymentDetails> initializePayment({
+    required String token,
+    required int reservationId,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/api/Payments/reservations/$reservationId/initialize',
+      token: token,
+    );
+
+    return MobilePaymentDetails.fromJson(response);
+  }
+
+  Future<MobilePaymentDetails> confirmPayment({
+    required String token,
+    required int paymentId,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/api/Payments/$paymentId/confirm',
+      token: token,
+      body: const <String, dynamic>{},
+    );
+
+    return MobilePaymentDetails.fromJson(response);
+  }
+
   Future<PagedResult<NewsArticleSummary>> fetchNews({
     required String token,
   }) async {

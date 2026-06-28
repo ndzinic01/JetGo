@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/network/api_exception.dart';
 import 'mobile_data_service.dart';
@@ -26,12 +28,16 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   final MobileDataService _dataService = MobileDataService();
 
   MobileReservationDetails? _details;
+  MobilePaymentDetails? _paymentDetails;
   bool _isLoading = true;
+  bool _isPaymentSubmitting = false;
   String? _errorMessage;
+  bool _markDirtyOnPop = false;
 
   @override
   void initState() {
     super.initState();
+    _markDirtyOnPop = widget.markDirtyOnPop;
     _load();
   }
 
@@ -53,6 +59,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
       setState(() {
         _details = details;
+        if (_paymentDetails != null && _paymentDetails!.id != details.paymentId) {
+          _paymentDetails = null;
+        }
       });
     } on ApiException catch (error) {
       if (!mounted) {
@@ -85,7 +94,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          Navigator.of(context).pop(widget.markDirtyOnPop);
+          Navigator.of(context).pop(_markDirtyOnPop);
         }
       },
       child: Scaffold(
@@ -94,7 +103,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () {
-              Navigator.of(context).pop(widget.markDirtyOnPop);
+              Navigator.of(context).pop(_markDirtyOnPop);
             },
           ),
           actions: [
@@ -178,7 +187,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                         ? 'Placanje je evidentirano.'
                         : 'Placanje jos nije evidentirano.',
                   ),
-                  if (details.canInitiatePayment) ...[
+                  if (_shouldShowPaymentCard(details) &&
+                      !details.isPaid &&
+                      !_hasPendingPayment(details)) ...[
                     const SizedBox(height: 8),
                     Text(
                       'Rezervacija je spremna za payment korak na backendu.',
@@ -189,6 +200,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               ),
             ),
           ),
+          if (_shouldShowPaymentCard(details)) ...[
+            const SizedBox(height: 12),
+            _buildPaymentCard(context, details),
+          ],
           const SizedBox(height: 12),
           Card(
             child: Padding(
@@ -261,6 +276,277 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildPaymentCard(
+    BuildContext context,
+    MobileReservationDetails details,
+  ) {
+    final effectivePaymentId = _paymentDetails?.id ?? details.paymentId;
+    final effectivePaymentStatus = _paymentDetails?.status ?? details.paymentStatus;
+    final paymentStatusLabel =
+        MobileDisplay.paymentStatusLabel(effectivePaymentStatus);
+    final amount = _paymentDetails?.amount ?? details.totalAmount;
+    final currency = _paymentDetails?.currency ?? details.currency;
+    final approvalUrl = _paymentDetails?.approvalUrl;
+    final statusReason = _paymentDetails?.statusReason;
+    final canInitializePayment =
+        !details.isPaid && (details.canInitiatePayment || _hasPendingPayment(details));
+    final canConfirmPayment = !details.isPaid && effectivePaymentId != null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Placanje',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                _StatusChip(label: paymentStatusLabel),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Iznos: ${MobileDisplay.formatMoney(amount, currency)}'),
+            Text('Provider: ${_paymentDetails?.provider ?? 'PayPal'}'),
+            Text(
+              effectivePaymentId == null
+                  ? 'Payment jos nije iniciran.'
+                  : 'Payment ID: $effectivePaymentId',
+            ),
+            if (statusReason != null && statusReason.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(statusReason),
+            ],
+            if (approvalUrl != null && approvalUrl.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Approval link je spreman. Nakon PayPal odobrenja vratite se u aplikaciju i kliknite "Potvrdi placanje".',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 16),
+              if (canInitializePayment || canConfirmPayment)
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                  if (canInitializePayment)
+                    FilledButton.icon(
+                      onPressed: _isPaymentSubmitting
+                          ? null
+                          : () => _initializePayment(details),
+                      icon: _isPaymentSubmitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.open_in_new_rounded),
+                      label: Text(
+                        _hasPendingPayment(details)
+                            ? 'Otvori PayPal'
+                            : 'Iniciraj placanje',
+                        ),
+                      ),
+                  if (approvalUrl != null && approvalUrl.trim().isNotEmpty)
+                    OutlinedButton.icon(
+                      onPressed: _isPaymentSubmitting
+                          ? null
+                          : () => _openApprovalUrl(approvalUrl),
+                      icon: const Icon(Icons.open_in_browser_rounded),
+                      label: const Text('Otvori PayPal'),
+                    ),
+                  if (canConfirmPayment)
+                    OutlinedButton.icon(
+                      onPressed: _isPaymentSubmitting
+                          ? null
+                          : () => _confirmPayment(effectivePaymentId),
+                      icon: const Icon(Icons.verified_rounded),
+                      label: const Text('Potvrdi placanje'),
+                    ),
+                  if (approvalUrl != null && approvalUrl.trim().isNotEmpty)
+                    OutlinedButton.icon(
+                      onPressed: () => _copyApprovalUrl(approvalUrl),
+                      icon: const Icon(Icons.copy_rounded),
+                      label: const Text('Kopiraj link'),
+                    ),
+                ],
+              )
+            else
+              Text(
+                details.isPaid
+                    ? 'Placanje je zavrseno i evidentirano na rezervaciji.'
+                    : 'Trenutno nema dostupnih payment akcija za ovu rezervaciju.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _shouldShowPaymentCard(MobileReservationDetails details) {
+    return details.canInitiatePayment || details.paymentId != null || details.isPaid;
+  }
+
+  bool _hasPendingPayment(MobileReservationDetails details) {
+    final paymentStatus = _paymentDetails?.status ?? details.paymentStatus;
+    return details.paymentId != null && !details.isPaid && paymentStatus == 1;
+  }
+
+  Future<void> _initializePayment(MobileReservationDetails details) async {
+    setState(() {
+      _isPaymentSubmitting = true;
+    });
+
+    try {
+      final payment = await _dataService.initializePayment(
+        token: widget.token,
+        reservationId: details.id,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _paymentDetails = payment;
+        _markDirtyOnPop = true;
+      });
+
+      final approvalUrl = payment.approvalUrl?.trim();
+      if (approvalUrl != null && approvalUrl.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Placanje je inicirano. Sada kliknite "Otvori PayPal" ili "Kopiraj link", pa se nakon odobrenja vratite u aplikaciju i kliknite "Potvrdi placanje".',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Placanje je inicirano, ali approval link trenutno nije dostupan.',
+            ),
+          ),
+        );
+      }
+
+      await _load();
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Placanje trenutno nije moguce inicirati.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPaymentSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmPayment(int paymentId) async {
+    setState(() {
+      _isPaymentSubmitting = true;
+    });
+
+    try {
+      final payment = await _dataService.confirmPayment(
+        token: widget.token,
+        paymentId: paymentId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _paymentDetails = payment;
+        _markDirtyOnPop = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Placanje je uspjesno potvrdeno.'),
+        ),
+      );
+
+      await _load();
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Placanje trenutno nije moguce potvrditi.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPaymentSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openApprovalUrl(String approvalUrl) async {
+    final uri = Uri.tryParse(approvalUrl);
+    if (uri == null) {
+      await _copyApprovalUrl(approvalUrl);
+      return;
+    }
+
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!launched) {
+      await _copyApprovalUrl(approvalUrl);
+    }
+  }
+
+  Future<void> _copyApprovalUrl(String approvalUrl) async {
+    await Clipboard.setData(ClipboardData(text: approvalUrl));
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Approval link je kopiran.')),
     );
   }
 }
