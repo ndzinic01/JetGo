@@ -20,45 +20,52 @@ class _ReportsSectionState extends State<ReportsSection> {
   DateTime? _reservationFrom;
   DateTime? _reservationTo;
   SavedReportFile? _lastReservationsReport;
+  ReservationsReportPreview? _reservationsPreview;
   bool _isReservationsDownloading = false;
+  bool _isReservationsPreviewLoading = true;
   String? _reservationsError;
+  String? _reservationsPreviewError;
 
   PaymentReportStatus? _paymentStatus;
   DateTime? _paymentFrom;
   DateTime? _paymentTo;
   SavedReportFile? _lastPaymentsReport;
+  PaymentsReportPreview? _paymentsPreview;
   bool _isPaymentsDownloading = false;
+  bool _isPaymentsPreviewLoading = true;
   String? _paymentsError;
+  String? _paymentsPreviewError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReservationsPreview();
+    _loadPaymentsPreview();
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cards = <Widget>[
-          Expanded(
-            child: _buildReservationsCard(),
-          ),
-          Expanded(
-            child: _buildPaymentsCard(),
-          ),
-        ];
+        final reservationCard = _buildReservationsCard();
+        final paymentCard = _buildPaymentsCard();
 
         if (constraints.maxWidth >= 1180) {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              cards[0],
+              Expanded(child: reservationCard),
               const SizedBox(width: 16),
-              cards[1],
+              Expanded(child: paymentCard),
             ],
           );
         }
 
         return ListView(
           children: [
-            _buildReservationsCard(),
+            reservationCard,
             const SizedBox(height: 16),
-            _buildPaymentsCard(),
+            paymentCard,
           ],
         );
       },
@@ -78,7 +85,7 @@ class _ReportsSectionState extends State<ReportsSection> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Izvjestaj generise backend i vraca PDF sa rezervacijama, ukupnim iznosom i aktivnim filterima.',
+              'Prije downloada dobijate preview broja rezervacija, iznosa i nekoliko zadnjih stavki koje ulaze u izvjestaj.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -86,10 +93,13 @@ class _ReportsSectionState extends State<ReportsSection> {
             const SizedBox(height: 18),
             _buildReservationFilters(),
             const SizedBox(height: 18),
+            _buildReservationPreviewPanel(),
+            const SizedBox(height: 18),
             _buildActionRow(
-              isLoading: _isReservationsDownloading,
+              isDownloading: _isReservationsDownloading,
               onDownload: _downloadReservationsReport,
               onReset: _resetReservationFilters,
+              onRefreshPreview: _loadReservationsPreview,
               onOpenFolder: _lastReservationsReport == null
                   ? null
                   : () => _openFolder(_lastReservationsReport!),
@@ -119,7 +129,7 @@ class _ReportsSectionState extends State<ReportsSection> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Izvjestaj sabira payment workflow, paid/refunded statistiku i vraca ga kao PDF spreman za seminarski prilog.',
+              'Preview prikazuje koliko payment stavki odgovara filteru, stanje po statusima i koje valute trenutno ulaze u PDF.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -127,10 +137,13 @@ class _ReportsSectionState extends State<ReportsSection> {
             const SizedBox(height: 18),
             _buildPaymentFilters(),
             const SizedBox(height: 18),
+            _buildPaymentsPreviewPanel(),
+            const SizedBox(height: 18),
             _buildActionRow(
-              isLoading: _isPaymentsDownloading,
+              isDownloading: _isPaymentsDownloading,
               onDownload: _downloadPaymentsReport,
               onReset: _resetPaymentFilters,
+              onRefreshPreview: _loadPaymentsPreview,
               onOpenFolder: _lastPaymentsReport == null
                   ? null
                   : () => _openFolder(_lastPaymentsReport!),
@@ -151,35 +164,30 @@ class _ReportsSectionState extends State<ReportsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<ReservationReportStatus?>(
-                key: ValueKey<ReservationReportStatus?>(_reservationStatus),
-                initialValue: _reservationStatus,
-                decoration: const InputDecoration(
-                  labelText: 'Status rezervacije',
-                ),
-                items: [
-                  const DropdownMenuItem<ReservationReportStatus?>(
-                    value: null,
-                    child: Text('Svi statusi'),
-                  ),
-                  ...ReservationReportStatus.values.map(
-                    (status) => DropdownMenuItem<ReservationReportStatus?>(
-                      value: status,
-                      child: Text(status.label),
-                    ),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _reservationStatus = value;
-                  });
-                },
+        DropdownButtonFormField<ReservationReportStatus?>(
+          key: ValueKey<ReservationReportStatus?>(_reservationStatus),
+          initialValue: _reservationStatus,
+          decoration: const InputDecoration(
+            labelText: 'Status rezervacije',
+          ),
+          items: [
+            const DropdownMenuItem<ReservationReportStatus?>(
+              value: null,
+              child: Text('Svi statusi'),
+            ),
+            ...ReservationReportStatus.values.map(
+              (status) => DropdownMenuItem<ReservationReportStatus?>(
+                value: status,
+                child: Text(status.label),
               ),
             ),
           ],
+          onChanged: (value) {
+            setState(() {
+              _reservationStatus = value;
+            });
+            _loadReservationsPreview();
+          },
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -196,6 +204,7 @@ class _ReportsSectionState extends State<ReportsSection> {
                       setState(() {
                         _reservationFrom = null;
                       });
+                      _loadReservationsPreview();
                     },
             ),
             _DateChip(
@@ -208,6 +217,7 @@ class _ReportsSectionState extends State<ReportsSection> {
                       setState(() {
                         _reservationTo = null;
                       });
+                      _loadReservationsPreview();
                     },
             ),
           ],
@@ -220,35 +230,30 @@ class _ReportsSectionState extends State<ReportsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<PaymentReportStatus?>(
-                key: ValueKey<PaymentReportStatus?>(_paymentStatus),
-                initialValue: _paymentStatus,
-                decoration: const InputDecoration(
-                  labelText: 'Status placanja',
-                ),
-                items: [
-                  const DropdownMenuItem<PaymentReportStatus?>(
-                    value: null,
-                    child: Text('Svi statusi'),
-                  ),
-                  ...PaymentReportStatus.values.map(
-                    (status) => DropdownMenuItem<PaymentReportStatus?>(
-                      value: status,
-                      child: Text(status.label),
-                    ),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _paymentStatus = value;
-                  });
-                },
+        DropdownButtonFormField<PaymentReportStatus?>(
+          key: ValueKey<PaymentReportStatus?>(_paymentStatus),
+          initialValue: _paymentStatus,
+          decoration: const InputDecoration(
+            labelText: 'Status placanja',
+          ),
+          items: [
+            const DropdownMenuItem<PaymentReportStatus?>(
+              value: null,
+              child: Text('Svi statusi'),
+            ),
+            ...PaymentReportStatus.values.map(
+              (status) => DropdownMenuItem<PaymentReportStatus?>(
+                value: status,
+                child: Text(status.label),
               ),
             ),
           ],
+          onChanged: (value) {
+            setState(() {
+              _paymentStatus = value;
+            });
+            _loadPaymentsPreview();
+          },
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -265,6 +270,7 @@ class _ReportsSectionState extends State<ReportsSection> {
                       setState(() {
                         _paymentFrom = null;
                       });
+                      _loadPaymentsPreview();
                     },
             ),
             _DateChip(
@@ -277,6 +283,7 @@ class _ReportsSectionState extends State<ReportsSection> {
                       setState(() {
                         _paymentTo = null;
                       });
+                      _loadPaymentsPreview();
                     },
             ),
           ],
@@ -285,10 +292,141 @@ class _ReportsSectionState extends State<ReportsSection> {
     );
   }
 
+  Widget _buildReservationPreviewPanel() {
+    if (_isReservationsPreviewLoading) {
+      return const _PreviewStatePanel(
+        icon: Icons.hourglass_top_rounded,
+        title: 'Ucitavanje preview-a',
+        message: 'Pripremamo pregled rezervacija za odabrane filtere.',
+        isLoading: true,
+      );
+    }
+
+    if (_reservationsPreviewError != null) {
+      return _PreviewStatePanel(
+        icon: Icons.cloud_off_rounded,
+        title: 'Preview nije dostupan',
+        message: _reservationsPreviewError!,
+      );
+    }
+
+    final preview = _reservationsPreview;
+    if (preview == null) {
+      return const _PreviewStatePanel(
+        icon: Icons.info_outline_rounded,
+        title: 'Preview nije ucitan',
+        message: 'Kliknite "Osvjezi preview" da povucemo pregled.',
+      );
+    }
+
+    return _PreviewPanel(
+      title: 'Preview',
+      updatedAtLabel: _formatDateTime(preview.generatedAtLocal),
+      metrics: [
+        _PreviewMetric(
+          label: 'Rezervacije',
+          value: preview.totalReservations.toString(),
+        ),
+        _PreviewMetric(
+          label: 'Placene',
+          value: preview.paidReservations.toString(),
+        ),
+        _PreviewMetric(
+          label: 'Neplacene',
+          value: preview.unpaidReservations.toString(),
+        ),
+        _PreviewMetric(
+          label: 'Sjedista',
+          value: preview.totalSeats.toString(),
+        ),
+      ],
+      amounts: preview.amounts,
+      emptyMessage:
+          'Nema rezervacija za trenutne filtere. PDF ce sadrzavati samo zaglavlje i poruku da nema podataka.',
+      sampleItems: preview.sampleItems
+          .map(
+            (item) => _PreviewSampleRow(
+              title: item.reservationCode,
+              subtitle:
+                  '${_safeText(item.customerName)} • ${item.routeCode} • ${item.statusLabel}',
+              meta:
+                  '${item.amount.toStringAsFixed(2)} ${item.currency} • ${_formatDateTime(item.createdAtUtc.toLocal())}',
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildPaymentsPreviewPanel() {
+    if (_isPaymentsPreviewLoading) {
+      return const _PreviewStatePanel(
+        icon: Icons.hourglass_top_rounded,
+        title: 'Ucitavanje preview-a',
+        message: 'Pripremamo pregled payment stavki za odabrane filtere.',
+        isLoading: true,
+      );
+    }
+
+    if (_paymentsPreviewError != null) {
+      return _PreviewStatePanel(
+        icon: Icons.cloud_off_rounded,
+        title: 'Preview nije dostupan',
+        message: _paymentsPreviewError!,
+      );
+    }
+
+    final preview = _paymentsPreview;
+    if (preview == null) {
+      return const _PreviewStatePanel(
+        icon: Icons.info_outline_rounded,
+        title: 'Preview nije ucitan',
+        message: 'Kliknite "Osvjezi preview" da povucemo pregled.',
+      );
+    }
+
+    return _PreviewPanel(
+      title: 'Preview',
+      updatedAtLabel: _formatDateTime(preview.generatedAtLocal),
+      metrics: [
+        _PreviewMetric(
+          label: 'Placanja',
+          value: preview.totalPayments.toString(),
+        ),
+        _PreviewMetric(
+          label: 'Paid',
+          value: preview.paidPayments.toString(),
+        ),
+        _PreviewMetric(
+          label: 'Refunded',
+          value: preview.refundedPayments.toString(),
+        ),
+        _PreviewMetric(
+          label: 'Pending / Failed',
+          value: '${preview.pendingPayments} / ${preview.failedPayments}',
+        ),
+      ],
+      amounts: preview.amounts,
+      emptyMessage:
+          'Nema payment stavki za trenutne filtere. PDF ce se svejedno generisati, ali bez konkretnih redova.',
+      sampleItems: preview.sampleItems
+          .map(
+            (item) => _PreviewSampleRow(
+              title: item.reservationCode,
+              subtitle:
+                  '${_safeText(item.customerName)} • ${item.routeCode} • ${item.statusLabel}',
+              meta:
+                  '${item.amount.toStringAsFixed(2)} ${item.currency} • ${_formatDateTime(item.createdAtUtc.toLocal())}',
+            ),
+          )
+          .toList(),
+    );
+  }
+
   Widget _buildActionRow({
-    required bool isLoading,
+    required bool isDownloading,
     required Future<void> Function() onDownload,
     required VoidCallback onReset,
+    required Future<void> Function() onRefreshPreview,
     required VoidCallback? onOpenFolder,
     required String downloadLabel,
   }) {
@@ -297,8 +435,8 @@ class _ReportsSectionState extends State<ReportsSection> {
       runSpacing: 12,
       children: [
         FilledButton.icon(
-          onPressed: isLoading ? null : onDownload,
-          icon: isLoading
+          onPressed: isDownloading ? null : onDownload,
+          icon: isDownloading
               ? const SizedBox(
                   width: 16,
                   height: 16,
@@ -308,12 +446,17 @@ class _ReportsSectionState extends State<ReportsSection> {
           label: Text(downloadLabel),
         ),
         OutlinedButton.icon(
-          onPressed: isLoading ? null : onReset,
+          onPressed: isDownloading ? null : onRefreshPreview,
+          icon: const Icon(Icons.preview_rounded),
+          label: const Text('Osvjezi preview'),
+        ),
+        OutlinedButton.icon(
+          onPressed: isDownloading ? null : onReset,
           icon: const Icon(Icons.filter_alt_off_rounded),
           label: const Text('Ocisti filtere'),
         ),
         OutlinedButton.icon(
-          onPressed: isLoading ? null : onOpenFolder,
+          onPressed: isDownloading ? null : onOpenFolder,
           icon: const Icon(Icons.folder_open_rounded),
           label: const Text('Otvori folder'),
         ),
@@ -384,8 +527,122 @@ class _ReportsSectionState extends State<ReportsSection> {
     );
   }
 
+  Future<void> _loadReservationsPreview() async {
+    final rangeError = _validateRangeSilently(_reservationFrom, _reservationTo);
+    if (rangeError != null) {
+      setState(() {
+        _reservationsPreviewError = rangeError;
+        _isReservationsPreviewLoading = false;
+        _reservationsPreview = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isReservationsPreviewLoading = true;
+      _reservationsPreviewError = null;
+    });
+
+    try {
+      final preview = await _service.loadReservationsPreview(
+        token: widget.token,
+        status: _reservationStatus,
+        createdFromLocal: _reservationFrom,
+        createdToLocal: _reservationTo,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _reservationsPreview = preview;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _reservationsPreviewError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _reservationsPreviewError =
+            'Preview rezervacija trenutno nije moguce ucitati.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isReservationsPreviewLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadPaymentsPreview() async {
+    final rangeError = _validateRangeSilently(_paymentFrom, _paymentTo);
+    if (rangeError != null) {
+      setState(() {
+        _paymentsPreviewError = rangeError;
+        _isPaymentsPreviewLoading = false;
+        _paymentsPreview = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isPaymentsPreviewLoading = true;
+      _paymentsPreviewError = null;
+    });
+
+    try {
+      final preview = await _service.loadPaymentsPreview(
+        token: widget.token,
+        status: _paymentStatus,
+        createdFromLocal: _paymentFrom,
+        createdToLocal: _paymentTo,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _paymentsPreview = preview;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _paymentsPreviewError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _paymentsPreviewError =
+            'Preview placanja trenutno nije moguce ucitati.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPaymentsPreviewLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _downloadReservationsReport() async {
-    if (!_validateRange(_reservationFrom, _reservationTo)) {
+    if (!_validateRangeForAction(_reservationFrom, _reservationTo)) {
       return;
     }
 
@@ -437,7 +694,7 @@ class _ReportsSectionState extends State<ReportsSection> {
   }
 
   Future<void> _downloadPaymentsReport() async {
-    if (!_validateRange(_paymentFrom, _paymentTo)) {
+    if (!_validateRangeForAction(_paymentFrom, _paymentTo)) {
       return;
     }
 
@@ -521,6 +778,7 @@ class _ReportsSectionState extends State<ReportsSection> {
         _reservationTo = picked;
       }
     });
+    await _loadReservationsPreview();
   }
 
   Future<void> _pickPaymentDate({required bool isFrom}) async {
@@ -545,6 +803,7 @@ class _ReportsSectionState extends State<ReportsSection> {
         _paymentTo = picked;
       }
     });
+    await _loadPaymentsPreview();
   }
 
   void _resetReservationFilters() {
@@ -553,7 +812,9 @@ class _ReportsSectionState extends State<ReportsSection> {
       _reservationFrom = null;
       _reservationTo = null;
       _reservationsError = null;
+      _reservationsPreviewError = null;
     });
+    _loadReservationsPreview();
   }
 
   void _resetPaymentFilters() {
@@ -562,16 +823,27 @@ class _ReportsSectionState extends State<ReportsSection> {
       _paymentFrom = null;
       _paymentTo = null;
       _paymentsError = null;
+      _paymentsPreviewError = null;
     });
+    _loadPaymentsPreview();
   }
 
-  bool _validateRange(DateTime? from, DateTime? to) {
+  String? _validateRangeSilently(DateTime? from, DateTime? to) {
     if (from != null && to != null && from.isAfter(to)) {
-      _showMessage('Datum "from" mora biti manji ili jednak datumu "to".');
-      return false;
+      return 'Datum "from" mora biti manji ili jednak datumu "to".';
     }
 
-    return true;
+    return null;
+  }
+
+  bool _validateRangeForAction(DateTime? from, DateTime? to) {
+    final errorMessage = _validateRangeSilently(from, to);
+    if (errorMessage == null) {
+      return true;
+    }
+
+    _showMessage(errorMessage);
+    return false;
   }
 
   void _showMessage(String message) {
@@ -587,6 +859,11 @@ class _ReportsSectionState extends State<ReportsSection> {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day.$month.${local.year} $hour:$minute';
+  }
+
+  String _safeText(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? '-' : trimmed;
   }
 }
 
@@ -649,6 +926,274 @@ class _DateChip extends StatelessWidget {
               icon: const Icon(Icons.close_rounded),
               tooltip: 'Ocisti datum',
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewStatePanel extends StatelessWidget {
+  const _PreviewStatePanel({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.isLoading = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(icon),
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(message),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewPanel extends StatelessWidget {
+  const _PreviewPanel({
+    required this.title,
+    required this.updatedAtLabel,
+    required this.metrics,
+    required this.amounts,
+    required this.sampleItems,
+    required this.emptyMessage,
+  });
+
+  final String title;
+  final String updatedAtLabel;
+  final List<_PreviewMetric> metrics;
+  final List<ReportAmountSummary> amounts;
+  final List<_PreviewSampleRow> sampleItems;
+  final String emptyMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(title, style: theme.textTheme.titleMedium),
+              const Spacer(),
+              Text(
+                'Osvjezeno: $updatedAtLabel',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: metrics.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              mainAxisExtent: 78,
+            ),
+            itemBuilder: (context, index) {
+              final metric = metrics[index];
+              return _MetricCard(metric: metric);
+            },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Ukupno po valutama',
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          if (amounts.isEmpty)
+            Text(
+              'Nema iznosa za prikaz.',
+              style: theme.textTheme.bodyMedium,
+            )
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: amounts
+                  .map(
+                    (amount) => Chip(
+                      label: Text(
+                        '${amount.amount.toStringAsFixed(2)} ${amount.currency}',
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            'Uzorak stavki',
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          if (sampleItems.isEmpty)
+            Text(
+              emptyMessage,
+              style: theme.textTheme.bodyMedium,
+            )
+          else
+            Column(
+              children: sampleItems
+                  .map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _PreviewSampleTile(item: item),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewMetric {
+  const _PreviewMetric({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({required this.metric});
+
+  final _PreviewMetric metric;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            metric.label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            metric.value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewSampleRow {
+  const _PreviewSampleRow({
+    required this.title,
+    required this.subtitle,
+    required this.meta,
+  });
+
+  final String title;
+  final String subtitle;
+  final String meta;
+}
+
+class _PreviewSampleTile extends StatelessWidget {
+  const _PreviewSampleTile({required this.item});
+
+  final _PreviewSampleRow item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(item.subtitle),
+          const SizedBox(height: 4),
+          Text(
+            item.meta,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );
