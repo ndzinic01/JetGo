@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/config/app_config.dart';
 import '../auth/auth_controller.dart';
 import '../flights_routes/flights_routes_section.dart';
+import '../overview/overview_section.dart';
 import '../payments/payments_section.dart';
 import '../reference_data/reference_data_section.dart';
 import '../reports/reports_section.dart';
@@ -194,9 +195,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   ) {
     switch (_selectedSection) {
       case AdminSection.overview:
-        return _OverviewSection(
-          fullName: fullName,
-          roles: roles,
+        return OverviewSection(
+          token: widget.authController.session!.accessToken,
+          currentUserFullName: fullName,
+          currentUserRoles: roles,
         );
       case AdminSection.referenceData:
         return ReferenceDataSection(
@@ -254,7 +256,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   String _sectionSubtitle(AdminSection section) {
     switch (section) {
       case AdminSection.overview:
-        return 'Prvi desktop skeleton za admin radni prostor.';
+        return 'Operativni pregled najvaznijih admin podataka u realnom vremenu.';
       case AdminSection.referenceData:
         return 'Referentni podaci su prvi konkretni CRUD korak.';
       case AdminSection.network:
@@ -384,120 +386,6 @@ class _NavButton extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OverviewSection extends StatelessWidget {
-  const _OverviewSection({
-    required this.fullName,
-    required this.roles,
-  });
-
-  final String fullName;
-  final List<String> roles;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          childAspectRatio: 1.5,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _OverviewCard(
-              title: 'Administrator',
-              value: fullName,
-              caption: 'Aktivna desktop sesija',
-              icon: Icons.admin_panel_settings_rounded,
-            ),
-            _OverviewCard(
-              title: 'Role',
-              value: roles.join(', '),
-              caption: 'Preuzete iz JWT sesije',
-              icon: Icons.verified_user_rounded,
-            ),
-            const _OverviewCard(
-              title: 'Ready',
-              value: 'Desktop shell',
-              caption: 'Spreman za CRUD module',
-              icon: Icons.desktop_windows_rounded,
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        const Card(
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Sta je spremno sada',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'Ovaj skeleton zatvara desktop login, admin-only ulaz i sidebar navigaciju. Sljedeci commit mozemo odmah puniti stvarnim tabelama i formama za prvi CRUD modul.',
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _OverviewCard extends StatelessWidget {
-  const _OverviewCard({
-    required this.title,
-    required this.value,
-    required this.caption,
-    required this.icon,
-  });
-
-  final String title;
-  final String value;
-  final String caption;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon),
-            const Spacer(),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleMedium,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              caption,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
         ),
       ),
     );

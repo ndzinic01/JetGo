@@ -148,6 +148,7 @@ public static class DependencyInjection
         services.AddScoped<IAirlineAdminService, AirlineAdminService>();
         services.AddScoped<IDestinationAdminService, DestinationAdminService>();
         services.AddScoped<IFlightAdminService, FlightAdminService>();
+        services.AddScoped<IAdminDashboardService, AdminDashboardService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
         services.AddScoped<IDestinationService, DestinationService>();
         services.AddScoped<IFlightService, FlightService>();
