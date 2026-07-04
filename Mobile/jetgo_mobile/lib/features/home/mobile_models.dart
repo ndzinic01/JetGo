@@ -503,6 +503,90 @@ class NewsArticleSummary {
   }
 }
 
+class MobileRecommendedFlight {
+  MobileRecommendedFlight({
+    required this.id,
+    required this.flightNumber,
+    required this.routeCode,
+    required this.airline,
+    required this.departureAirport,
+    required this.arrivalAirport,
+    required this.departureAtUtc,
+    required this.arrivalAtUtc,
+    required this.durationMinutes,
+    required this.basePrice,
+    required this.currency,
+    required this.availableSeats,
+    required this.totalSeats,
+    required this.status,
+    required this.recommendationScore,
+    required this.exactRouteSearchCount,
+    required this.keywordSearchCount,
+    required this.matchingReservationCount,
+    required this.popularityCount,
+    required this.appliedSignals,
+    required this.recommendationReason,
+  });
+
+  final int id;
+  final String flightNumber;
+  final String routeCode;
+  final AirlineSummary airline;
+  final AirportSummary departureAirport;
+  final AirportSummary arrivalAirport;
+  final DateTime departureAtUtc;
+  final DateTime arrivalAtUtc;
+  final int durationMinutes;
+  final double basePrice;
+  final String currency;
+  final int availableSeats;
+  final int totalSeats;
+  final int status;
+  final int recommendationScore;
+  final int exactRouteSearchCount;
+  final int keywordSearchCount;
+  final int matchingReservationCount;
+  final int popularityCount;
+  final List<String> appliedSignals;
+  final String recommendationReason;
+
+  factory MobileRecommendedFlight.fromJson(Map<String, dynamic> json) {
+    return MobileRecommendedFlight(
+      id: json['id'] as int? ?? 0,
+      flightNumber: json['flightNumber'] as String? ?? '',
+      routeCode: json['routeCode'] as String? ?? '',
+      airline: AirlineSummary.fromJson(
+        json['airline'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+      ),
+      departureAirport: AirportSummary.fromJson(
+        json['departureAirport'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
+      ),
+      arrivalAirport: AirportSummary.fromJson(
+        json['arrivalAirport'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
+      ),
+      departureAtUtc: DateTime.parse(json['departureAtUtc'] as String),
+      arrivalAtUtc: DateTime.parse(json['arrivalAtUtc'] as String),
+      durationMinutes: json['durationMinutes'] as int? ?? 0,
+      basePrice: (json['basePrice'] as num?)?.toDouble() ?? 0,
+      currency: json['currency'] as String? ?? 'BAM',
+      availableSeats: json['availableSeats'] as int? ?? 0,
+      totalSeats: json['totalSeats'] as int? ?? 0,
+      status: json['status'] as int? ?? 0,
+      recommendationScore: json['recommendationScore'] as int? ?? 0,
+      exactRouteSearchCount: json['exactRouteSearchCount'] as int? ?? 0,
+      keywordSearchCount: json['keywordSearchCount'] as int? ?? 0,
+      matchingReservationCount: json['matchingReservationCount'] as int? ?? 0,
+      popularityCount: json['popularityCount'] as int? ?? 0,
+      appliedSignals: ((json['appliedSignals'] as List<dynamic>?) ?? const [])
+          .map((item) => item.toString())
+          .toList(),
+      recommendationReason: json['recommendationReason'] as String? ?? '',
+    );
+  }
+}
+
 class MobileProfile {
   MobileProfile({
     required this.userId,

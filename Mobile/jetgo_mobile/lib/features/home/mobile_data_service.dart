@@ -24,6 +24,22 @@ class MobileDataService {
     return _mapPagedResult(response, MobileFlight.fromJson);
   }
 
+  Future<PagedResult<MobileRecommendedFlight>> fetchRecommendedFlights({
+    required String token,
+    int pageSize = 5,
+  }) async {
+    final response = await _apiClient.getJson(
+      '/api/Recommendations/flights',
+      token: token,
+      queryParameters: <String, String>{
+        'page': '1',
+        'pageSize': pageSize.toString(),
+      },
+    );
+
+    return _mapPagedResult(response, MobileRecommendedFlight.fromJson);
+  }
+
   Future<MobileFlightDetails> fetchFlightDetails({
     required String token,
     required int flightId,

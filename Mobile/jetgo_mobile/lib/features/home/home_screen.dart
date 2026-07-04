@@ -30,10 +30,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _errorMessage;
 
   List<MobileFlight> _flights = const [];
+  List<MobileRecommendedFlight> _recommendedFlights = const [];
   List<MobileReservation> _reservations = const [];
   List<NewsArticleSummary> _news = const [];
   MobileProfile? _profile;
   MobileNotificationSummary? _notificationSummary;
+  String? _recommendationsErrorMessage;
 
   String get _token => widget.authController.session?.accessToken ?? '';
 
@@ -67,6 +69,17 @@ class _HomeScreenState extends State<HomeScreen> {
             searchText: _flightSearchController.text,
           );
           _flights = flights.items;
+          try {
+            final recommendations = await _dataService.fetchRecommendedFlights(
+              token: _token,
+            );
+            _recommendedFlights = recommendations.items;
+            _recommendationsErrorMessage = null;
+          } catch (_) {
+            _recommendedFlights = const [];
+            _recommendationsErrorMessage =
+                'Preporuke trenutno nisu dostupne.';
+          }
           break;
         case 1:
           final reservations =
@@ -359,6 +372,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
+        _buildRecommendationsSection(context),
+        if (_recommendedFlights.isNotEmpty || _recommendationsErrorMessage != null)
+          const SizedBox(height: 16),
         if (_flights.isEmpty)
           const _EmptyState(
             icon: Icons.flight_rounded,
@@ -368,6 +384,137 @@ class _HomeScreenState extends State<HomeScreen> {
         else
           ..._flights.map(_buildFlightCard),
       ],
+    );
+  }
+
+  Widget _buildRecommendationsSection(BuildContext context) {
+    if (_recommendationsErrorMessage != null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Preporuceni letovi',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _recommendationsErrorMessage!,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_recommendedFlights.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final topRecommendations = _recommendedFlights.take(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Preporuceni letovi',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Na osnovu pretraga i historije rezervacija izdvajamo letove koji bi vam mogli biti najzanimljiviji.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        ...topRecommendations.map(_buildRecommendedFlightCard),
+      ],
+    );
+  }
+
+  Widget _buildRecommendedFlightCard(MobileRecommendedFlight flight) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _openFlightDetails(
+        MobileFlight(
+          id: flight.id,
+          flightNumber: flight.flightNumber,
+          routeCode: flight.routeCode,
+          airline: flight.airline,
+          departureAirport: flight.departureAirport,
+          arrivalAirport: flight.arrivalAirport,
+          departureAtUtc: flight.departureAtUtc,
+          arrivalAtUtc: flight.arrivalAtUtc,
+          durationMinutes: flight.durationMinutes,
+          basePrice: flight.basePrice,
+          currency: flight.currency,
+          availableSeats: flight.availableSeats,
+          totalSeats: flight.totalSeats,
+          status: flight.status,
+        ),
+      ),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${flight.flightNumber} - ${flight.routeCode}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${flight.departureAirport.cityName} (${flight.departureAirport.iataCode}) -> ${flight.arrivalAirport.cityName} (${flight.arrivalAirport.iataCode})',
+                        ),
+                      ],
+                    ),
+                  ),
+                  _StatusChip(
+                    label: 'Score ${flight.recommendationScore}',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                flight.recommendationReason,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: flight.appliedSignals
+                    .map(
+                      (signal) => Chip(
+                        label: Text(signal),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Polazak: ${MobileDisplay.formatDateTime(flight.departureAtUtc)}',
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${MobileDisplay.formatMoney(flight.basePrice, flight.currency)} - Slobodna sjedista ${flight.availableSeats}/${flight.totalSeats}',
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
