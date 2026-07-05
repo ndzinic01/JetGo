@@ -45,19 +45,6 @@ public sealed class ReservationService : IReservationService
         var nowUtc = DateTime.UtcNow;
         var normalizedSeatNumbers = NormalizeSeatNumbers(request.SeatNumbers);
 
-        var hasActiveReservation = await _dbContext.Reservations
-            .AsNoTracking()
-            .AnyAsync(
-                x => x.UserId == currentUserId
-                    && x.FlightId == request.FlightId
-                    && (x.Status == ReservationStatus.Pending || x.Status == ReservationStatus.Confirmed),
-                cancellationToken);
-
-        if (hasActiveReservation)
-        {
-            throw new ConflictException("Vec imate aktivnu rezervaciju za odabrani let.");
-        }
-
         var flight = await _dbContext.Flights
             .Include(x => x.Destination)
                 .ThenInclude(x => x.DepartureAirport)
