@@ -423,6 +423,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               'Sjedista: ${MobileDisplay.formatMoney(details.seatsTotalAmount, details.currency)}',
             ),
             Text(
+              'Ponuda: ${MobileDisplay.baggageOfferLabel(details.additionalBaggageCount)}',
+            ),
+            Text(
               'Dodatni prtljag: ${MobileDisplay.formatMoney(details.additionalBaggageTotalAmount, details.currency)}',
             ),
             const SizedBox(height: 6),
@@ -471,7 +474,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Text('Komada: ${details.additionalBaggageCount}'),
+            Text(
+              'Ponuda: ${MobileDisplay.baggageOfferLabel(details.additionalBaggageCount)}',
+            ),
             Text(
               'Cijena po komadu: ${MobileDisplay.formatMoney(details.additionalBaggageUnitPrice, details.currency)}',
             ),
@@ -626,6 +631,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       context: context,
       builder: (context) => _BaggageCountDialog(
         initialValue: details.additionalBaggageCount,
+        unitPrice: details.additionalBaggageUnitPrice,
+        currency: details.currency,
       ),
     );
 
@@ -736,9 +743,15 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _BaggageCountDialog extends StatefulWidget {
-  const _BaggageCountDialog({required this.initialValue});
+  const _BaggageCountDialog({
+    required this.initialValue,
+    required this.unitPrice,
+    required this.currency,
+  });
 
   final int initialValue;
+  final double unitPrice;
+  final String currency;
 
   @override
   State<_BaggageCountDialog> createState() => _BaggageCountDialogState();
@@ -762,13 +775,21 @@ class _BaggageCountDialogState extends State<_BaggageCountDialog> {
         child: DropdownButtonFormField<int>(
           initialValue: _selectedValue,
           decoration: const InputDecoration(
-            labelText: 'Broj dodatnih komada',
+            labelText: 'Ponuda za dodatni prtljag',
           ),
           items: List.generate(
             7,
             (index) => DropdownMenuItem<int>(
               value: index,
-              child: Text(index == 0 ? 'Bez dodatnog prtljaga' : '$index kom.'),
+              child: Text(
+                MobileDisplay.baggageOfferLabel(
+                  index,
+                  unitPrice: widget.unitPrice,
+                  currency: widget.currency,
+                  includePrice: true,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           onChanged: (value) {

@@ -456,7 +456,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                       DataCell(Text(item.status.label)),
                       DataCell(Text(_paymentSummary(item))),
                       DataCell(Text(item.seatsCount.toString())),
-                      DataCell(Text(item.additionalBaggageCount.toString())),
+                      DataCell(Text(_compactBaggageLabel(item.additionalBaggageCount))),
                       DataCell(
                         Text(
                           '${item.totalAmount.toStringAsFixed(2)} ${item.currency}',
@@ -542,7 +542,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
             if (details.canBeCancelled)
               OutlinedButton.icon(
                 onPressed: () => _changeStatus(
-                  title: 'Otkaži rezervaciju',
+                  title: 'Otkazi rezervaciju',
                   action: (reason) => _service.cancelReservation(
                     token: widget.token,
                     id: details.id,
@@ -592,8 +592,8 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                     '${details.seatsTotalAmount.toStringAsFixed(2)} ${details.currency}',
                   ),
                   _DetailsRow(
-                    'Dodatni komadi',
-                    details.additionalBaggageCount.toString(),
+                    'Ponuda prtljaga',
+                    _baggageOfferLabel(details.additionalBaggageCount),
                   ),
                   _DetailsRow(
                     'Cijena po komadu',
@@ -694,6 +694,28 @@ class _ReservationsSectionState extends State<ReservationsSection> {
       return item.isPaid ? 'Placeno' : '-';
     }
     return item.paymentStatus!.label;
+  }
+
+  String _compactBaggageLabel(int count) {
+    if (count <= 0) {
+      return 'Bez';
+    }
+
+    return '${count}x 23 kg';
+  }
+
+  String _baggageOfferLabel(int count) {
+    if (count <= 0) {
+      return 'Bez dodatnog prtljaga';
+    }
+
+    final noun = switch (count) {
+      1 => 'dodatni kofer',
+      2 || 3 || 4 => 'dodatna kofera',
+      _ => 'dodatnih kofera',
+    };
+
+    return '$count $noun do 23 kg';
   }
 
   String _formatDateTime(DateTime? value) {

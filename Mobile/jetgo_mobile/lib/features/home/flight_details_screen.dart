@@ -212,7 +212,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                 label: Text(
                   _isSubmitting
                       ? 'Kreiranje...'
-                      : 'Rezervisi (${_selectedSeats.length}) · ${MobileDisplay.formatMoney(_reservationTotal(details), details.currency)}',
+                      : 'Rezervisi (${_selectedSeats.length}) - ${MobileDisplay.formatMoney(_reservationTotal(details), details.currency)}',
                 ),
               ),
             ),
@@ -281,7 +281,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                     'Cijena po sjedistu: ${MobileDisplay.formatMoney(details.basePrice, details.currency)}',
                   ),
                   Text(
-                    'Dodatni prtljag po komadu: ${MobileDisplay.formatMoney(details.additionalBaggageUnitPrice, details.currency)}',
+                    'Dodatni kofer do 23 kg: ${MobileDisplay.formatMoney(details.additionalBaggageUnitPrice, details.currency)}',
                   ),
                   Text(
                     'Slobodna sjedista: ${details.availableSeats}/${details.totalSeats}',
@@ -348,13 +348,21 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                   DropdownButtonFormField<int>(
                     initialValue: _additionalBaggageCount,
                     decoration: const InputDecoration(
-                      labelText: 'Broj dodatnih komada',
+                      labelText: 'Ponuda za dodatni prtljag',
                     ),
                     items: List.generate(
                       7,
                       (index) => DropdownMenuItem<int>(
                         value: index,
-                        child: Text(index == 0 ? 'Bez dodatnog prtljaga' : '$index kom.'),
+                        child: Text(
+                          MobileDisplay.baggageOfferLabel(
+                            index,
+                            unitPrice: details.additionalBaggageUnitPrice,
+                            currency: details.currency,
+                            includePrice: true,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                     onChanged: (value) {
@@ -384,10 +392,10 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Sjedista: ${_selectedSeats.length} · ${MobileDisplay.formatMoney(_selectedSeatsTotal(details), details.currency)}',
+                          'Sjedista: ${_selectedSeats.length} - ${MobileDisplay.formatMoney(_selectedSeatsTotal(details), details.currency)}',
                         ),
                         Text(
-                          'Dodatni prtljag: $_additionalBaggageCount · ${MobileDisplay.formatMoney(_selectedBaggageTotal(details), details.currency)}',
+                          'Dodatni prtljag: ${MobileDisplay.baggageOfferLabel(_additionalBaggageCount)} - ${MobileDisplay.formatMoney(_selectedBaggageTotal(details), details.currency)}',
                         ),
                         const SizedBox(height: 6),
                         Text(

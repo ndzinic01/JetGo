@@ -64,6 +64,32 @@ class MobileDisplay {
     return '${value.toStringAsFixed(2)} $currency';
   }
 
+  static String baggageOfferLabel(
+    int count, {
+    double? unitPrice,
+    String currency = 'BAM',
+    bool includePrice = false,
+  }) {
+    if (count <= 0) {
+      return 'Bez dodatnog prtljaga';
+    }
+
+    final noun = switch (count) {
+      1 => 'dodatni kofer',
+      2 || 3 || 4 => 'dodatna kofera',
+      _ => 'dodatnih kofera',
+    };
+
+    final label = '$count $noun do 23 kg';
+
+    if (!includePrice || unitPrice == null) {
+      return label;
+    }
+
+    final total = unitPrice * count;
+    return '$label (+${formatMoney(total, currency)})';
+  }
+
   static String initials(String value) {
     final parts = value
         .split(' ')
