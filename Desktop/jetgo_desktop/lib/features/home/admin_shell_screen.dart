@@ -5,6 +5,7 @@ import '../auth/auth_controller.dart';
 import '../flights_routes/flights_routes_section.dart';
 import '../overview/overview_section.dart';
 import '../payments/payments_section.dart';
+import '../news/news_section.dart';
 import '../reference_data/reference_data_section.dart';
 import '../reports/reports_section.dart';
 import '../reservations/reservations_section.dart';
@@ -18,6 +19,7 @@ enum AdminSection {
   reservations,
   users,
   support,
+  news,
   reports,
   payments,
 }
@@ -124,6 +126,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                           onTap: () => _selectSection(AdminSection.support),
                         ),
                         _NavButton(
+                          icon: Icons.article_rounded,
+                          label: 'News',
+                          isSelected: _selectedSection == AdminSection.news,
+                          onTap: () => _selectSection(AdminSection.news),
+                        ),
+                        _NavButton(
                           icon: Icons.receipt_long_rounded,
                           label: 'Reports',
                           isSelected: _selectedSection == AdminSection.reports,
@@ -221,6 +229,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return SupportSection(
           token: widget.authController.session!.accessToken,
         );
+      case AdminSection.news:
+        return NewsSection(
+          token: widget.authController.session!.accessToken,
+        );
       case AdminSection.reports:
         return ReportsSection(
           token: widget.authController.session!.accessToken,
@@ -246,6 +258,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return 'Users';
       case AdminSection.support:
         return 'Support';
+      case AdminSection.news:
+        return 'News';
       case AdminSection.reports:
         return 'Reports';
       case AdminSection.payments:
@@ -267,6 +281,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return 'Upravljanje korisnicima i pristupima.';
       case AdminSection.support:
         return 'Desktop support inbox za odgovore i pregled upita.';
+      case AdminSection.news:
+        return 'Kreiranje i uredjivanje novosti koje korisnici vide u mobile aplikaciji.';
       case AdminSection.reports:
         return 'Preuzimanje i kontrola PDF izvjestaja.';
       case AdminSection.payments:
