@@ -84,66 +84,115 @@ public sealed class PaymentsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("paypal/return")]
-    public ContentResult PayPalReturn([FromQuery] string? token, [FromQuery] string? payerId, [FromQuery] string? PayerID)
+    public ContentResult PayPalReturn(
+        [FromQuery] string? token,
+        [FromQuery] string? payerId,
+        [FromQuery] string? PayerID,
+        [FromQuery] int? reservationId)
     {
         var payerValue = string.IsNullOrWhiteSpace(payerId) ? PayerID : payerId;
+        var appReturnUrl = BuildJetGoAppLink("paypal-return", token, payerValue, reservationId);
         var html = """
             <!DOCTYPE html>
-            <html lang="en">
+            <html lang="bs">
             <head>
                 <meta charset="utf-8" />
-                <title>JetGo PayPal Return</title>
+                <title>JetGo PayPal povratak</title>
                 <style>
                     body { font-family: Arial, sans-serif; padding: 32px; background: #f7fafc; color: #0f172a; }
                     .card { max-width: 720px; margin: 0 auto; background: white; border: 1px solid #dbe2ea; border-radius: 8px; padding: 24px; }
+                    .actions { margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap; }
+                    .button { display: inline-block; background: #0f766e; color: white; text-decoration: none; padding: 12px 18px; border-radius: 999px; font-weight: 700; }
+                    .button.secondary { background: #e2e8f0; color: #0f172a; }
+                    p.note { color: #475569; }
                     code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
                 </style>
             </head>
             <body>
                 <div class="card">
-                    <h1>PayPal approval received</h1>
-                    <p>The buyer approval flow returned to JetGo.</p>
+                    <h1>PayPal odobrenje je zaprimljeno</h1>
+                    <p>Placanje je odobreno na PayPal strani i sada se mozete vratiti u JetGo aplikaciju.</p>
                     <p><strong>Order token:</strong> <code>__TOKEN__</code></p>
                     <p><strong>Payer ID:</strong> <code>__PAYER__</code></p>
-                    <p>Return to Swagger or the mobile app and call the payment confirm endpoint for this payment.</p>
+                    <p class="note">Kada se vratite u aplikaciju, dovrsite posljednji korak potvrde placanja.</p>
+                    <div class="actions">
+                        <a class="button" href="__APP_RETURN_URL__">Vrati se u JetGo aplikaciju</a>
+                        <a class="button secondary" href="javascript:history.back()">Nazad</a>
+                    </div>
                 </div>
             </body>
             </html>
             """
             .Replace("__TOKEN__", System.Net.WebUtility.HtmlEncode(token ?? string.Empty))
-            .Replace("__PAYER__", System.Net.WebUtility.HtmlEncode(payerValue ?? string.Empty));
+            .Replace("__PAYER__", System.Net.WebUtility.HtmlEncode(payerValue ?? string.Empty))
+            .Replace("__APP_RETURN_URL__", System.Net.WebUtility.HtmlEncode(appReturnUrl));
 
         return Content(html, "text/html");
     }
 
     [AllowAnonymous]
     [HttpGet("paypal/cancel")]
-    public ContentResult PayPalCancel([FromQuery] string? token)
+    public ContentResult PayPalCancel([FromQuery] string? token, [FromQuery] int? reservationId)
     {
+        var appCancelUrl = BuildJetGoAppLink("paypal-cancel", token, null, reservationId);
         var html = """
             <!DOCTYPE html>
-            <html lang="en">
+            <html lang="bs">
             <head>
                 <meta charset="utf-8" />
-                <title>JetGo PayPal Cancel</title>
+                <title>JetGo PayPal prekid</title>
                 <style>
                     body { font-family: Arial, sans-serif; padding: 32px; background: #f7fafc; color: #0f172a; }
                     .card { max-width: 720px; margin: 0 auto; background: white; border: 1px solid #dbe2ea; border-radius: 8px; padding: 24px; }
+                    .actions { margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap; }
+                    .button { display: inline-block; background: #0f766e; color: white; text-decoration: none; padding: 12px 18px; border-radius: 999px; font-weight: 700; }
+                    .button.secondary { background: #e2e8f0; color: #0f172a; }
                     code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
                 </style>
             </head>
             <body>
                 <div class="card">
-                    <h1>PayPal approval cancelled</h1>
-                    <p>The buyer cancelled the PayPal flow before approval was completed.</p>
+                    <h1>PayPal placanje je prekinuto</h1>
+                    <p>Korisnik je prekinuo PayPal korak prije zavrsetka odobrenja.</p>
                     <p><strong>Order token:</strong> <code>__TOKEN__</code></p>
-                    <p>You can return to JetGo and try the payment again.</p>
+                    <p>Možete se vratiti u JetGo i pokusati placanje ponovo.</p>
+                    <div class="actions">
+                        <a class="button" href="__APP_CANCEL_URL__">Vrati se u JetGo aplikaciju</a>
+                        <a class="button secondary" href="javascript:history.back()">Nazad</a>
+                    </div>
                 </div>
             </body>
             </html>
             """
-            .Replace("__TOKEN__", System.Net.WebUtility.HtmlEncode(token ?? string.Empty));
+            .Replace("__TOKEN__", System.Net.WebUtility.HtmlEncode(token ?? string.Empty))
+            .Replace("__APP_CANCEL_URL__", System.Net.WebUtility.HtmlEncode(appCancelUrl));
 
         return Content(html, "text/html");
+    }
+
+    private static string BuildJetGoAppLink(string host, string? token, string? payerId, int? reservationId)
+    {
+        var queryParameters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            queryParameters.Add($"token={Uri.EscapeDataString(token)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(payerId))
+        {
+            queryParameters.Add($"payerId={Uri.EscapeDataString(payerId)}");
+        }
+
+        if (reservationId.HasValue)
+        {
+            queryParameters.Add($"reservationId={reservationId.Value}");
+        }
+
+        var query = queryParameters.Count > 0
+            ? $"?{string.Join("&", queryParameters)}"
+            : string.Empty;
+
+        return $"jetgo://{host}{query}";
     }
 }

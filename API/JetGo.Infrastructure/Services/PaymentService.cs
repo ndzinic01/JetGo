@@ -100,6 +100,8 @@ public sealed class PaymentService : IPaymentService
                         providerPricing.CurrencyCode,
                         reservation.ReservationCode,
                         BuildPaymentDescription(reservation),
+                        BuildPayPalCallbackUrl(_payPalSettings.ReturnUrl, reservation.Id),
+                        BuildPayPalCallbackUrl(_payPalSettings.CancelUrl, reservation.Id),
                         cancellationToken);
 
                     reservation.Payment.Status = PaymentStatus.Pending;
@@ -126,6 +128,8 @@ public sealed class PaymentService : IPaymentService
             pricing.CurrencyCode,
             reservation.ReservationCode,
             BuildPaymentDescription(reservation),
+            BuildPayPalCallbackUrl(_payPalSettings.ReturnUrl, reservation.Id),
+            BuildPayPalCallbackUrl(_payPalSettings.CancelUrl, reservation.Id),
             cancellationToken);
 
         var payment = new Payment
@@ -670,6 +674,17 @@ public sealed class PaymentService : IPaymentService
         reservation.StatusChangedAtUtc = nowUtc;
         reservation.StatusReason = "Rezervacija je automatski potvrdjena i spremna za placanje.";
         return true;
+    }
+
+    private static string BuildPayPalCallbackUrl(string baseUrl, int reservationId)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return baseUrl;
+        }
+
+        var separator = baseUrl.Contains('?') ? "&" : "?";
+        return $"{baseUrl}{separator}reservationId={reservationId}";
     }
 
     private ProviderPricing ConvertReservationAmountToProviderAmount(decimal reservationAmount, string reservationCurrency)

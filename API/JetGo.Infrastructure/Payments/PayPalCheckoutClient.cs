@@ -39,6 +39,8 @@ public sealed class PayPalCheckoutClient
         string currencyCode,
         string reservationCode,
         string description,
+        string returnUrl,
+        string cancelUrl,
         CancellationToken cancellationToken)
     {
         var accessToken = await GetAccessTokenAsync(cancellationToken);
@@ -57,8 +59,8 @@ public sealed class PayPalCheckoutClient
                         user_action = "PAY_NOW",
                         shipping_preference = "NO_SHIPPING",
                         brand_name = "JetGo",
-                        return_url = _settings.ReturnUrl,
-                        cancel_url = _settings.CancelUrl
+                        return_url = returnUrl,
+                        cancel_url = cancelUrl
                     }
                 }
             },

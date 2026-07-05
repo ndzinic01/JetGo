@@ -32,6 +32,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   bool _isLoading = true;
   bool _isPaymentSubmitting = false;
   bool _isBaggageSubmitting = false;
+  bool _hasOpenedPayPalApproval = false;
   String? _errorMessage;
   bool _markDirtyOnPop = false;
 
@@ -62,6 +63,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         _details = details;
         if (_paymentDetails != null && _paymentDetails!.id != details.paymentId) {
           _paymentDetails = null;
+          _hasOpenedPayPalApproval = false;
         }
       });
     } on ApiException catch (error) {
@@ -295,6 +297,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     final amount = _paymentDetails?.amount ?? details.totalAmount;
     final currency = _paymentDetails?.currency ?? details.currency;
     final approvalUrl = _paymentDetails?.approvalUrl;
+    final hasApprovalUrl = approvalUrl != null && approvalUrl.trim().isNotEmpty;
     final statusReason = _paymentDetails?.statusReason;
     final canInitializePayment =
         !details.isPaid && (details.canInitiatePayment || _hasPendingPayment(details));
@@ -336,24 +339,26 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-            if (approvalUrl != null && approvalUrl.trim().isNotEmpty) ...[
+            if (hasApprovalUrl) ...[
               const SizedBox(height: 8),
               Text(
-                'Approval link je spreman. Nakon PayPal odobrenja vratite se u aplikaciju i kliknite "Potvrdi placanje".',
+                'Korak 1: otvorite PayPal i odobrite placanje. Kada se vratite u aplikaciju, pojavit ce se korak za zavrsetak placanja.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
             const SizedBox(height: 16),
-              if (canInitializePayment || canConfirmPayment)
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
+            if (canInitializePayment || canConfirmPayment)
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
                   if (canInitializePayment)
                     FilledButton.icon(
                       onPressed: _isPaymentSubmitting
                           ? null
-                          : () => _initializePayment(details),
+                          : hasApprovalUrl
+                              ? () => _openApprovalUrl(approvalUrl)
+                              : () => _initializePayment(details),
                       icon: _isPaymentSubmitting
                           ? const SizedBox(
                               width: 18,
@@ -362,28 +367,20 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                             )
                           : const Icon(Icons.open_in_new_rounded),
                       label: Text(
-                        _hasPendingPayment(details)
-                            ? 'Otvori PayPal'
-                            : 'Iniciraj placanje',
-                        ),
+                        hasApprovalUrl
+                            ? '1. Otvori PayPal'
+                            : '1. Pokreni PayPal',
                       ),
-                  if (approvalUrl != null && approvalUrl.trim().isNotEmpty)
-                    OutlinedButton.icon(
-                      onPressed: _isPaymentSubmitting
-                          ? null
-                          : () => _openApprovalUrl(approvalUrl),
-                      icon: const Icon(Icons.open_in_browser_rounded),
-                      label: const Text('Otvori PayPal'),
                     ),
-                  if (canConfirmPayment)
+                  if (canConfirmPayment && _hasOpenedPayPalApproval)
                     OutlinedButton.icon(
                       onPressed: _isPaymentSubmitting
                           ? null
                           : () => _confirmPayment(effectivePaymentId),
                       icon: const Icon(Icons.verified_rounded),
-                      label: const Text('Potvrdi placanje'),
+                      label: const Text('2. Zavrsi placanje'),
                     ),
-                  if (approvalUrl != null && approvalUrl.trim().isNotEmpty)
+                  if (hasApprovalUrl)
                     OutlinedButton.icon(
                       onPressed: () => _copyApprovalUrl(approvalUrl),
                       icon: const Icon(Icons.copy_rounded),
@@ -522,18 +519,13 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
       setState(() {
         _paymentDetails = payment;
+        _hasOpenedPayPalApproval = false;
         _markDirtyOnPop = true;
       });
 
       final approvalUrl = payment.approvalUrl?.trim();
       if (approvalUrl != null && approvalUrl.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Placanje je inicirano. Sada kliknite "Otvori PayPal" ili "Kopiraj link", pa se nakon odobrenja vratite u aplikaciju i kliknite "Potvrdi placanje".',
-            ),
-          ),
-        );
+        await _openApprovalUrl(approvalUrl);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -589,6 +581,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
       setState(() {
         _paymentDetails = payment;
+        _hasOpenedPayPalApproval = false;
         _markDirtyOnPop = true;
       });
 
@@ -658,6 +651,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       setState(() {
         _details = updated;
         _paymentDetails = null;
+        _hasOpenedPayPalApproval = false;
         _markDirtyOnPop = true;
       });
 
@@ -696,6 +690,12 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   }
 
   Future<void> _openApprovalUrl(String approvalUrl) async {
+    if (mounted) {
+      setState(() {
+        _hasOpenedPayPalApproval = true;
+      });
+    }
+
     final uri = Uri.tryParse(approvalUrl);
     if (uri == null) {
       await _copyApprovalUrl(approvalUrl);
