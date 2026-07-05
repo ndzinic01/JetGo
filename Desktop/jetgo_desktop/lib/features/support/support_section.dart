@@ -325,10 +325,10 @@ class _SupportSectionState extends State<SupportSection> {
                   DataColumn(label: Text('Naslov')),
                   DataColumn(label: Text('Kupac')),
                   DataColumn(label: Text('Email')),
-                  DataColumn(label: Text('Preview')),
+                  DataColumn(label: Text('Pregled')),
                   DataColumn(label: Text('Kreirano')),
                   DataColumn(label: Text('Odgovor')),
-                  DataColumn(label: Text('Replied at')),
+                  DataColumn(label: Text('Odgovoreno u')),
                 ],
                 rows: _messages.map((item) {
                   final isSelected = item.id == _selectedMessageId;
@@ -440,7 +440,7 @@ class _SupportSectionState extends State<SupportSection> {
           icon: Icon(
             details.isReplied ? Icons.edit_note_rounded : Icons.reply_rounded,
           ),
-          label: Text(details.isReplied ? 'Edit reply' : 'Reply'),
+          label: Text(details.isReplied ? 'Uredi odgovor' : 'Odgovori'),
         ),
         const SizedBox(height: 20),
         Expanded(
@@ -452,9 +452,9 @@ class _SupportSectionState extends State<SupportSection> {
                   _DetailsRow('Ime i prezime', details.customer.fullName),
                   _DetailsRow('Korisnicko ime', '@${details.customer.username}'),
                   _DetailsRow('Email', details.customer.email),
-                  _DetailsRow('User ID', details.customer.userId),
+                  _DetailsRow('ID korisnika', details.customer.userId),
                 ],
-                body: 'Profil korisnika koji je poslao support upit.',
+                body: 'Profil korisnika koji je poslao upit podrsci.',
               ),
               const SizedBox(height: 16),
               _DetailsBlock(
@@ -477,7 +477,7 @@ class _SupportSectionState extends State<SupportSection> {
                     details.isReplied ? 'Odgovoreno' : 'Ceka odgovor',
                   ),
                   _DetailsRow(
-                    'Replied at',
+                    'Odgovoreno u',
                     _formatDateTime(details.repliedAtUtc),
                   ),
                 ],

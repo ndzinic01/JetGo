@@ -2,56 +2,56 @@ class MobileDisplay {
   static String flightStatusLabel(int status) {
     switch (status) {
       case 1:
-        return 'Scheduled';
+        return 'Zakazan';
       case 2:
-        return 'Delayed';
+        return 'Kasni';
       case 3:
-        return 'Cancelled';
+        return 'Otkazan';
       case 4:
-        return 'Completed';
+        return 'Zavrsen';
       default:
-        return 'Unknown';
+        return 'Nepoznato';
     }
   }
 
   static String reservationStatusLabel(int status) {
     switch (status) {
       case 1:
-        return 'Pending';
+        return 'Na cekanju';
       case 2:
-        return 'Confirmed';
+        return 'Potvrdjena';
       case 3:
-        return 'Cancelled';
+        return 'Otkazana';
       case 4:
-        return 'Completed';
+        return 'Zavrsena';
       default:
-        return 'Unknown';
+        return 'Nepoznato';
     }
   }
 
   static String notificationStatusLabel(int status) {
     switch (status) {
       case 1:
-        return 'Unread';
+        return 'Neprocitana';
       case 2:
-        return 'Read';
+        return 'Procitana';
       default:
-        return 'Unknown';
+        return 'Nepoznato';
     }
   }
 
   static String paymentStatusLabel(int? status) {
     switch (status) {
       case 1:
-        return 'Pending';
+        return 'Na cekanju';
       case 2:
-        return 'Paid';
+        return 'Placeno';
       case 3:
-        return 'Failed';
+        return 'Neuspjelo';
       case 4:
-        return 'Refunded';
+        return 'Refundirano';
       default:
-        return 'Unknown';
+        return 'Nepoznato';
     }
   }
 

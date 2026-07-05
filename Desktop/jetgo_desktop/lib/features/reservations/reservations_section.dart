@@ -67,7 +67,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
         return;
       }
       setState(() {
-        _errorMessage = 'Reservations modul trenutno nije dostupan.';
+        _errorMessage = 'Modul rezervacija trenutno nije dostupan.';
         _isLoading = false;
       });
     }
@@ -588,7 +588,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                   _DetailsRow('Ime i prezime', details.customer.fullName),
                   _DetailsRow('Korisnicko ime', '@${details.customer.username}'),
                   _DetailsRow('Email', details.customer.email),
-                  _DetailsRow('User ID', details.customer.userId),
+                  _DetailsRow('ID korisnika', details.customer.userId),
                 ],
               ),
               const SizedBox(height: 16),
@@ -596,11 +596,11 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                 title: 'Placanje',
                 rows: [
                   _DetailsRow(
-                    'Payment ID',
+                    'ID placanja',
                     details.paymentId?.toString() ?? '-',
                   ),
                   _DetailsRow(
-                    'Payment status',
+                    'Status placanja',
                     details.paymentStatus?.label ?? '-',
                   ),
                   _DetailsRow(
@@ -608,7 +608,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                     details.isPaid ? 'Da' : 'Ne',
                   ),
                   _DetailsRow(
-                    'Moze payment',
+                    'Moze placanje',
                     details.canInitiatePayment ? 'Da' : 'Ne',
                   ),
                 ],
@@ -659,7 +659,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
 
   String _paymentSummary(ReservationItem item) {
     if (item.paymentStatus == null) {
-      return item.isPaid ? 'Paid' : '-';
+      return item.isPaid ? 'Placeno' : '-';
     }
     return item.paymentStatus!.label;
   }

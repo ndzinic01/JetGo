@@ -300,7 +300,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                 onSubmitted: (_) => _loadPayments(),
                 decoration: const InputDecoration(
                   labelText: 'Pretraga placanja',
-                  hintText: 'Reservation code, customer, provider ili route',
+                  hintText: 'Kod rezervacije, kupac, servis ili ruta',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
               ),
@@ -382,15 +382,15 @@ class _PaymentsSectionState extends State<PaymentsSection> {
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 columns: const [
-                  DataColumn(label: Text('Reservation')),
+                  DataColumn(label: Text('Rezervacija')),
                   DataColumn(label: Text('Kupac')),
                   DataColumn(label: Text('Let')),
                   DataColumn(label: Text('Ruta')),
-                  DataColumn(label: Text('Provider')),
+                  DataColumn(label: Text('Servis')),
                   DataColumn(label: Text('Iznos')),
                   DataColumn(label: Text('Status')),
                   DataColumn(label: Text('Kreirano')),
-                  DataColumn(label: Text('Paid at')),
+                  DataColumn(label: Text('Placeno u')),
                 ],
                 rows: _payments.map((item) {
                   final isSelected = item.id == _selectedPaymentId;
@@ -485,12 +485,12 @@ class _PaymentsSectionState extends State<PaymentsSection> {
               FilledButton.icon(
                 onPressed: _openRefundDialog,
                 icon: const Icon(Icons.reply_all_rounded),
-                label: const Text('Refund'),
+                label: const Text('Refundiraj'),
               ),
             FilledButton.tonalIcon(
               onPressed: _openDebugDialog,
               icon: const Icon(Icons.bug_report_rounded),
-              label: const Text('PayPal debug'),
+              label: const Text('PayPal provjera'),
             ),
           ],
         ),
@@ -501,16 +501,16 @@ class _PaymentsSectionState extends State<PaymentsSection> {
               _DetailsBlock(
                 title: 'Placanje',
                 rows: [
-                  _DetailsRow('Payment ID', details.id.toString()),
-                  _DetailsRow('Provider', details.provider),
+                  _DetailsRow('ID placanja', details.id.toString()),
+                  _DetailsRow('Servis placanja', details.provider),
                   _DetailsRow(
-                    'Provider ref',
+                    'Referenca servisa',
                     details.providerReference?.trim().isNotEmpty == true
                         ? details.providerReference!
                         : '-',
                   ),
                   _DetailsRow(
-                    'Approval URL',
+                    'URL odobrenja',
                     details.approvalUrl?.trim().isNotEmpty == true
                         ? details.approvalUrl!
                         : '-',
@@ -527,18 +527,18 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                 rows: [
                   _DetailsRow('Status', details.status.label),
                   _DetailsRow('Kreirano', _formatDateTime(details.createdAtUtc)),
-                  _DetailsRow('Updated', _formatDateTime(details.updatedAtUtc)),
-                  _DetailsRow('Paid at', _formatDateTime(details.paidAtUtc)),
+                  _DetailsRow('Azurirano', _formatDateTime(details.updatedAtUtc)),
+                  _DetailsRow('Placeno u', _formatDateTime(details.paidAtUtc)),
                   _DetailsRow(
-                    'Refunded at',
+                    'Refundirano u',
                     _formatDateTime(details.refundedAtUtc),
                   ),
                   _DetailsRow(
-                    'Moze confirm',
+                    'Moze potvrda',
                     details.canBeConfirmed ? 'Da' : 'Ne',
                   ),
                   _DetailsRow(
-                    'Moze refund',
+                    'Moze povrat',
                     details.canBeRefunded ? 'Da' : 'Ne',
                   ),
                 ],
@@ -550,12 +550,12 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                   _DetailsRow('Ime i prezime', details.customer.fullName),
                   _DetailsRow('Korisnicko ime', '@${details.customer.username}'),
                   _DetailsRow('Email', details.customer.email),
-                  _DetailsRow('User ID', details.customer.userId),
+                  _DetailsRow('ID korisnika', details.customer.userId),
                 ],
               ),
               const SizedBox(height: 16),
               _DetailsBlock(
-                title: 'Status reason',
+                title: 'Razlog statusa',
                 rows: [
                   _DetailsRow(
                     'Napomena',
@@ -581,7 +581,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
 
     if (_debugErrorMessage != null) {
       return _DetailsBlock(
-        title: 'PayPal debug',
+        title: 'PayPal provjera',
         rows: [
           _DetailsRow('Greska', _debugErrorMessage!),
         ],
@@ -591,11 +591,11 @@ class _PaymentsSectionState extends State<PaymentsSection> {
     final debug = _debugSnapshot;
     if (debug == null) {
       return const _DetailsBlock(
-        title: 'PayPal debug',
+        title: 'PayPal provjera',
         rows: [
           _DetailsRow(
             'Stanje',
-            'Debug snapshot nije ucitan. Kliknite "PayPal debug" za provjeru.',
+            'Debug snapshot nije ucitan. Kliknite "PayPal provjera" za provjeru.',
           ),
         ],
       );
@@ -606,14 +606,14 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       children: [
         ..._buildDebugSummaryRows(debug),
         _DetailsBlock(
-          title: 'PayPal debug',
+          title: 'PayPal provjera',
           rows: _buildDebugPrimaryRows(debug),
         ),
         const SizedBox(height: 12),
         _DetailsBlock(
-          title: 'Debug links',
+          title: 'Debug linkovi',
           rows: debug.links.isEmpty
-              ? const [_DetailsRow('Links', 'Nema linkova.')]
+              ? const [_DetailsRow('Linkovi', 'Nema linkova.')]
               : debug.links
                   .map(
                     (link) => _DetailsRow(
@@ -625,9 +625,9 @@ class _PaymentsSectionState extends State<PaymentsSection> {
         ),
         const SizedBox(height: 12),
         _DetailsBlock(
-          title: 'Captures',
+          title: 'Capture zapisi',
           rows: debug.captures.isEmpty
-              ? const [_DetailsRow('Captures', 'Nema capture zapisa.')]
+              ? const [_DetailsRow('Capture zapisi', 'Nema capture zapisa.')]
               : debug.captures
                   .map(
                     (capture) => _DetailsRow(
@@ -659,27 +659,28 @@ class _PaymentsSectionState extends State<PaymentsSection> {
 
   List<_DetailsRow> _buildDebugPrimaryRows(PayPalDebugSnapshot debug) {
     final isCapture = debug.payPalResourceType.toLowerCase() == 'capture';
-    final resourceIdLabel = isCapture ? 'Capture ID' : 'Order ID';
-    final resourceStatusLabel = isCapture ? 'Capture status' : 'Order status';
+    final resourceIdLabel = isCapture ? 'ID capture zapisa' : 'ID narudzbe';
+    final resourceStatusLabel =
+        isCapture ? 'Status capture zapisa' : 'Status narudzbe';
 
     return [
-      _DetailsRow('Resource type', debug.payPalResourceType),
+      _DetailsRow('Tip resursa', debug.payPalResourceType),
       _DetailsRow(resourceIdLabel, debug.payPalOrderId),
       _DetailsRow(resourceStatusLabel, debug.payPalOrderStatus),
       _DetailsRow(
-        'Stored ref',
+        'Sacuvana referenca',
         debug.storedProviderReference.trim().isNotEmpty
             ? debug.storedProviderReference
             : '-',
       ),
-      _DetailsRow('Callback token', debug.callbackToken ?? '-'),
+      _DetailsRow('Povratni token', debug.callbackToken ?? '-'),
       _DetailsRow(
-        'Token match',
+        'Poklapanje tokena',
         debug.callbackTokenMatchesStoredReference ? 'Da' : 'Ne',
       ),
-      _DetailsRow('Payment status', debug.paymentStatus.label),
-      _DetailsRow('Reservation status', debug.reservationStatus.label),
-      _DetailsRow('Approval URL', debug.approvalUrl ?? '-'),
+      _DetailsRow('Status placanja', debug.paymentStatus.label),
+      _DetailsRow('Status rezervacije', debug.reservationStatus.label),
+      _DetailsRow('URL odobrenja', debug.approvalUrl ?? '-'),
     ];
   }
 
@@ -830,7 +831,7 @@ class _RefundDialogState extends State<_RefundDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Refund placanja'),
+      title: const Text('Povrat placanja'),
       content: SizedBox(
         width: 520,
         child: Form(
@@ -902,7 +903,7 @@ class _PayPalDebugDialogState extends State<_PayPalDebugDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('PayPal debug'),
+      title: const Text('PayPal provjera'),
       content: SizedBox(
         width: 460,
         child: Column(
@@ -910,13 +911,13 @@ class _PayPalDebugDialogState extends State<_PayPalDebugDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Ako imate order token sa PayPal return stranice, unesite ga ovdje. Polje je opcionalno.',
+              'Ako imate token narudzbe sa PayPal povratne stranice, unesite ga ovdje. Polje je opcionalno.',
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _controller,
               decoration: const InputDecoration(
-                labelText: 'Callback token',
+                labelText: 'Povratni token',
               ),
             ),
           ],
@@ -929,7 +930,7 @@ class _PayPalDebugDialogState extends State<_PayPalDebugDialog> {
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('Ucitaj debug'),
+          child: const Text('Ucitaj provjeru'),
         ),
       ],
     );

@@ -74,7 +74,7 @@ class _NewsSectionState extends State<NewsSection> {
     } on ApiException catch (error) {
       _errorMessage = error.message;
     } catch (_) {
-      _errorMessage = 'News modul trenutno nije dostupan. Pokusajte ponovo.';
+      _errorMessage = 'Modul novosti trenutno nije dostupan. Pokusajte ponovo.';
     } finally {
       if (mounted) {
         setState(() {
@@ -287,11 +287,11 @@ class _NewsSectionState extends State<NewsSection> {
                 ),
                 DropdownMenuItem<bool?>(
                   value: true,
-                  child: Text('Published'),
+                  child: Text('Objavljeno'),
                 ),
                 DropdownMenuItem<bool?>(
                   value: false,
-                  child: Text('Draft'),
+                  child: Text('Skica'),
                 ),
               ],
               onChanged: (value) {
@@ -344,8 +344,8 @@ class _NewsSectionState extends State<NewsSection> {
                 columns: const [
                   DataColumn(label: Text('Naslov')),
                   DataColumn(label: Text('Status')),
-                  DataColumn(label: Text('Published')),
-                  DataColumn(label: Text('Image URL')),
+                  DataColumn(label: Text('Objavljeno')),
+                  DataColumn(label: Text('URL slike')),
                 ],
                 rows: _articles.map((item) {
                   final isSelected = item.id == _selectedArticleId;
@@ -362,7 +362,9 @@ class _NewsSectionState extends State<NewsSection> {
                           ),
                         ),
                       ),
-                      DataCell(Text(item.isPublished ? 'Published' : 'Draft')),
+                      DataCell(
+                        Text(item.isPublished ? 'Objavljeno' : 'Skica'),
+                      ),
                       DataCell(Text(_formatDateTime(item.publishedAtUtc))),
                       DataCell(
                         ConstrainedBox(
@@ -422,12 +424,12 @@ class _NewsSectionState extends State<NewsSection> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Published: ${_formatDateTime(details.publishedAtUtc)}',
+                    'Objavljeno: ${_formatDateTime(details.publishedAtUtc)}',
                   ),
                 ],
               ),
             ),
-            _StatusBadge(label: details.isPublished ? 'Published' : 'Draft'),
+            _StatusBadge(label: details.isPublished ? 'Objavljeno' : 'Skica'),
           ],
         ),
         const SizedBox(height: 16),
@@ -445,14 +447,14 @@ class _NewsSectionState extends State<NewsSection> {
                 rows: [
                   _DetailsRow(
                     'Status',
-                    details.isPublished ? 'Published' : 'Draft',
+                    details.isPublished ? 'Objavljeno' : 'Skica',
                   ),
                   _DetailsRow(
-                    'Published at',
+                    'Objavljeno',
                     _formatDateTime(details.publishedAtUtc),
                   ),
                   _DetailsRow(
-                    'Created at',
+                    'Kreirano',
                     _formatDateTime(details.createdAtUtc),
                   ),
                 ],
@@ -462,7 +464,7 @@ class _NewsSectionState extends State<NewsSection> {
                 title: 'Slika',
                 rows: [
                   _DetailsRow(
-                    'Image URL',
+                    'URL slike',
                     details.imageUrl.trim().isEmpty ? '-' : details.imageUrl,
                   ),
                 ],
@@ -719,10 +721,10 @@ class _NewsArticleDialogState extends State<_NewsArticleDialog> {
                 TextFormField(
                   controller: _imageUrlController,
                   maxLength: 500,
-                  decoration: const InputDecoration(labelText: 'Image URL'),
+                  decoration: const InputDecoration(labelText: 'URL slike'),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Image URL je obavezan.';
+                      return 'URL slike je obavezan.';
                     }
                     return null;
                   },
@@ -753,7 +755,7 @@ class _NewsArticleDialogState extends State<_NewsArticleDialog> {
                     });
                   },
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Published'),
+                  title: const Text('Objavljeno'),
                   subtitle: const Text(
                     'Objavljene vijesti su odmah vidljive korisnicima u mobile aplikaciji.',
                   ),

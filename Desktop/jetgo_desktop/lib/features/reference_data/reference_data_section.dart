@@ -188,6 +188,32 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
     await _loadCurrentTab(showLoader: false);
   }
 
+  Future<void> _changeCityCountryFilter(int? value) async {
+    setState(() {
+      _cityCountryFilter = value;
+    });
+    await _loadCurrentTab();
+  }
+
+  Future<void> _changeAirportCountryFilter(int? value) async {
+    final nextFilteredCities = value == null
+        ? _allCities
+        : _allCities.where((city) => city.countryId == value).toList();
+
+    setState(() {
+      _airportCountryFilter = value;
+
+      if (value == null) {
+        _airportCityFilter = null;
+      } else if (_airportCityFilter != null &&
+          !nextFilteredCities.any((city) => city.id == _airportCityFilter)) {
+        _airportCityFilter = null;
+      }
+    });
+
+    await _loadCurrentTab();
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
@@ -491,22 +517,22 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
               ButtonSegment(
                 value: ReferenceDataTab.countries,
                 icon: Icon(Icons.flag_rounded),
-                label: Text('Countries'),
+                label: Text('Drzave'),
               ),
               ButtonSegment(
                 value: ReferenceDataTab.cities,
                 icon: Icon(Icons.location_city_rounded),
-                label: Text('Cities'),
+                label: Text('Gradovi'),
               ),
               ButtonSegment(
                 value: ReferenceDataTab.airports,
                 icon: Icon(Icons.local_airport_rounded),
-                label: Text('Airports'),
+                label: Text('Aerodromi'),
               ),
               ButtonSegment(
                 value: ReferenceDataTab.airlines,
                 icon: Icon(Icons.flight_rounded),
-                label: Text('Airlines'),
+                label: Text('Aviokompanije'),
               ),
             ],
             selected: <ReferenceDataTab>{_selectedTab},
@@ -601,10 +627,7 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
                   ),
                 ],
                 onChanged: (value) {
-                  setState(() {
-                    _cityCountryFilter = value;
-                  });
-                  _loadCurrentTab();
+                  _changeCityCountryFilter(value);
                 },
               ),
             ),
@@ -662,20 +685,7 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
                   ),
                 ],
                 onChanged: (value) {
-                  final nextFilteredCities = value == null
-                      ? _allCities
-                      : _allCities
-                          .where((city) => city.countryId == value)
-                          .toList();
-                  setState(() {
-                    _airportCountryFilter = value;
-                    if (_airportCityFilter != null &&
-                        !nextFilteredCities
-                            .any((city) => city.id == _airportCityFilter)) {
-                      _airportCityFilter = null;
-                    }
-                  });
-                  _loadCurrentTab();
+                  _changeAirportCountryFilter(value);
                 },
               ),
             ),

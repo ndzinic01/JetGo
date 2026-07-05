@@ -463,14 +463,14 @@ class _UsersSectionState extends State<UsersSection> {
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 columns: const [
-                  DataColumn(label: Text('Username')),
+                  DataColumn(label: Text('Korisnicko ime')),
                   DataColumn(label: Text('Ime i prezime')),
                   DataColumn(label: Text('Email')),
                   DataColumn(label: Text('Telefon')),
-                  DataColumn(label: Text('Role')),
+                  DataColumn(label: Text('Uloge')),
                   DataColumn(label: Text('Status')),
-                  DataColumn(label: Text('Reservations')),
-                  DataColumn(label: Text('Payments')),
+                  DataColumn(label: Text('Rezervacije')),
+                  DataColumn(label: Text('Placanja')),
                 ],
                 rows: _users.map((item) {
                   final isSelected = item.userId == _selectedUserId;
@@ -576,7 +576,7 @@ class _UsersSectionState extends State<UsersSection> {
             FilledButton.icon(
               onPressed: _openEditDialog,
               icon: const Icon(Icons.edit_rounded),
-              label: const Text('Edit'),
+              label: const Text('Uredi'),
             ),
             Tooltip(
               message: canDeactivate
@@ -591,13 +591,13 @@ class _UsersSectionState extends State<UsersSection> {
                       ? Icons.person_off_rounded
                       : Icons.verified_user_rounded,
                 ),
-                label: Text(details.isActive ? 'Deactivate' : 'Activate'),
+                label: Text(details.isActive ? 'Deaktiviraj' : 'Aktiviraj'),
               ),
             ),
             FilledButton.tonalIcon(
               onPressed: _openResetPasswordDialog,
               icon: const Icon(Icons.lock_reset_rounded),
-              label: const Text('Reset password'),
+              label: const Text('Resetuj lozinku'),
             ),
           ],
         ),
@@ -617,7 +617,7 @@ class _UsersSectionState extends State<UsersSection> {
                         : '-',
                   ),
                   _DetailsRow(
-                    'Image URL',
+                    'URL slike',
                     details.imageUrl?.trim().isNotEmpty == true
                         ? details.imageUrl!
                         : '-',
@@ -626,10 +626,10 @@ class _UsersSectionState extends State<UsersSection> {
               ),
               const SizedBox(height: 16),
               _DetailsBlock(
-                title: 'Role i status',
+                title: 'Uloge i status',
                 rows: [
                   _DetailsRow(
-                    'Role',
+                    'Uloge',
                     details.roles.isEmpty ? '-' : details.roles.join(', '),
                   ),
                   _DetailsRow(
@@ -647,20 +647,20 @@ class _UsersSectionState extends State<UsersSection> {
                 title: 'Statistika',
                 rows: [
                   _DetailsRow(
-                    'Reservations',
+                    'Rezervacije',
                     details.reservationsCount.toString(),
                   ),
-                  _DetailsRow('Payments', details.paymentsCount.toString()),
+                  _DetailsRow('Placanja', details.paymentsCount.toString()),
                   _DetailsRow(
-                    'Support messages',
+                    'Poruke podrske',
                     details.supportMessagesCount.toString(),
                   ),
                   _DetailsRow(
-                    'Search history',
+                    'Historija pretrage',
                     details.searchHistoryCount.toString(),
                   ),
                   _DetailsRow(
-                    'Unread notifications',
+                    'Neprocitane notifikacije',
                     details.unreadNotificationsCount.toString(),
                   ),
                 ],
@@ -669,7 +669,7 @@ class _UsersSectionState extends State<UsersSection> {
               _DetailsBlock(
                 title: 'Audit',
                 rows: [
-                  _DetailsRow('User ID', details.userId),
+                  _DetailsRow('ID korisnika', details.userId),
                   _DetailsRow('Kreiran', _formatDateTime(details.createdAtUtc)),
                   _DetailsRow(
                     'Zadnji update',
@@ -913,13 +913,13 @@ class _EditUserDialogState extends State<_EditUserDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _imageUrlController,
-                  decoration: const InputDecoration(labelText: 'Image URL'),
+                  decoration: const InputDecoration(labelText: 'URL slike'),
                 ),
                 const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Role',
+                    'Uloge',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),

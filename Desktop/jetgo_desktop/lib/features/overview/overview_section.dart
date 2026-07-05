@@ -70,7 +70,7 @@ class _OverviewSectionState extends State<OverviewSection> {
 
       setState(() {
         _errorMessage =
-            'Dashboard podaci trenutno nisu dostupni. Pokusajte ponovo.';
+            'Podaci kontrolne table trenutno nisu dostupni. Pokusajte ponovo.';
       });
     } finally {
       if (mounted) {
@@ -97,7 +97,7 @@ class _OverviewSectionState extends State<OverviewSection> {
               const Icon(Icons.cloud_off_rounded, size: 40),
               const SizedBox(height: 12),
               Text(
-                'Dashboard nije dostupan',
+                'Kontrolna tabla nije dostupna',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -194,7 +194,7 @@ class _DashboardHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Snapshot: ${_Formatters.dateTime(generatedAtUtc)}',
+                  'Pregled: ${_Formatters.dateTime(generatedAtUtc)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -242,9 +242,9 @@ class _SnapshotCard extends StatelessWidget {
       ),
       _MetricData(
         icon: Icons.payments_rounded,
-        title: 'Paid placanja',
+        title: 'Placena placanja',
         value: summary.paidPaymentsCount.toString(),
-        detail: 'Pending: ${summary.pendingPaymentsCount}',
+        detail: 'Na cekanju: ${summary.pendingPaymentsCount}',
       ),
       _MetricData(
         icon: Icons.undo_rounded,
@@ -318,7 +318,7 @@ class _AttentionCard extends StatelessWidget {
           icon: Icons.hourglass_top_rounded,
           title: 'Placanja u obradi',
           message:
-              '${summary.pendingPaymentsCount} payment zapisa je jos u pending statusu.',
+              'Broj placanja koja su jos na cekanju: ${summary.pendingPaymentsCount}.',
         ),
     ];
 

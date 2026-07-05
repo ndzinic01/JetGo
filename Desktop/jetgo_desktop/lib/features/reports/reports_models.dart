@@ -105,10 +105,10 @@ class PaymentsReportPreview {
 }
 
 enum ReservationReportStatus {
-  pending(1, 'Pending'),
-  confirmed(2, 'Confirmed'),
-  cancelled(3, 'Cancelled'),
-  completed(4, 'Completed');
+  pending(1, 'Na cekanju'),
+  confirmed(2, 'Potvrdjeno'),
+  cancelled(3, 'Otkazano'),
+  completed(4, 'Zavrseno');
 
   const ReservationReportStatus(this.value, this.label);
 
@@ -117,10 +117,10 @@ enum ReservationReportStatus {
 }
 
 enum PaymentReportStatus {
-  pending(1, 'Pending'),
-  paid(2, 'Paid'),
-  failed(3, 'Failed'),
-  refunded(4, 'Refunded');
+  pending(1, 'Na cekanju'),
+  paid(2, 'Placeno'),
+  failed(3, 'Neuspjelo'),
+  refunded(4, 'Refundirano');
 
   const PaymentReportStatus(this.value, this.label);
 

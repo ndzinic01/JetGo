@@ -263,10 +263,10 @@ class FlightDetails {
 }
 
 enum FlightStatusValue {
-  scheduled(1, 'Scheduled'),
-  delayed(2, 'Delayed'),
-  cancelled(3, 'Cancelled'),
-  completed(4, 'Completed');
+  scheduled(1, 'Zakazan'),
+  delayed(2, 'Kasni'),
+  cancelled(3, 'Otkazan'),
+  completed(4, 'Zavrsen');
 
   const FlightStatusValue(this.value, this.label);
 

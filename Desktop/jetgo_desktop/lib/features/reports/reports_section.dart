@@ -397,15 +397,15 @@ class _ReportsSectionState extends State<ReportsSection> {
           value: preview.totalPayments.toString(),
         ),
         _PreviewMetric(
-          label: 'Paid',
+          label: 'Placeno',
           value: preview.paidPayments.toString(),
         ),
         _PreviewMetric(
-          label: 'Refunded',
+          label: 'Refundirano',
           value: preview.refundedPayments.toString(),
         ),
         _PreviewMetric(
-          label: 'Pending / Failed',
+          label: 'Na cekanju / Neuspjelo',
           value: '${preview.pendingPayments} / ${preview.failedPayments}',
         ),
       ],
@@ -500,7 +500,7 @@ class _ReportsSectionState extends State<ReportsSection> {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
-          'PDF jos nije preuzet. Nakon downloada bice sacuvan u Downloads/JetGoReports.',
+          'PDF jos nije preuzet. Nakon downloada bice sacuvan u Downloads/JetGoReports folder.',
           style: theme.textTheme.bodyMedium,
         ),
       );
@@ -670,7 +670,7 @@ class _ReportsSectionState extends State<ReportsSection> {
       setState(() {
         _lastReservationsReport = file;
       });
-      _showMessage('Reservations report je sacuvan u JetGoReports folder.');
+      _showMessage('Izvjestaj rezervacija je sacuvan u JetGoReports folder.');
     } on ApiException catch (error) {
       if (!mounted) {
         return;
@@ -686,7 +686,7 @@ class _ReportsSectionState extends State<ReportsSection> {
 
       setState(() {
         _reservationsError =
-            'Reservations report trenutno nije moguce preuzeti.';
+            'Izvjestaj rezervacija trenutno nije moguce preuzeti.';
       });
     } finally {
       if (mounted) {
@@ -722,7 +722,7 @@ class _ReportsSectionState extends State<ReportsSection> {
       setState(() {
         _lastPaymentsReport = file;
       });
-      _showMessage('Payments report je sacuvan u JetGoReports folder.');
+      _showMessage('Izvjestaj placanja je sacuvan u JetGoReports folder.');
     } on ApiException catch (error) {
       if (!mounted) {
         return;

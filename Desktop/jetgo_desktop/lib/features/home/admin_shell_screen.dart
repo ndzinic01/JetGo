@@ -101,7 +101,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                       children: [
                         _NavButton(
                           icon: Icons.space_dashboard_rounded,
-                          label: 'Dashboard',
+                          label: 'Kontrolna tabla',
                           isSelected:
                               _selectedSection == AdminSection.overview,
                           onTap: () =>
@@ -289,7 +289,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   String _sectionTitle(AdminSection section) {
     switch (section) {
       case AdminSection.overview:
-        return 'Dashboard';
+        return 'Kontrolna tabla';
       case AdminSection.referenceData:
         return 'Osnovni podaci';
       case AdminSection.network:
