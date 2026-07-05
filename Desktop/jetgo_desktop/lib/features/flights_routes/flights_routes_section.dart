@@ -82,7 +82,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
         return;
       }
       setState(() {
-        _errorMessage = 'Flights & Routes trenutno nisu dostupni.';
+        _errorMessage = 'Rute i letovi trenutno nisu dostupni.';
         _isLoading = false;
       });
     }
@@ -303,13 +303,13 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
       await _reloadAfterMutation(refreshLookups: true);
       _showMessage(
         initial == null
-            ? 'Destinacija je uspjesno dodana.'
-            : 'Destinacija je uspjesno azurirana.',
+            ? 'Ruta je uspjesno dodana.'
+            : 'Ruta je uspjesno azurirana.',
       );
     } on ApiException catch (error) {
       _showMessage(error.message);
     } catch (_) {
-      _showMessage('Spremanje destinacije trenutno nije dostupno.');
+      _showMessage('Spremanje rute trenutno nije dostupno.');
     }
   }
 
@@ -328,7 +328,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
     } on ApiException catch (error) {
       _showMessage(error.message);
     } catch (_) {
-      _showMessage('Detalji destinacije trenutno nisu dostupni.');
+      _showMessage('Detalji rute trenutno nisu dostupni.');
     }
   }
 
@@ -421,12 +421,12 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
               ButtonSegment(
                 value: FlightsRoutesTab.destinations,
                 icon: Icon(Icons.alt_route_rounded),
-                label: Text('Destinations'),
+                label: Text('Rute'),
               ),
               ButtonSegment(
                 value: FlightsRoutesTab.flights,
                 icon: Icon(Icons.flight_takeoff_rounded),
-                label: Text('Flights'),
+                label: Text('Letovi'),
               ),
             ],
             selected: <FlightsRoutesTab>{_selectedTab},
@@ -469,8 +469,8 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
                     controller: _destinationSearchController,
                     onSubmitted: (_) => _loadCurrentTab(),
                     decoration: const InputDecoration(
-                      labelText: 'Pretraga destinacija',
-                      hintText: 'Route code, grad ili IATA kod',
+                      labelText: 'Pretraga ruta',
+                      hintText: 'Oznaka rute, grad ili IATA kod',
                       prefixIcon: Icon(Icons.search_rounded),
                     ),
                   ),
@@ -481,7 +481,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
                       ? null
                       : () => _openDestinationDialog(),
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('Nova destinacija'),
+                  label: const Text('Nova ruta'),
                 ),
                 const SizedBox(width: 12),
                 IconButton(
@@ -782,9 +782,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
 
   Widget _buildDestinationsTable() {
     if (_destinations.isEmpty) {
-      return const _EmptyTableState(
-        title: 'Nema destinacija za prikaz',
-        message: 'Pokusajte druge filtere ili dodajte novu destinaciju.',
+        return const _EmptyTableState(
+        title: 'Nema ruta za prikaz',
+        message: 'Pokusajte druge filtere ili dodajte novu rutu.',
       );
     }
 
@@ -792,12 +792,10 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
       child: DataTable(
         columns: const [
           DataColumn(label: Text('Ruta')),
-          DataColumn(label: Text('Polazak')),
-          DataColumn(label: Text('Dolazak')),
+          DataColumn(label: Text('Polazni aerodrom')),
+          DataColumn(label: Text('Dolazni aerodrom')),
           DataColumn(label: Text('Status')),
           DataColumn(label: Text('Naredni let')),
-          DataColumn(label: Text('Upcoming')),
-          DataColumn(label: Text('Najniza cijena')),
           DataColumn(label: Text('Akcije')),
         ],
         rows: _destinations.map((item) {
@@ -808,8 +806,6 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
               DataCell(_AirportCellText(airport: item.arrivalAirport)),
               DataCell(Text(item.isActive ? 'Aktivna' : 'Neaktivna')),
               DataCell(Text(_formatDateTime(item.nextDepartureAtUtc))),
-              DataCell(Text(item.upcomingFlightsCount.toString())),
-              DataCell(Text(_formatPrice(item.lowestBasePrice))),
               DataCell(
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -923,13 +919,6 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
     return '$day.$month.${local.year} $hour:$minute';
   }
 
-  String _formatPrice(double? value) {
-    if (value == null) {
-      return '-';
-    }
-
-    return '${value.toStringAsFixed(2)} BAM';
-  }
 }
 
 class _AirportCellText extends StatelessWidget {
@@ -1029,7 +1018,7 @@ class _DestinationDialogState extends State<_DestinationDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(
-        widget.initial == null ? 'Nova destinacija' : 'Uredi destinaciju',
+        widget.initial == null ? 'Nova ruta' : 'Uredi rutu',
       ),
       content: SizedBox(
         width: 460,
@@ -1111,9 +1100,9 @@ class _DestinationDialogState extends State<_DestinationDialog> {
                     _isActive = value;
                   });
                 },
-                title: const Text('Aktivna destinacija'),
+                title: const Text('Aktivna ruta'),
                 subtitle: const Text(
-                  'Neaktivna destinacija ostaje vidljiva, ali nije za novi promet.',
+                  'Neaktivna ruta ostaje u sistemu, ali nije dostupna za nove letove.',
                 ),
               ),
             ],
@@ -1247,7 +1236,7 @@ class _FlightDialogState extends State<_FlightDialog> {
                 DropdownButtonFormField<int>(
                   initialValue: _destinationId == 0 ? null : _destinationId,
                   decoration: const InputDecoration(
-                    labelText: 'Destinacija',
+                    labelText: 'Ruta',
                   ),
                   items: widget.destinations
                       .map(
@@ -1270,7 +1259,7 @@ class _FlightDialogState extends State<_FlightDialog> {
                   },
                   validator: (value) {
                     if (value == null || value <= 0) {
-                      return 'Destinacija je obavezna.';
+                      return 'Ruta je obavezna.';
                     }
                     return null;
                   },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
 import '../flights_routes/flights_routes_section.dart';
 import '../overview/overview_section.dart';
@@ -41,16 +42,17 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     final session = widget.authController.session!;
     final user = session.user;
     final theme = Theme.of(context);
+    final palette = theme.extension<DesktopPalette>()!;
 
     return Scaffold(
       body: SafeArea(
         child: Row(
           children: [
             Container(
-              width: 280,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              width: 250,
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: palette.sidebar,
                 border: Border(
                   right: BorderSide(color: theme.colorScheme.outlineVariant),
                 ),
@@ -58,22 +60,35 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.admin_panel_settings_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'JetGo Admin',
-                          style: theme.textTheme.titleLarge,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(28, 26, 20, 20),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: theme.colorScheme.outlineVariant,
                         ),
                       ),
-                    ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.insert_chart_outlined_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'JetGo Admin',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontSize: 20,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   _AdminProfileCard(
                     fullName: user.fullName,
                     username: user.username,
@@ -82,10 +97,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   const SizedBox(height: 20),
                   Expanded(
                     child: ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
                       children: [
                         _NavButton(
                           icon: Icons.space_dashboard_rounded,
-                          label: 'Overview',
+                          label: 'Dashboard',
                           isSelected:
                               _selectedSection == AdminSection.overview,
                           onTap: () =>
@@ -93,7 +109,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                         ),
                         _NavButton(
                           icon: Icons.public_rounded,
-                          label: 'Reference Data',
+                          label: 'Osnovni podaci',
                           isSelected:
                               _selectedSection == AdminSection.referenceData,
                           onTap: () =>
@@ -101,13 +117,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                         ),
                         _NavButton(
                           icon: Icons.alt_route_rounded,
-                          label: 'Flights & Routes',
+                          label: 'Rute i letovi',
                           isSelected: _selectedSection == AdminSection.network,
                           onTap: () => _selectSection(AdminSection.network),
                         ),
                         _NavButton(
                           icon: Icons.confirmation_num_rounded,
-                          label: 'Reservations',
+                          label: 'Rezervacije',
                           isSelected:
                               _selectedSection == AdminSection.reservations,
                           onTap: () =>
@@ -115,53 +131,56 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                         ),
                         _NavButton(
                           icon: Icons.group_rounded,
-                          label: 'Users',
+                          label: 'Korisnici',
                           isSelected: _selectedSection == AdminSection.users,
                           onTap: () => _selectSection(AdminSection.users),
                         ),
                         _NavButton(
                           icon: Icons.support_agent_rounded,
-                          label: 'Support',
+                          label: 'Podrska',
                           isSelected: _selectedSection == AdminSection.support,
                           onTap: () => _selectSection(AdminSection.support),
                         ),
                         _NavButton(
                           icon: Icons.article_rounded,
-                          label: 'News',
+                          label: 'Novosti',
                           isSelected: _selectedSection == AdminSection.news,
                           onTap: () => _selectSection(AdminSection.news),
                         ),
                         _NavButton(
                           icon: Icons.receipt_long_rounded,
-                          label: 'Reports',
+                          label: 'Izvjestaji',
                           isSelected: _selectedSection == AdminSection.reports,
                           onTap: () => _selectSection(AdminSection.reports),
                         ),
                         _NavButton(
                           icon: Icons.payments_rounded,
-                          label: 'Payments',
+                          label: 'Placanja',
                           isSelected: _selectedSection == AdminSection.payments,
                           onTap: () => _selectSection(AdminSection.payments),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: widget.authController.logout,
-                    icon: const Icon(Icons.logout_rounded),
-                    label: const Text('Odjava'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: OutlinedButton.icon(
+                      onPressed: widget.authController.logout,
+                      icon: const Icon(Icons.logout_rounded),
+                      label: const Text('Odjava'),
+                    ),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _TopBar(
+                      icon: _sectionIcon(_selectedSection),
                       title: _sectionTitle(_selectedSection),
                       subtitle: _sectionSubtitle(_selectedSection),
                     ),
@@ -244,37 +263,60 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     }
   }
 
+  IconData _sectionIcon(AdminSection section) {
+    switch (section) {
+      case AdminSection.overview:
+        return Icons.insert_chart_outlined_rounded;
+      case AdminSection.referenceData:
+        return Icons.public_rounded;
+      case AdminSection.network:
+        return Icons.flight_takeoff_rounded;
+      case AdminSection.reservations:
+        return Icons.calendar_month_rounded;
+      case AdminSection.users:
+        return Icons.group_rounded;
+      case AdminSection.support:
+        return Icons.support_agent_rounded;
+      case AdminSection.news:
+        return Icons.campaign_rounded;
+      case AdminSection.reports:
+        return Icons.description_outlined;
+      case AdminSection.payments:
+        return Icons.payments_outlined;
+    }
+  }
+
   String _sectionTitle(AdminSection section) {
     switch (section) {
       case AdminSection.overview:
-        return 'Overview';
+        return 'Dashboard';
       case AdminSection.referenceData:
-        return 'Reference Data';
+        return 'Osnovni podaci';
       case AdminSection.network:
-        return 'Flights & Routes';
+        return 'Rute i letovi';
       case AdminSection.reservations:
-        return 'Reservations';
+        return 'Rezervacije';
       case AdminSection.users:
-        return 'Users';
+        return 'Upravljanje korisnicima';
       case AdminSection.support:
-        return 'Support';
+        return 'Podrska';
       case AdminSection.news:
-        return 'News';
+        return 'Novosti';
       case AdminSection.reports:
-        return 'Reports';
+        return 'Izvjestaji';
       case AdminSection.payments:
-        return 'Payments';
+        return 'Placanja';
     }
   }
 
   String _sectionSubtitle(AdminSection section) {
     switch (section) {
       case AdminSection.overview:
-        return 'Operativni pregled najvaznijih admin podataka u realnom vremenu.';
+        return 'Kratak pregled najvaznijih operativnih pokazatelja.';
       case AdminSection.referenceData:
-        return 'Referentni podaci su prvi konkretni CRUD korak.';
+        return 'Drzave, gradovi, aerodromi i aviokompanije koje koriste ostali moduli.';
       case AdminSection.network:
-        return 'Letovi i destinacije dolaze odmah iza reference data modula.';
+        return 'Rute predstavljaju vezu izmedju dva aerodroma, a letovi su konkretni termini na tim rutama.';
       case AdminSection.reservations:
         return 'Operativni pregled rezervacija za desktop korisnika.';
       case AdminSection.users:
@@ -292,22 +334,43 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.title, required this.subtitle});
+  const _TopBar({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
+  final IconData icon;
   final String title;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.headlineMedium),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: theme.colorScheme.primary, size: 28),
+              const SizedBox(width: 12),
+              Text(title, style: theme.textTheme.headlineMedium),
+            ],
+          ),
+        ),
         const SizedBox(height: 8),
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+          style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
         ),
       ],
@@ -330,15 +393,20 @@ class _AdminProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
+            backgroundColor: Colors.white,
             child: Text(
               fullName.isNotEmpty ? fullName.trim()[0].toUpperCase() : 'A',
             ),
@@ -375,32 +443,42 @@ class _NavButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? theme.colorScheme.secondaryContainer
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w400,
+      padding: const EdgeInsets.only(bottom: 0),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? Colors.white.withValues(alpha: 0.52)
+                  : Colors.transparent,
+              border: Border(
+                top: BorderSide(color: theme.colorScheme.outlineVariant),
+                bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF2F5F97),
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

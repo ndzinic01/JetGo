@@ -51,12 +51,16 @@ class _ReportsSectionState extends State<ReportsSection> {
         final paymentCard = _buildPaymentsCard();
 
         if (constraints.maxWidth >= 1180) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          return ListView(
             children: [
-              Expanded(child: reservationCard),
-              const SizedBox(width: 16),
-              Expanded(child: paymentCard),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: reservationCard),
+                  const SizedBox(width: 16),
+                  Expanded(child: paymentCard),
+                ],
+              ),
             ],
           );
         }
@@ -80,12 +84,12 @@ class _ReportsSectionState extends State<ReportsSection> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Reservations PDF',
+              'Izvjestaj rezervacija (PDF)',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Prije downloada dobijate preview broja rezervacija, iznosa i nekoliko zadnjih stavki koje ulaze u izvjestaj.',
+              'Pregled prikazuje broj rezervacija, iznose i nekoliko primjer stavki prije preuzimanja PDF-a.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -103,7 +107,7 @@ class _ReportsSectionState extends State<ReportsSection> {
               onOpenFolder: _lastReservationsReport == null
                   ? null
                   : () => _openFolder(_lastReservationsReport!),
-              downloadLabel: 'Preuzmi reservations report',
+              downloadLabel: 'Preuzmi PDF',
             ),
             const SizedBox(height: 18),
             _buildResultPanel(
@@ -124,12 +128,12 @@ class _ReportsSectionState extends State<ReportsSection> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Payments PDF',
+              'Izvjestaj placanja (PDF)',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Preview prikazuje koliko payment stavki odgovara filteru, stanje po statusima i koje valute trenutno ulaze u PDF.',
+              'Pregled prikazuje broj payment stavki, statuse i valute koje ulaze u PDF.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -147,7 +151,7 @@ class _ReportsSectionState extends State<ReportsSection> {
               onOpenFolder: _lastPaymentsReport == null
                   ? null
                   : () => _openFolder(_lastPaymentsReport!),
-              downloadLabel: 'Preuzmi payments report',
+              downloadLabel: 'Preuzmi PDF',
             ),
             const SizedBox(height: 18),
             _buildResultPanel(
@@ -195,7 +199,7 @@ class _ReportsSectionState extends State<ReportsSection> {
           runSpacing: 12,
           children: [
             _DateChip(
-              label: 'Created from',
+              label: 'Kreirano od',
               value: _reservationFrom,
               onTap: () => _pickReservationDate(isFrom: true),
               onClear: _reservationFrom == null
@@ -208,7 +212,7 @@ class _ReportsSectionState extends State<ReportsSection> {
                     },
             ),
             _DateChip(
-              label: 'Created to',
+              label: 'Kreirano do',
               value: _reservationTo,
               onTap: () => _pickReservationDate(isFrom: false),
               onClear: _reservationTo == null
@@ -261,7 +265,7 @@ class _ReportsSectionState extends State<ReportsSection> {
           runSpacing: 12,
           children: [
             _DateChip(
-              label: 'Created from',
+              label: 'Kreirano od',
               value: _paymentFrom,
               onTap: () => _pickPaymentDate(isFrom: true),
               onClear: _paymentFrom == null
@@ -274,7 +278,7 @@ class _ReportsSectionState extends State<ReportsSection> {
                     },
             ),
             _DateChip(
-              label: 'Created to',
+              label: 'Kreirano do',
               value: _paymentTo,
               onTap: () => _pickPaymentDate(isFrom: false),
               onClear: _paymentTo == null
@@ -320,7 +324,7 @@ class _ReportsSectionState extends State<ReportsSection> {
     }
 
     return _PreviewPanel(
-      title: 'Preview',
+      title: 'Pregled',
       updatedAtLabel: _formatDateTime(preview.generatedAtLocal),
       metrics: [
         _PreviewMetric(
@@ -385,7 +389,7 @@ class _ReportsSectionState extends State<ReportsSection> {
     }
 
     return _PreviewPanel(
-      title: 'Preview',
+      title: 'Pregled',
       updatedAtLabel: _formatDateTime(preview.generatedAtLocal),
       metrics: [
         _PreviewMetric(
@@ -1033,19 +1037,25 @@ class _PreviewPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: metrics.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              mainAxisExtent: 78,
-            ),
-            itemBuilder: (context, index) {
-              final metric = metrics[index];
-              return _MetricCard(metric: metric);
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final crossAxisCount = constraints.maxWidth < 430 ? 1 : 2;
+
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: metrics.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  mainAxisExtent: 96,
+                ),
+                itemBuilder: (context, index) {
+                  final metric = metrics[index];
+                  return _MetricCard(metric: metric);
+                },
+              );
             },
           ),
           const SizedBox(height: 12),

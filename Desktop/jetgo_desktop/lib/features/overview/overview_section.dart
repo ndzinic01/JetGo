@@ -59,6 +59,7 @@ class _OverviewSectionState extends State<OverviewSection> {
       if (!mounted) {
         return;
       }
+
       setState(() {
         _errorMessage = error.message;
       });
@@ -66,9 +67,10 @@ class _OverviewSectionState extends State<OverviewSection> {
       if (!mounted) {
         return;
       }
+
       setState(() {
         _errorMessage =
-            'Overview podaci trenutno nisu dostupni. Pokusajte ponovo.';
+            'Dashboard podaci trenutno nisu dostupni. Pokusajte ponovo.';
       });
     } finally {
       if (mounted) {
@@ -95,7 +97,7 @@ class _OverviewSectionState extends State<OverviewSection> {
               const Icon(Icons.cloud_off_rounded, size: 40),
               const SizedBox(height: 12),
               Text(
-                'Overview nije dostupan',
+                'Dashboard nije dostupan',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -117,69 +119,30 @@ class _OverviewSectionState extends State<OverviewSection> {
 
     final summary = _summary;
     if (summary == null) {
-      return const Center(child: Text('Nema overview podataka za prikaz.'));
+      return const Center(child: Text('Nema dashboard podataka za prikaz.'));
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final activityCards = [
-          _ActivityCard(
-            title: 'Zadnje rezervacije',
-            subtitle: 'Najnovije kreirane rezervacije u sistemu.',
-            child: _RecentReservationsList(items: summary.recentReservations),
-          ),
-          _ActivityCard(
-            title: 'Zadnja placanja',
-            subtitle: 'Najnoviji payment zapisi i trenutni statusi.',
-            child: _RecentPaymentsList(items: summary.recentPayments),
-          ),
-          _ActivityCard(
-            title: 'Support queue',
-            subtitle: 'Najnoviji korisnicki upiti i odgovor admina.',
-            child: _RecentSupportList(items: summary.recentSupportMessages),
-          ),
-        ];
-
-        return ListView(
-          children: [
-            _WelcomeBand(
-              fullName: widget.currentUserFullName,
-              roles: widget.currentUserRoles,
-              generatedAtUtc: summary.generatedAtUtc,
-              onRefresh: () => _loadSummary(showLoader: false),
-            ),
-            const SizedBox(height: 16),
-            _SnapshotCard(summary: summary),
-            const SizedBox(height: 16),
-            _RevenueCard(amounts: summary.paidAmountsByCurrency),
-            const SizedBox(height: 16),
-            if (constraints.maxWidth >= 1320)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: activityCards[0]),
-                  const SizedBox(width: 16),
-                  Expanded(child: activityCards[1]),
-                  const SizedBox(width: 16),
-                  Expanded(child: activityCards[2]),
-                ],
-              )
-            else ...[
-              activityCards[0],
-              const SizedBox(height: 16),
-              activityCards[1],
-              const SizedBox(height: 16),
-              activityCards[2],
-            ],
-          ],
-        );
-      },
+    return ListView(
+      children: [
+        _DashboardHeader(
+          fullName: widget.currentUserFullName,
+          roles: widget.currentUserRoles,
+          generatedAtUtc: summary.generatedAtUtc,
+          onRefresh: () => _loadSummary(showLoader: false),
+        ),
+        const SizedBox(height: 16),
+        _SnapshotCard(summary: summary),
+        const SizedBox(height: 16),
+        _AttentionCard(summary: summary),
+        const SizedBox(height: 16),
+        _RevenueCard(amounts: summary.paidAmountsByCurrency),
+      ],
     );
   }
 }
 
-class _WelcomeBand extends StatelessWidget {
-  const _WelcomeBand({
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({
     required this.fullName,
     required this.roles,
     required this.generatedAtUtc,
@@ -194,9 +157,11 @@ class _WelcomeBand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final rolesLabel = roles.isEmpty ? 'Admin' : roles.join(', ');
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -205,28 +170,15 @@ class _WelcomeBand extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Dobrodosli nazad, $fullName',
+                    'Dobrodosli, $fullName',
                     style: theme.textTheme.headlineSmall,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
-                    'Ovdje imate brzi operativni pregled korisnika, letova, rezervacija, support-a i payment toka.',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: roles
-                        .map(
-                          (role) => Chip(
-                            avatar: const Icon(Icons.verified_user_rounded, size: 16),
-                            label: Text(role),
-                          ),
-                        )
-                        .toList(),
+                    'Uloga: $rolesLabel',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -240,12 +192,12 @@ class _WelcomeBand extends StatelessWidget {
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Osvjezi'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
                   'Snapshot: ${_Formatters.dateTime(generatedAtUtc)}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -266,73 +218,137 @@ class _SnapshotCard extends StatelessWidget {
     final metrics = [
       _MetricData(
         icon: Icons.group_rounded,
-        title: 'Korisnici',
-        value: summary.totalUsersCount.toString(),
-        lineOne: 'Aktivni: ${summary.activeUsersCount}',
-        lineTwo: 'Neaktivni: ${summary.inactiveUsersCount}',
+        title: 'Aktivni korisnici',
+        value: summary.activeUsersCount.toString(),
+        detail: 'Ukupno: ${summary.totalUsersCount}',
       ),
       _MetricData(
         icon: Icons.flight_takeoff_rounded,
-        title: 'Letovi',
+        title: 'Planirani letovi',
         value: summary.upcomingFlightsCount.toString(),
-        lineOne: 'Upcoming / active',
-        lineTwo: 'Delayed: ${summary.delayedFlightsCount}',
+        detail: 'Kasnjenja: ${summary.delayedFlightsCount}',
       ),
       _MetricData(
         icon: Icons.confirmation_num_rounded,
-        title: 'Rezervacije',
-        value: summary.totalReservationsCount.toString(),
-        lineOne: 'Pending: ${summary.pendingReservationsCount}',
-        lineTwo:
-            'Obradjeno: ${summary.totalReservationsCount - summary.pendingReservationsCount}',
+        title: 'Cekaju potvrdu',
+        value: summary.pendingReservationsCount.toString(),
+        detail: 'Sve rezervacije: ${summary.totalReservationsCount}',
       ),
       _MetricData(
         icon: Icons.support_agent_rounded,
-        title: 'Support',
+        title: 'Otvorena podrska',
         value: summary.openSupportMessagesCount.toString(),
-        lineOne: 'Otvorene poruke',
-        lineTwo: 'Odgovorene: ${summary.answeredSupportMessagesCount}',
+        detail: 'Odgovoreno: ${summary.answeredSupportMessagesCount}',
       ),
       _MetricData(
         icon: Icons.payments_rounded,
-        title: 'Placanja',
+        title: 'Paid placanja',
         value: summary.paidPaymentsCount.toString(),
-        lineOne: 'Paid placanja',
-        lineTwo:
-            'Pending: ${summary.pendingPaymentsCount}  Refunded: ${summary.refundedPaymentsCount}',
+        detail: 'Pending: ${summary.pendingPaymentsCount}',
+      ),
+      _MetricData(
+        icon: Icons.undo_rounded,
+        title: 'Refundirana',
+        value: summary.refundedPaymentsCount.toString(),
+        detail: 'Za pregled refund toka',
       ),
     ];
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Operational snapshot',
+              'Pregled sistema',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Najbitniji brojevi iz sistema na jednom mjestu, bez otvaranja svakog modula posebno.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 14,
               runSpacing: 14,
               children: metrics
                   .map(
                     (metric) => SizedBox(
-                      width: 240,
+                      width: 220,
                       child: _MetricTile(metric: metric),
                     ),
                   )
                   .toList(),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AttentionCard extends StatelessWidget {
+  const _AttentionCard({required this.summary});
+
+  final AdminDashboardSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <_FocusItem>[
+      if (summary.pendingReservationsCount > 0)
+        _FocusItem(
+          icon: Icons.schedule_rounded,
+          title: 'Rezervacije na cekanju',
+          message:
+              '${summary.pendingReservationsCount} rezervacija jos ceka admin potvrdu.',
+        ),
+      if (summary.delayedFlightsCount > 0)
+        _FocusItem(
+          icon: Icons.warning_amber_rounded,
+          title: 'Kasnjenja letova',
+          message:
+              '${summary.delayedFlightsCount} aktivnih letova trenutno ima status kasnjenja.',
+        ),
+      if (summary.openSupportMessagesCount > 0)
+        _FocusItem(
+          icon: Icons.mark_email_unread_rounded,
+          title: 'Podrska ceka odgovor',
+          message:
+              '${summary.openSupportMessagesCount} korisnickih upita jos nije zatvoreno.',
+        ),
+      if (summary.pendingPaymentsCount > 0)
+        _FocusItem(
+          icon: Icons.hourglass_top_rounded,
+          title: 'Placanja u obradi',
+          message:
+              '${summary.pendingPaymentsCount} payment zapisa je jos u pending statusu.',
+        ),
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Operativni fokus',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            if (items.isEmpty)
+              Text(
+                'Trenutno nema otvorenih stavki koje traze hitnu paznju.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              )
+            else
+              Column(
+                children: items
+                    .map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _FocusTile(item: item),
+                      ),
+                    )
+                    .toList(),
+              ),
           ],
         ),
       ),
@@ -349,24 +365,17 @@ class _RevenueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Collected paid amounts',
+              'Naplaceni iznosi',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Zbir uspjesno naplacenih paymenta grupisan po valuti. Dobro dođe i za demo i za seminarski dio.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             if (amounts.isEmpty)
-              const Text('Jos nema paid placanja za prikaz iznosa.')
+              const Text('Jos nema evidentiranih paid uplata za prikaz.')
             else
               Wrap(
                 spacing: 10,
@@ -374,7 +383,10 @@ class _RevenueCard extends StatelessWidget {
                 children: amounts
                     .map(
                       (amount) => Chip(
-                        avatar: const Icon(Icons.account_balance_wallet_rounded, size: 16),
+                        avatar: const Icon(
+                          Icons.account_balance_wallet_rounded,
+                          size: 16,
+                        ),
                         label: Text(
                           '${amount.amount.toStringAsFixed(2)} ${amount.currency}',
                         ),
@@ -389,56 +401,18 @@ class _RevenueCard extends StatelessWidget {
   }
 }
 
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MetricData {
   const _MetricData({
     required this.icon,
     required this.title,
     required this.value,
-    required this.lineOne,
-    required this.lineTwo,
+    required this.detail,
   });
 
   final IconData icon;
   final String title;
   final String value;
-  final String lineOne;
-  final String lineTwo;
+  final String detail;
 }
 
 class _MetricTile extends StatelessWidget {
@@ -461,7 +435,7 @@ class _MetricTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(metric.icon, size: 20),
+              Icon(metric.icon, size: 20, color: theme.colorScheme.primary),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -471,21 +445,19 @@ class _MetricTile extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           Text(
             metric.value,
-            style: theme.textTheme.headlineMedium?.copyWith(
+            style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          Text(metric.lineOne),
-          const SizedBox(height: 2),
           Text(
-            metric.lineTwo,
+            metric.detail,
             style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -493,138 +465,54 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
-class _RecentReservationsList extends StatelessWidget {
-  const _RecentReservationsList({required this.items});
-
-  final List<AdminDashboardRecentReservation> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const _EmptyActivityMessage(
-        message: 'Jos nema rezervacija u sistemu.',
-      );
-    }
-
-    return Column(
-      children: items
-          .map(
-            (item) => _ActivityRow(
-              title: item.reservationCode,
-              subtitle:
-                  '${_Formatters.safeText(item.customerName)} • ${item.flightNumber} • ${item.routeCode}',
-              meta:
-                  '${_Formatters.reservationStatus(item.status)} • ${item.totalAmount.toStringAsFixed(2)} ${item.currency} • ${_Formatters.dateTime(item.createdAtUtc)}',
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _RecentPaymentsList extends StatelessWidget {
-  const _RecentPaymentsList({required this.items});
-
-  final List<AdminDashboardRecentPayment> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const _EmptyActivityMessage(
-        message: 'Jos nema payment zapisa u sistemu.',
-      );
-    }
-
-    return Column(
-      children: items
-          .map(
-            (item) => _ActivityRow(
-              title: item.reservationCode,
-              subtitle:
-                  '${_Formatters.safeText(item.customerName)} • ${item.flightNumber} • ${item.routeCode}',
-              meta:
-                  '${_Formatters.paymentStatus(item.status)} • ${item.amount.toStringAsFixed(2)} ${item.currency} • ${_Formatters.dateTime(item.createdAtUtc)}',
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _RecentSupportList extends StatelessWidget {
-  const _RecentSupportList({required this.items});
-
-  final List<AdminDashboardRecentSupportMessage> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const _EmptyActivityMessage(
-        message: 'Jos nema support poruka u inboxu.',
-      );
-    }
-
-    return Column(
-      children: items
-          .map(
-            (item) => _ActivityRow(
-              title: item.subject,
-              subtitle:
-                  '${_Formatters.safeText(item.customerName)} • ${_Formatters.safeText(item.customerEmail)}',
-              meta:
-                  '${item.isReplied ? 'Odgovoreno' : 'Ceka odgovor'} • ${_Formatters.dateTime(item.createdAtUtc)}',
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({
+class _FocusItem {
+  const _FocusItem({
+    required this.icon,
     required this.title,
-    required this.subtitle,
-    required this.meta,
+    required this.message,
   });
 
+  final IconData icon;
   final String title;
-  final String subtitle;
-  final String meta;
+  final String message;
+}
+
+class _FocusTile extends StatelessWidget {
+  const _FocusTile({required this.item});
+
+  final _FocusItem item;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            meta,
-            style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+          Icon(item.icon, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: theme.textTheme.titleMedium,
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  item.message,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -632,52 +520,7 @@ class _ActivityRow extends StatelessWidget {
   }
 }
 
-class _EmptyActivityMessage extends StatelessWidget {
-  const _EmptyActivityMessage({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Center(child: Text(message)),
-    );
-  }
-}
-
 class _Formatters {
-  static String reservationStatus(int value) {
-    switch (value) {
-      case 2:
-        return 'Confirmed';
-      case 3:
-        return 'Cancelled';
-      case 4:
-        return 'Completed';
-      default:
-        return 'Pending';
-    }
-  }
-
-  static String paymentStatus(int value) {
-    switch (value) {
-      case 2:
-        return 'Paid';
-      case 3:
-        return 'Failed';
-      case 4:
-        return 'Refunded';
-      default:
-        return 'Pending';
-    }
-  }
-
-  static String safeText(String value) {
-    final trimmed = value.trim();
-    return trimmed.isEmpty ? '-' : trimmed;
-  }
-
   static String dateTime(DateTime value) {
     final local = value.toLocal();
     final day = local.day.toString().padLeft(2, '0');

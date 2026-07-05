@@ -15,10 +15,15 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
+  static const _heroImageUrl =
+      'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=80';
+
   final MobileDataService _dataService = MobileDataService();
 
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _showUnreadOnly = false;
+  String _typeFilter = 'Sve';
   String? _errorMessage;
   MobileNotificationSummary? _summary;
   List<MobileNotification> _notifications = const [];
@@ -203,74 +208,102 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     }
 
+    final visibleNotifications = _notifications.where((notification) {
+      if (_showUnreadOnly && !notification.isUnread) {
+        return false;
+      }
+
+      switch (_typeFilter) {
+        case 'Neprocitane':
+          return notification.isUnread;
+        case 'Procitane':
+          return !notification.isUnread;
+        default:
+          return true;
+      }
+    }).toList();
+
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Centar notifikacija',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Ovdje pratite potvrde rezervacija, promjene statusa i payment obavijesti.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _SummaryBlock(
-                      icon: Icons.mark_email_unread_rounded,
-                      label: 'Neprocitane',
-                      value: summary.unreadCount.toString(),
+        _NotificationsHero(summary: summary),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _typeFilter,
+                        decoration: const InputDecoration(
+                          labelText: 'Vrsta prikaza',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Sve',
+                            child: Text('Sve'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Neprocitane',
+                            child: Text('Neprocitane'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Procitane',
+                            child: Text('Procitane'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setState(() {
+                            _typeFilter = value;
+                          });
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _SummaryBlock(
-                      icon: Icons.notifications_active_rounded,
-                      label: 'Ukupno',
-                      value: summary.totalCount.toString(),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _showUnreadOnly,
+                      onChanged: (value) {
+                        setState(() {
+                          _showUnreadOnly = value ?? false;
+                        });
+                      },
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _LatestNotificationRow(
-                value: summary.latestCreatedAtUtc == null
-                    ? '-'
-                    : MobileDisplay.formatDateTime(summary.latestCreatedAtUtc!),
-              ),
-              if (summary.unreadCount > 0) ...[
-                const SizedBox(height: 14),
-                FilledButton.tonalIcon(
-                  onPressed: _isSubmitting ? null : _markAllAsRead,
-                  icon: const Icon(Icons.done_all_rounded),
-                  label: const Text('Oznaci sve kao procitano'),
+                    const Expanded(
+                      child: Text('Samo neprocitane'),
+                    ),
+                    if (summary.unreadCount > 0)
+                      TextButton.icon(
+                        onPressed: _isSubmitting ? null : _markAllAsRead,
+                        icon: const Icon(Icons.done_all_rounded),
+                        label: const Text('Procitaj sve'),
+                      ),
+                  ],
                 ),
               ],
-            ],
+            ),
           ),
         ),
         const SizedBox(height: 16),
-        if (_notifications.isEmpty)
+        if (visibleNotifications.isEmpty)
           const _NotificationsEmptyState(
             icon: Icons.notifications_none_rounded,
             title: 'Nemate notifikacija',
             message: 'Kad backend zabiljezi nove dogadjaje, pojavit ce se ovdje.',
           )
         else
-          ..._notifications.map(_buildNotificationCard),
+          ...visibleNotifications.map(_buildNotificationCard),
       ],
     );
   }
@@ -281,17 +314,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: isUnread ? 1 : 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(6),
         side: BorderSide(
           color: isUnread
-              ? theme.colorScheme.primary.withValues(alpha: 0.28)
+              ? theme.colorScheme.primary.withValues(alpha: 0.34)
               : theme.colorScheme.outlineVariant,
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -299,19 +331,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: isUnread
-                        ? theme.colorScheme.secondaryContainer
-                        : theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+                    color: _iconBackground(theme, notification),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Icon(
-                    isUnread
-                        ? Icons.notifications_active_rounded
-                        : Icons.notifications_none_rounded,
-                    color: theme.colorScheme.primary,
+                    _notificationIcon(notification),
+                    color: _iconColor(notification),
+                    size: 20,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -324,35 +353,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         style: theme.textTheme.titleMedium,
                       ),
                       const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
+                      Text(
+                        MobileDisplay.notificationStatusLabel(
+                          notification.status,
                         ),
-                        decoration: BoxDecoration(
-                          color: isUnread
-                              ? theme.colorScheme.secondaryContainer
-                              : theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          MobileDisplay.notificationStatusLabel(
-                            notification.status,
-                          ),
-                          style: theme.textTheme.labelMedium,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                 ),
+                if (isUnread)
+                  Container(
+                    width: 12,
+                    height: 12,
+                    margin: const EdgeInsets.only(top: 6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Text(
               notification.body,
               style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Icon(
@@ -373,8 +402,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   TextButton.icon(
                     onPressed:
                         _isSubmitting ? null : () => _markAsRead(notification),
-                    icon: const Icon(Icons.done_rounded),
-                    label: const Text('Procitano'),
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: const Text('Procitaj'),
                   )
                 else
                   const Icon(
@@ -388,71 +417,116 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
     );
   }
-}
 
-class _LatestNotificationRow extends StatelessWidget {
-  const _LatestNotificationRow({required this.value});
+  IconData _notificationIcon(MobileNotification notification) {
+    final text = '${notification.title} ${notification.body}'.toLowerCase();
+    if (text.contains('otkazan')) {
+      return Icons.close_rounded;
+    }
+    if (text.contains('odgod')) {
+      return Icons.warning_amber_rounded;
+    }
+    if (text.contains('vrijeme')) {
+      return Icons.access_time_filled_rounded;
+    }
+    if (text.contains('podrsk') || text.contains('poruka')) {
+      return Icons.chat_bubble_outline_rounded;
+    }
+    return Icons.notifications_active_rounded;
+  }
 
-  final String value;
+  Color _iconColor(MobileNotification notification) {
+    final text = '${notification.title} ${notification.body}'.toLowerCase();
+    if (text.contains('otkazan')) {
+      return const Color(0xFFE84C3D);
+    }
+    if (text.contains('odgod')) {
+      return const Color(0xFFF1C40F);
+    }
+    if (text.contains('vrijeme')) {
+      return const Color(0xFF4A90E2);
+    }
+    return const Color(0xFF4A90E2);
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.history_rounded,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Zadnja aktivnost: $value',
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
-        ],
-      ),
-    );
+  Color _iconBackground(ThemeData theme, MobileNotification notification) {
+    return _iconColor(notification).withValues(alpha: 0.14);
   }
 }
 
-class _SummaryBlock extends StatelessWidget {
-  const _SummaryBlock({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+class _NotificationsHero extends StatelessWidget {
+  const _NotificationsHero({required this.summary});
 
-  final IconData icon;
-  final String label;
-  final String value;
+  final MobileNotificationSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: theme.colorScheme.primary),
-        const SizedBox(height: 10),
-        Text(label, style: theme.textTheme.labelMedium),
-        const SizedBox(height: 6),
-        Text(value, style: theme.textTheme.titleMedium),
-      ],
+    final latest = summary.latestCreatedAtUtc == null
+        ? '-'
+        : MobileDisplay.formatDateTime(summary.latestCreatedAtUtc!);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 230,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              _NotificationsScreenState._heroImageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.14),
+                );
+              },
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.12),
+                    Colors.black.withValues(alpha: 0.36),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Spacer(),
+                  Text(
+                    'Notifikacije',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ukupno: ${summary.totalCount}  |  Neprocitane: ${summary.unreadCount}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Zadnja aktivnost: $latest',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.92),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

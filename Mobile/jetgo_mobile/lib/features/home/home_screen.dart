@@ -22,6 +22,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const _heroImageUrl =
+      'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=80';
+
   final MobileDataService _dataService = MobileDataService();
   final TextEditingController _flightSearchController = TextEditingController();
 
@@ -338,10 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = widget.authController.session?.user;
-    final theme = Theme.of(context);
     final notificationSummary = _notificationSummary;
-    final displayName = _profile?.fullName ?? user?.fullName ?? 'Dobrodosli';
 
     return Scaffold(
       appBar: AppBar(
@@ -367,26 +367,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              color: theme.colorScheme.surfaceContainerHighest,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Text(
-                user == null
-                    ? 'Dobrodosli'
-                    : 'Prijavljeni ste kao $displayName',
-                style: theme.textTheme.bodyMedium,
-              ),
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadCurrentTab,
-                child: _buildBody(context),
-              ),
-            ),
-          ],
+        child: RefreshIndicator(
+          onRefresh: _loadCurrentTab,
+          child: _buildBody(context),
         ),
       ),
       bottomNavigationBar: NavigationBar(
@@ -450,27 +433,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildFlightsTab(BuildContext context) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        TextField(
-          controller: _flightSearchController,
-          textInputAction: TextInputAction.search,
-          onSubmitted: (_) => _loadCurrentTab(),
-          decoration: InputDecoration(
-            labelText: 'Pretraga letova',
-            hintText: 'Unesite grad, aerodrom ili oznaku rute',
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: IconButton(
-              tooltip: 'Pokreni pretragu',
-              onPressed: _loadCurrentTab,
-              icon: const Icon(Icons.arrow_forward_rounded),
-            ),
-          ),
-        ),
+        _buildFlightsHero(context),
         const SizedBox(height: 16),
+        _buildSearchPanel(context),
+        const SizedBox(height: 20),
         _buildRecommendationsSection(context),
-        if (_recommendedFlights.isNotEmpty || _recommendationsErrorMessage != null)
-          const SizedBox(height: 16),
+        const SizedBox(height: 20),
+        _SectionHeader(
+          title: 'Dostupni letovi',
+          subtitle: userFriendlySearchLabel(),
+        ),
+        const SizedBox(height: 10),
         if (_flights.isEmpty)
           const _EmptyState(
             icon: Icons.flight_rounded,
@@ -483,6 +458,136 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String userFriendlySearchLabel() {
+    final query = _flightSearchController.text.trim();
+    if (query.isEmpty) {
+      return 'Pregled svih aktivnih i dostupnih opcija za putovanje.';
+    }
+
+    return 'Rezultati za pojam: "$query".';
+  }
+
+  Widget _buildFlightsHero(BuildContext context) {
+    final theme = Theme.of(context);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 230,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              _heroImageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                );
+              },
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.12),
+                    Colors.black.withValues(alpha: 0.34),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Spacer(),
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.82),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.menu_rounded),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Find your flight',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Brza pretraga letova, rezervacija i preporuka na jednom mjestu.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchPanel(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Pretraga letova',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _flightSearchController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _loadCurrentTab(),
+              decoration: InputDecoration(
+                labelText: 'Grad, aerodrom ili oznaka rute',
+                hintText: 'npr. Sarajevo, VIE ili BNX-VIE',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: IconButton(
+                  tooltip: 'Pokreni pretragu',
+                  onPressed: _loadCurrentTab,
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Prijavljeni ste kao ${_profile?.fullName ?? widget.authController.session?.user.fullName ?? 'korisnik'}',
+                  ),
+                ),
+                FilledButton(
+                  onPressed: _loadCurrentTab,
+                  child: const Text('Pretrazi'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRecommendationsSection(BuildContext context) {
     if (_recommendationsErrorMessage != null) {
       return Card(
@@ -492,8 +597,8 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Preporuceni letovi',
-                style: Theme.of(context).textTheme.titleMedium,
+                'Preporuceno za vas',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
@@ -507,30 +612,48 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_recommendedFlights.isEmpty) {
-      return const SizedBox.shrink();
+      return const _EmptyState(
+        icon: Icons.travel_explore_rounded,
+        title: 'Preporuke jos nisu spremne',
+        message: 'Nakon nekoliko pretraga i rezervacija ovdje ce se pojaviti personalizovani prijedlozi.',
+      );
     }
 
-    final topRecommendations = _recommendedFlights.take(3).toList();
+    final topRecommendations = _recommendedFlights.take(6).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Preporuceni letovi',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Na osnovu pretraga i historije rezervacija izdvajamo letove koji bi vam mogli biti najzanimljiviji.',
-          style: Theme.of(context).textTheme.bodyMedium,
+        const _SectionHeader(
+          title: 'Preporuceno za vas',
+          subtitle: 'Najzanimljivije opcije na osnovu pretraga i historije rezervacija.',
         ),
         const SizedBox(height: 12),
-        ...topRecommendations.map(_buildRecommendedFlightCard),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: topRecommendations.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.78,
+          ),
+          itemBuilder: (context, index) {
+            return _buildRecommendedFlightCard(topRecommendations[index]);
+          },
+        ),
       ],
     );
   }
 
   Widget _buildRecommendedFlightCard(MobileRecommendedFlight flight) {
+    final imageUrl = _destinationImageFor(
+      cityName: flight.arrivalAirport.cityName,
+      airportCode: flight.arrivalAirport.iataCode,
+      routeCode: flight.routeCode,
+    );
+
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: () => _openFlightDetails(
@@ -552,63 +675,77 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1.08,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${flight.flightNumber} - ${flight.routeCode}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${flight.departureAirport.cityName} (${flight.departureAirport.iataCode}) -> ${flight.arrivalAirport.cityName} (${flight.arrivalAirport.iataCode})',
-                        ),
-                      ],
-                    ),
+                  Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .secondaryContainer,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.flight_rounded, size: 34),
+                      );
+                    },
                   ),
-                  _StatusChip(
-                    label: 'Score ${flight.recommendationScore}',
+                  Positioned(
+                    left: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.88),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        MobileDisplay.formatMoney(
+                          flight.basePrice,
+                          flight.currency,
+                        ),
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                flight.recommendationReason,
-                style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${flight.departureAirport.cityName} -> ${flight.arrivalAirport.cityName}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${flight.routeCode}  |  ${flight.flightNumber}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    MobileDisplay.formatDateTime(flight.departureAtUtc),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: flight.appliedSignals
-                    .map(
-                      (signal) => Chip(
-                        label: Text(signal),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Polazak: ${MobileDisplay.formatDateTime(flight.departureAtUtc)}',
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${MobileDisplay.formatMoney(flight.basePrice, flight.currency)} - Slobodna sjedista ${flight.availableSeats}/${flight.totalSeats}',
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -948,51 +1085,115 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFlightCard(MobileFlight flight) {
+    final imageUrl = _destinationImageFor(
+      cityName: flight.arrivalAirport.cityName,
+      airportCode: flight.arrivalAirport.iataCode,
+      routeCode: flight.routeCode,
+    );
+
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: () => _openFlightDetails(flight),
       child: Card(
         margin: const EdgeInsets.only(bottom: 12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 112,
+              width: double.infinity,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Theme.of(context).colorScheme.secondaryContainer,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.flight_rounded, size: 34),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      '${flight.flightNumber} - ${flight.routeCode}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${flight.departureAirport.cityName} -> ${flight.arrivalAirport.cityName}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      _StatusChip(
+                        label: MobileDisplay.flightStatusLabel(flight.status),
+                      ),
+                    ],
                   ),
-                  _StatusChip(
-                    label: MobileDisplay.flightStatusLabel(flight.status),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${flight.flightNumber}  |  ${flight.airline.name}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Polazak: ${MobileDisplay.formatDateTime(flight.departureAtUtc)}',
+                  ),
+                  Text(
+                    'Dolazak: ${MobileDisplay.formatDateTime(flight.arrivalAtUtc)}',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${MobileDisplay.formatMoney(flight.basePrice, flight.currency)}  |  Slobodna sjedista ${flight.availableSeats}/${flight.totalSeats}',
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                '${flight.departureAirport.cityName} (${flight.departureAirport.iataCode}) -> ${flight.arrivalAirport.cityName} (${flight.arrivalAirport.iataCode})',
-              ),
-              const SizedBox(height: 4),
-              Text('${flight.airline.name} - ${flight.airline.code}'),
-              const SizedBox(height: 8),
-              Text(
-                'Polazak: ${MobileDisplay.formatDateTime(flight.departureAtUtc)}',
-              ),
-              Text(
-                'Dolazak: ${MobileDisplay.formatDateTime(flight.arrivalAtUtc)}',
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${MobileDisplay.formatMoney(flight.basePrice, flight.currency)} - Slobodna sjedista ${flight.availableSeats}/${flight.totalSeats}',
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String _destinationImageFor({
+    required String cityName,
+    required String airportCode,
+    required String routeCode,
+  }) {
+    final key = '${cityName.toLowerCase()} ${airportCode.toLowerCase()} ${routeCode.toLowerCase()}';
+
+    if (key.contains('paris') || key.contains('cdg')) {
+      return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('rome') || key.contains('fco')) {
+      return 'https://images.unsplash.com/photo-1525874684015-58379d421a52?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('istanbul') || key.contains('ist')) {
+      return 'https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('berlin') || key.contains('ber')) {
+      return 'https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('vienna') || key.contains('vie') || key.contains('bec')) {
+      return 'https://images.unsplash.com/photo-1516550893923-42d28e5677af?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('zurich') || key.contains('zrh')) {
+      return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('zagreb') || key.contains('zag')) {
+      return 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('frankfurt') || key.contains('fra')) {
+      return 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('belgrade') || key.contains('beograd') || key.contains('beg')) {
+      return 'https://images.unsplash.com/photo-1578922746465-3a80a228f223?auto=format&fit=crop&w=900&q=80';
+    }
+
+    return _heroImageUrl;
   }
 }
 
@@ -1084,6 +1285,36 @@ class _StatusChip extends StatelessWidget {
         label,
         style: Theme.of(context).textTheme.labelMedium,
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
     );
   }
 }
