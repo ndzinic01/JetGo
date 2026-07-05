@@ -193,7 +193,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                       !_hasPendingPayment(details)) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Rezervacija je spremna za payment korak na backendu.',
+                      'Rezervacija je spremna za placanje.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -319,11 +319,11 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
             ),
             const SizedBox(height: 12),
             Text('Iznos: ${MobileDisplay.formatMoney(amount, currency)}'),
-            Text('Provider: ${_paymentDetails?.provider ?? 'PayPal'}'),
+            Text('Servis placanja: ${_paymentDetails?.provider ?? 'PayPal'}'),
             Text(
               effectivePaymentId == null
-                  ? 'Payment jos nije iniciran.'
-                  : 'Payment ID: $effectivePaymentId',
+                  ? 'Placanje jos nije inicirano.'
+                  : 'ID placanja: $effectivePaymentId',
             ),
             if (statusReason != null && statusReason.trim().isNotEmpty) ...[
               const SizedBox(height: 8),

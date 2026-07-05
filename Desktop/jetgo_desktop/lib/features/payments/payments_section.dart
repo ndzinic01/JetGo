@@ -534,10 +534,6 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                     _formatDateTime(details.refundedAtUtc),
                   ),
                   _DetailsRow(
-                    'Moze potvrda',
-                    details.canBeConfirmed ? 'Da' : 'Ne',
-                  ),
-                  _DetailsRow(
                     'Moze povrat',
                     details.canBeRefunded ? 'Da' : 'Ne',
                   ),

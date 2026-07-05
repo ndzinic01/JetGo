@@ -53,6 +53,7 @@ public sealed class PaymentService : IPaymentService
 
         var currentUserId = GetRequiredCurrentUserId();
         var isAdmin = CurrentUserIsAdmin();
+        var nowUtc = DateTime.UtcNow;
 
         var reservation = await _dbContext.Reservations
             .Include(x => x.Payment)
@@ -70,6 +71,7 @@ public sealed class PaymentService : IPaymentService
             throw new ForbiddenException("Mozete inicirati placanje samo za vlastitu rezervaciju.");
         }
 
+        var wasAutoConfirmed = AutoConfirmReservationIfNeeded(reservation, currentUserId, nowUtc);
         EnsureReservationCanReceivePayment(reservation);
 
         if (reservation.Payment is not null)
@@ -80,6 +82,11 @@ public sealed class PaymentService : IPaymentService
                     throw new ConflictException("Placanje za odabranu rezervaciju je vec uspjesno zavrseno.");
                 case PaymentStatus.Pending:
                 {
+                    if (wasAutoConfirmed)
+                    {
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                    }
+
                     var approvalUrl = await TryResolveApprovalUrlAsync(reservation.Payment.ProviderReference, cancellationToken);
                     return await GetByIdInternalAsync(reservation.Payment.Id, approvalUrl, cancellationToken);
                 }
@@ -103,7 +110,7 @@ public sealed class PaymentService : IPaymentService
                     reservation.Payment.StatusReason = BuildInitializedStatusReason(reservation.Currency, providerPricing.CurrencyCode);
                     reservation.Payment.PaidAtUtc = null;
                     reservation.Payment.RefundedAtUtc = null;
-                    reservation.Payment.UpdatedAtUtc = DateTime.UtcNow;
+                    reservation.Payment.UpdatedAtUtc = nowUtc;
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
                     _logger.LogInformation("Payment {PaymentId} re-initialized through PayPal for reservation {ReservationId}.", reservation.Payment.Id, reservation.Id);
@@ -315,8 +322,16 @@ public sealed class PaymentService : IPaymentService
             throw new ForbiddenException("Mozete potvrditi placanje samo za vlastitu rezervaciju.");
         }
 
+        var nowUtc = DateTime.UtcNow;
+        var wasAutoConfirmed = AutoConfirmReservationIfNeeded(payment.Reservation, currentUserId, nowUtc);
+
         if (payment.Status == PaymentStatus.Paid)
         {
+            if (wasAutoConfirmed)
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+
             return await GetByIdInternalAsync(id, null, cancellationToken);
         }
 
@@ -372,7 +387,7 @@ public sealed class PaymentService : IPaymentService
         }
 
         var capturedPayment = ExtractCompletedCapture(orderSnapshot);
-        var paidAtUtc = capturedPayment.CreateTime?.ToUniversalTime() ?? DateTime.UtcNow;
+        var paidAtUtc = capturedPayment.CreateTime?.ToUniversalTime() ?? nowUtc;
 
         payment.ProviderReference = capturedPayment.Id;
         payment.Status = PaymentStatus.Paid;
@@ -383,14 +398,14 @@ public sealed class PaymentService : IPaymentService
         payment.StatusReason = string.IsNullOrWhiteSpace(request.Reason)
             ? "Placanje je uspjesno potvrdjeno server-side PayPal capture verifikacijom."
             : request.Reason.Trim();
-        payment.UpdatedAtUtc = DateTime.UtcNow;
+        payment.UpdatedAtUtc = nowUtc;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishNotificationSafelyAsync(
             payment.Reservation.UserId,
             "Placanje potvrdjeno",
             $"Placanje za rezervaciju {payment.Reservation.ReservationCode} je uspjesno evidentirano kroz PayPal sandbox.",
-            DateTime.UtcNow,
+            nowUtc,
             cancellationToken);
 
         _logger.LogInformation("Payment {PaymentId} captured through PayPal for reservation {ReservationId}.", payment.Id, payment.ReservationId);
@@ -635,12 +650,26 @@ public sealed class PaymentService : IPaymentService
         if (reservation.Status != ReservationStatus.Confirmed)
         {
             throw new ValidationException(
-                "Placanje je moguce inicirati samo za potvrdjenu rezervaciju.",
+                "Placanje je moguce inicirati samo za aktivnu rezervaciju.",
                 new Dictionary<string, string[]>
                 {
-                    ["reservation"] = ["Placanje mozete pokrenuti tek nakon sto rezervacija bude potvrdjena."]
+                    ["reservation"] = ["Placanje mozete pokrenuti samo za rezervaciju koja nije otkazana niti zavrsena."]
                 });
         }
+    }
+
+    private static bool AutoConfirmReservationIfNeeded(Reservation reservation, string actorUserId, DateTime nowUtc)
+    {
+        if (reservation.Status != ReservationStatus.Pending)
+        {
+            return false;
+        }
+
+        reservation.Status = ReservationStatus.Confirmed;
+        reservation.StatusChangedByUserId = actorUserId;
+        reservation.StatusChangedAtUtc = nowUtc;
+        reservation.StatusReason = "Rezervacija je automatski potvrdjena i spremna za placanje.";
+        return true;
     }
 
     private ProviderPricing ConvertReservationAmountToProviderAmount(decimal reservationAmount, string reservationCurrency)

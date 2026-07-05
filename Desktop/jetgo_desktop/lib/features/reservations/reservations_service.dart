@@ -43,22 +43,6 @@ class ReservationsService {
     return ReservationDetails.fromJson(response);
   }
 
-  Future<ReservationDetails> confirmReservation({
-    required String token,
-    required int id,
-    String? reason,
-  }) async {
-    final response = await _apiClient.postJson(
-      '/api/Reservations/$id/confirm',
-      token: token,
-      body: <String, dynamic>{
-        'reason': _normalizeReason(reason),
-      },
-    );
-
-    return ReservationDetails.fromJson(response);
-  }
-
   Future<ReservationDetails> cancelReservation({
     required String token,
     required int id,

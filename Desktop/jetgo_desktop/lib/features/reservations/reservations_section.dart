@@ -526,19 +526,6 @@ class _ReservationsSectionState extends State<ReservationsSection> {
           spacing: 10,
           runSpacing: 10,
           children: [
-            if (details.canBeConfirmed)
-              FilledButton.icon(
-                onPressed: () => _changeStatus(
-                  title: 'Potvrdi rezervaciju',
-                  action: (reason) => _service.confirmReservation(
-                    token: widget.token,
-                    id: details.id,
-                    reason: reason,
-                  ),
-                ),
-                icon: const Icon(Icons.check_circle_outline_rounded),
-                label: const Text('Potvrdi'),
-              ),
             if (details.canBeCancelled)
               OutlinedButton.icon(
                 onPressed: () => _changeStatus(

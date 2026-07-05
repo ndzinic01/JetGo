@@ -147,7 +147,7 @@ public sealed class ReservationService : IReservationService
         await PublishNotificationSafelyAsync(
             currentUserId,
             "Rezervacija kreirana",
-            $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je uspjesno kreirana i ceka potvrdu.",
+            $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je uspjesno kreirana i odmah spremna za placanje.",
             nowUtc,
             cancellationToken);
 
@@ -188,14 +188,7 @@ public sealed class ReservationService : IReservationService
             throw new ForbiddenException("Nemate pravo pristupa trazenoj rezervaciji.");
         }
 
-        reservation.CanBeCancelled = _stateMachine.CanCancel(reservation.Status);
-        reservation.CanBeConfirmed = isAdmin && _stateMachine.CanConfirm(reservation.Status);
-        reservation.CanBeCompleted = isAdmin && _stateMachine.CanComplete(reservation.Status);
-        reservation.CanInitiatePayment = reservation.Status == ReservationStatus.Confirmed && !reservation.IsPaid;
-        reservation.CanBeRefunded = isAdmin && reservation.PaymentStatus == PaymentStatus.Paid && reservation.Status != ReservationStatus.Completed;
-        reservation.CanUpdateBaggage = CanUpdateBaggage(reservation.Status, reservation.PaymentStatus, reservation.IsPaid);
-
-        return reservation;
+        return BuildVisibleReservationDetails(reservation, isAdmin);
     }
 
     public async Task<ReservationDetailsDto> UpdateBaggageAsync(int id, UpdateReservationBaggageRequest request, CancellationToken cancellationToken = default)
@@ -257,35 +250,6 @@ public sealed class ReservationService : IReservationService
             $"Rezervacija {reservation.ReservationCode} sada ima {request.AdditionalBaggageCount} dodatnih komada prtljaga.",
             nowUtc,
             cancellationToken);
-
-        return await GetByIdAsync(id, cancellationToken);
-    }
-
-    public async Task<ReservationDetailsDto> ConfirmAsync(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken = default)
-    {
-        EnsureCurrentUserIsAdmin();
-        var actorUserId = GetRequiredCurrentUserId();
-        var nowUtc = DateTime.UtcNow;
-
-        var reservation = await _dbContext.Reservations
-            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-
-        if (reservation is null)
-        {
-            throw new NotFoundException($"Rezervacija sa ID vrijednoscu {id} nije pronadjena.");
-        }
-
-        _stateMachine.Confirm(reservation, actorUserId, request.Reason, nowUtc);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await PublishNotificationSafelyAsync(
-            reservation.UserId,
-            "Rezervacija potvrdjena",
-            $"Rezervacija {reservation.ReservationCode} je potvrdjena.",
-            nowUtc,
-            cancellationToken);
-
-        _logger.LogInformation("Reservation {ReservationCode} confirmed by {UserId}.", reservation.ReservationCode, actorUserId);
 
         return await GetByIdAsync(id, cancellationToken);
     }
@@ -400,7 +364,9 @@ public sealed class ReservationService : IReservationService
                 DepartureAirportCode = x.Flight.Destination.DepartureAirport.IataCode,
                 ArrivalAirportCode = x.Flight.Destination.ArrivalAirport.IataCode,
                 DepartureAtUtc = x.Flight.DepartureAtUtc,
-                Status = x.Status,
+                Status = x.Status == ReservationStatus.Pending
+                    ? ReservationStatus.Confirmed
+                    : x.Status,
                 TotalAmount = x.TotalAmount,
                 Currency = x.Currency,
                 PaymentId = x.Payment != null ? x.Payment.Id : null,
@@ -599,6 +565,65 @@ public sealed class ReservationService : IReservationService
         }
 
         return reservationStatus is ReservationStatus.Pending or ReservationStatus.Confirmed;
+    }
+
+    private ReservationDetailsDto BuildVisibleReservationDetails(ReservationDetailsDto reservation, bool isAdmin)
+    {
+        var actualStatus = reservation.Status;
+
+        return new ReservationDetailsDto
+        {
+            Id = reservation.Id,
+            ReservationCode = reservation.ReservationCode,
+            FlightId = reservation.FlightId,
+            FlightNumber = reservation.FlightNumber,
+            RouteCode = reservation.RouteCode,
+            DepartureAirportCode = reservation.DepartureAirportCode,
+            ArrivalAirportCode = reservation.ArrivalAirportCode,
+            DepartureAtUtc = reservation.DepartureAtUtc,
+            ArrivalAtUtc = reservation.ArrivalAtUtc,
+            Status = GetDisplayReservationStatus(actualStatus),
+            TotalAmount = reservation.TotalAmount,
+            Currency = reservation.Currency,
+            SeatsTotalAmount = reservation.SeatsTotalAmount,
+            AdditionalBaggageCount = reservation.AdditionalBaggageCount,
+            AdditionalBaggageUnitPrice = reservation.AdditionalBaggageUnitPrice,
+            AdditionalBaggageTotalAmount = reservation.AdditionalBaggageTotalAmount,
+            PaymentId = reservation.PaymentId,
+            PaymentStatus = reservation.PaymentStatus,
+            IsPaid = reservation.IsPaid,
+            CreatedAtUtc = reservation.CreatedAtUtc,
+            StatusChangedAtUtc = reservation.StatusChangedAtUtc,
+            StatusChangedByUserId = reservation.StatusChangedByUserId,
+            StatusReason = GetDisplayStatusReason(actualStatus, reservation.StatusReason),
+            Customer = reservation.Customer,
+            Seats = reservation.Seats,
+            CanBeCancelled = _stateMachine.CanCancel(actualStatus),
+            CanBeConfirmed = false,
+            CanBeCompleted = isAdmin && _stateMachine.CanComplete(actualStatus),
+            CanInitiatePayment =
+                (actualStatus is ReservationStatus.Pending or ReservationStatus.Confirmed) &&
+                !reservation.IsPaid,
+            CanBeRefunded =
+                isAdmin &&
+                reservation.PaymentStatus == PaymentStatus.Paid &&
+                actualStatus != ReservationStatus.Completed,
+            CanUpdateBaggage = CanUpdateBaggage(actualStatus, reservation.PaymentStatus, reservation.IsPaid)
+        };
+    }
+
+    private static ReservationStatus GetDisplayReservationStatus(ReservationStatus reservationStatus)
+    {
+        return reservationStatus == ReservationStatus.Pending
+            ? ReservationStatus.Confirmed
+            : reservationStatus;
+    }
+
+    private static string? GetDisplayStatusReason(ReservationStatus reservationStatus, string? statusReason)
+    {
+        return reservationStatus == ReservationStatus.Pending
+            ? "Rezervacija je automatski potvrdjena i spremna za placanje."
+            : statusReason;
     }
 
     private string GetRequiredCurrentUserId()

@@ -8,30 +8,10 @@ public sealed class ReservationStateMachine
 {
     public void MarkCreated(Reservation reservation, string actorUserId, DateTime nowUtc)
     {
-        reservation.Status = ReservationStatus.Pending;
-        reservation.StatusChangedByUserId = actorUserId;
-        reservation.StatusChangedAtUtc = nowUtc;
-        reservation.StatusReason = "Rezervacija je kreirana i ceka potvrdu.";
-    }
-
-    public void Confirm(Reservation reservation, string actorUserId, string? reason, DateTime nowUtc)
-    {
-        if (reservation.Status != ReservationStatus.Pending)
-        {
-            throw new ValidationException(
-                "Samo rezervacija u statusu Pending moze biti potvrdjena.",
-                new Dictionary<string, string[]>
-                {
-                    ["status"] = ["Potvrda je dozvoljena samo za rezervacije u statusu Pending."]
-                });
-        }
-
         reservation.Status = ReservationStatus.Confirmed;
         reservation.StatusChangedByUserId = actorUserId;
         reservation.StatusChangedAtUtc = nowUtc;
-        reservation.StatusReason = string.IsNullOrWhiteSpace(reason)
-            ? "Rezervacija je potvrdjena od strane administratora."
-            : reason.Trim();
+        reservation.StatusReason = "Rezervacija je automatski potvrdjena i spremna za placanje.";
     }
 
     public void Cancel(Reservation reservation, string actorUserId, string reason, DateTime nowUtc, bool hasCompletedPayment)
@@ -105,11 +85,6 @@ public sealed class ReservationStateMachine
     public bool CanCancel(ReservationStatus status)
     {
         return status is ReservationStatus.Pending or ReservationStatus.Confirmed;
-    }
-
-    public bool CanConfirm(ReservationStatus status)
-    {
-        return status == ReservationStatus.Pending;
     }
 
     public bool CanComplete(ReservationStatus status)
