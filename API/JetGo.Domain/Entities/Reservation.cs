@@ -19,6 +19,12 @@ public sealed class Reservation : AuditableEntity
 
     public string Currency { get; set; } = "BAM";
 
+    public int AdditionalBaggageCount { get; set; }
+
+    public decimal AdditionalBaggageUnitPrice { get; set; }
+
+    public decimal AdditionalBaggageTotalPrice { get; set; }
+
     public string? StatusChangedByUserId { get; set; }
 
     public DateTime? StatusChangedAtUtc { get; set; }

@@ -7,6 +7,7 @@ import '../flights_routes/flights_routes_section.dart';
 import '../overview/overview_section.dart';
 import '../payments/payments_section.dart';
 import '../news/news_section.dart';
+import '../profile/profile_section.dart';
 import '../reference_data/reference_data_section.dart';
 import '../reports/reports_section.dart';
 import '../reservations/reservations_section.dart';
@@ -15,6 +16,7 @@ import '../users/users_section.dart';
 
 enum AdminSection {
   overview,
+  profile,
   referenceData,
   network,
   reservations,
@@ -106,6 +108,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                               _selectedSection == AdminSection.overview,
                           onTap: () =>
                               _selectSection(AdminSection.overview),
+                        ),
+                        _NavButton(
+                          icon: Icons.person_rounded,
+                          label: 'Moj profil',
+                          isSelected:
+                              _selectedSection == AdminSection.profile,
+                          onTap: () => _selectSection(AdminSection.profile),
                         ),
                         _NavButton(
                           icon: Icons.public_rounded,
@@ -227,6 +236,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           currentUserFullName: fullName,
           currentUserRoles: roles,
         );
+      case AdminSection.profile:
+        return ProfileSection(
+          token: widget.authController.session!.accessToken,
+          authController: widget.authController,
+        );
       case AdminSection.referenceData:
         return ReferenceDataSection(
           token: widget.authController.session!.accessToken,
@@ -267,6 +281,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     switch (section) {
       case AdminSection.overview:
         return Icons.insert_chart_outlined_rounded;
+      case AdminSection.profile:
+        return Icons.person_outline_rounded;
       case AdminSection.referenceData:
         return Icons.public_rounded;
       case AdminSection.network:
@@ -290,6 +306,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     switch (section) {
       case AdminSection.overview:
         return 'Kontrolna tabla';
+      case AdminSection.profile:
+        return 'Moj profil';
       case AdminSection.referenceData:
         return 'Osnovni podaci';
       case AdminSection.network:
@@ -313,6 +331,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     switch (section) {
       case AdminSection.overview:
         return 'Kratak pregled najvaznijih operativnih pokazatelja.';
+      case AdminSection.profile:
+        return 'Pregled i uredjivanje licnih podataka prijavljenog administratora.';
       case AdminSection.referenceData:
         return 'Drzave, gradovi, aerodromi i aviokompanije koje koriste ostali moduli.';
       case AdminSection.network:

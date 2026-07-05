@@ -304,7 +304,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                 onSubmitted: (_) => _loadReservations(),
                 decoration: const InputDecoration(
                   labelText: 'Pretraga rezervacija',
-                  hintText: 'Kod rezervacije, kupac, flight number ili ruta',
+                  hintText: 'Kod rezervacije, kupac, broj leta ili ruta',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
               ),
@@ -427,8 +427,9 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                   DataColumn(label: Text('Ruta')),
                   DataColumn(label: Text('Polazak')),
                   DataColumn(label: Text('Status')),
-                  DataColumn(label: Text('Payment')),
+                  DataColumn(label: Text('Placanje')),
                   DataColumn(label: Text('Sjedista')),
+                  DataColumn(label: Text('Prtljag')),
                   DataColumn(label: Text('Ukupno')),
                 ],
                 rows: _reservations.map((item) {
@@ -455,6 +456,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                       DataCell(Text(item.status.label)),
                       DataCell(Text(_paymentSummary(item))),
                       DataCell(Text(item.seatsCount.toString())),
+                      DataCell(Text(item.additionalBaggageCount.toString())),
                       DataCell(
                         Text(
                           '${item.totalAmount.toStringAsFixed(2)} ${item.currency}',
@@ -535,7 +537,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                   ),
                 ),
                 icon: const Icon(Icons.check_circle_outline_rounded),
-                label: const Text('Confirm'),
+                label: const Text('Potvrdi'),
               ),
             if (details.canBeCancelled)
               OutlinedButton.icon(
@@ -548,7 +550,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                   ),
                 ),
                 icon: const Icon(Icons.cancel_outlined),
-                label: const Text('Cancel'),
+                label: const Text('Otkazi'),
               ),
             if (details.canBeCompleted)
               FilledButton.tonalIcon(
@@ -561,7 +563,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                   ),
                 ),
                 icon: const Icon(Icons.task_alt_rounded),
-                label: const Text('Complete'),
+                label: const Text('Zavrsi'),
               ),
           ],
         ),
@@ -575,10 +577,40 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                   _DetailsRow('Polazak', _formatDateTime(details.departureAtUtc)),
                   _DetailsRow('Dolazak', _formatDateTime(details.arrivalAtUtc)),
                   _DetailsRow(
+                    'Ukupno sjedista',
+                    '${details.seats.length}',
+                  ),
+                  _DetailsRow('Kreirano', _formatDateTime(details.createdAtUtc)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _DetailsBlock(
+                title: 'Cijena i prtljag',
+                rows: [
+                  _DetailsRow(
+                    'Sjedista',
+                    '${details.seatsTotalAmount.toStringAsFixed(2)} ${details.currency}',
+                  ),
+                  _DetailsRow(
+                    'Dodatni komadi',
+                    details.additionalBaggageCount.toString(),
+                  ),
+                  _DetailsRow(
+                    'Cijena po komadu',
+                    '${details.additionalBaggageUnitPrice.toStringAsFixed(2)} ${details.currency}',
+                  ),
+                  _DetailsRow(
+                    'Ukupno prtljag',
+                    '${details.additionalBaggageTotalAmount.toStringAsFixed(2)} ${details.currency}',
+                  ),
+                  _DetailsRow(
                     'Ukupno',
                     '${details.totalAmount.toStringAsFixed(2)} ${details.currency}',
                   ),
-                  _DetailsRow('Kreirano', _formatDateTime(details.createdAtUtc)),
+                  _DetailsRow(
+                    'Moze izmjena prtljaga',
+                    details.canUpdateBaggage ? 'Da' : 'Ne',
+                  ),
                 ],
               ),
               const SizedBox(height: 16),

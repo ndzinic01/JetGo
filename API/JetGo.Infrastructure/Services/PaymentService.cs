@@ -670,6 +670,11 @@ public sealed class PaymentService : IPaymentService
 
     private static string BuildPaymentDescription(Reservation reservation)
     {
+        if (reservation.AdditionalBaggageCount > 0)
+        {
+            return $"Reservation {reservation.ReservationCode} for flight {reservation.Flight.FlightNumber} with {reservation.AdditionalBaggageCount} extra baggage item(s)";
+        }
+
         return $"Reservation {reservation.ReservationCode} for flight {reservation.Flight.FlightNumber}";
     }
 

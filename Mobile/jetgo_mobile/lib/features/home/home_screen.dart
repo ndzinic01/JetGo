@@ -815,6 +815,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Ukupno: ${MobileDisplay.formatMoney(reservation.totalAmount, reservation.currency)} - Sjedista: ${reservation.seatsCount}',
                   ),
+                  if (reservation.additionalBaggageCount > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Dodatni prtljag: ${reservation.additionalBaggageCount}',
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     reservation.isPaid

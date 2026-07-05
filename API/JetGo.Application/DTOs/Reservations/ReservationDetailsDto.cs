@@ -28,6 +28,14 @@ public sealed class ReservationDetailsDto
 
     public string Currency { get; init; } = "BAM";
 
+    public decimal SeatsTotalAmount { get; init; }
+
+    public int AdditionalBaggageCount { get; init; }
+
+    public decimal AdditionalBaggageUnitPrice { get; init; }
+
+    public decimal AdditionalBaggageTotalAmount { get; init; }
+
     public int? PaymentId { get; init; }
 
     public PaymentStatus? PaymentStatus { get; init; }
@@ -55,4 +63,6 @@ public sealed class ReservationDetailsDto
     public bool CanInitiatePayment { get; set; }
 
     public bool CanBeRefunded { get; set; }
+
+    public bool CanUpdateBaggage { get; set; }
 }

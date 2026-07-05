@@ -53,6 +53,14 @@ public sealed class ReservationsController : ControllerBase
         return Ok(response);
     }
 
+    [HttpPut("{id:int}/baggage")]
+    [ProducesResponseType(typeof(ReservationDetailsDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ReservationDetailsDto>> UpdateBaggage(int id, [FromBody] UpdateReservationBaggageRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _reservationService.UpdateBaggageAsync(id, request, cancellationToken);
+        return Ok(response);
+    }
+
     [HttpPost("{id:int}/confirm")]
     [Authorize(Roles = RoleNames.Admin)]
     [ProducesResponseType(typeof(ReservationDetailsDto), StatusCodes.Status200OK)]

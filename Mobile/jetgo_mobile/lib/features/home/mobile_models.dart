@@ -142,6 +142,7 @@ class MobileFlightDetails {
     required this.durationMinutes,
     required this.basePrice,
     required this.currency,
+    required this.additionalBaggageUnitPrice,
     required this.availableSeats,
     required this.totalSeats,
     required this.reservedSeats,
@@ -161,6 +162,7 @@ class MobileFlightDetails {
   final int durationMinutes;
   final double basePrice;
   final String currency;
+  final double additionalBaggageUnitPrice;
   final int availableSeats;
   final int totalSeats;
   final int reservedSeats;
@@ -189,6 +191,8 @@ class MobileFlightDetails {
       durationMinutes: json['durationMinutes'] as int? ?? 0,
       basePrice: (json['basePrice'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? '',
+      additionalBaggageUnitPrice:
+          (json['additionalBaggageUnitPrice'] as num?)?.toDouble() ?? 0,
       availableSeats: json['availableSeats'] as int? ?? 0,
       totalSeats: json['totalSeats'] as int? ?? 0,
       reservedSeats: json['reservedSeats'] as int? ?? 0,
@@ -216,6 +220,7 @@ class MobileReservation {
     required this.currency,
     required this.isPaid,
     required this.seatsCount,
+    required this.additionalBaggageCount,
     required this.createdAtUtc,
     this.paymentId,
     this.paymentStatus,
@@ -237,6 +242,7 @@ class MobileReservation {
   final int? paymentStatus;
   final bool isPaid;
   final int seatsCount;
+  final int additionalBaggageCount;
   final DateTime createdAtUtc;
   final String? customerName;
 
@@ -257,6 +263,7 @@ class MobileReservation {
       paymentStatus: json['paymentStatus'] as int?,
       isPaid: json['isPaid'] as bool? ?? false,
       seatsCount: json['seatsCount'] as int? ?? 0,
+      additionalBaggageCount: json['additionalBaggageCount'] as int? ?? 0,
       createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
       customerName: json['customerName'] as String?,
     );
@@ -320,6 +327,10 @@ class MobileReservationDetails {
     required this.status,
     required this.totalAmount,
     required this.currency,
+    required this.seatsTotalAmount,
+    required this.additionalBaggageCount,
+    required this.additionalBaggageUnitPrice,
+    required this.additionalBaggageTotalAmount,
     required this.isPaid,
     required this.createdAtUtc,
     required this.customer,
@@ -329,6 +340,7 @@ class MobileReservationDetails {
     required this.canBeCompleted,
     required this.canInitiatePayment,
     required this.canBeRefunded,
+    required this.canUpdateBaggage,
     this.paymentId,
     this.paymentStatus,
     this.statusChangedAtUtc,
@@ -348,6 +360,10 @@ class MobileReservationDetails {
   final int status;
   final double totalAmount;
   final String currency;
+  final double seatsTotalAmount;
+  final int additionalBaggageCount;
+  final double additionalBaggageUnitPrice;
+  final double additionalBaggageTotalAmount;
   final int? paymentId;
   final int? paymentStatus;
   final bool isPaid;
@@ -362,6 +378,7 @@ class MobileReservationDetails {
   final bool canBeCompleted;
   final bool canInitiatePayment;
   final bool canBeRefunded;
+  final bool canUpdateBaggage;
 
   factory MobileReservationDetails.fromJson(Map<String, dynamic> json) {
     return MobileReservationDetails(
@@ -377,6 +394,12 @@ class MobileReservationDetails {
       status: json['status'] as int? ?? 0,
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? '',
+      seatsTotalAmount: (json['seatsTotalAmount'] as num?)?.toDouble() ?? 0,
+      additionalBaggageCount: json['additionalBaggageCount'] as int? ?? 0,
+      additionalBaggageUnitPrice:
+          (json['additionalBaggageUnitPrice'] as num?)?.toDouble() ?? 0,
+      additionalBaggageTotalAmount:
+          (json['additionalBaggageTotalAmount'] as num?)?.toDouble() ?? 0,
       paymentId: json['paymentId'] as int?,
       paymentStatus: json['paymentStatus'] as int?,
       isPaid: json['isPaid'] as bool? ?? false,
@@ -397,6 +420,7 @@ class MobileReservationDetails {
       canBeCompleted: json['canBeCompleted'] as bool? ?? false,
       canInitiatePayment: json['canInitiatePayment'] as bool? ?? false,
       canBeRefunded: json['canBeRefunded'] as bool? ?? false,
+      canUpdateBaggage: json['canUpdateBaggage'] as bool? ?? false,
     );
   }
 }

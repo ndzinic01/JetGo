@@ -23,6 +23,7 @@ class FlightDetailsScreen extends StatefulWidget {
 class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
   final MobileDataService _dataService = MobileDataService();
   final Set<String> _selectedSeats = <String>{};
+  int _additionalBaggageCount = 0;
 
   MobileFlightDetails? _details;
   bool _isLoading = true;
@@ -40,6 +41,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
       _isLoading = true;
       _errorMessage = null;
       _selectedSeats.clear();
+      _additionalBaggageCount = 0;
     });
 
     try {
@@ -95,6 +97,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
         token: widget.token,
         flightId: details.id,
         seatNumbers: _selectedSeats.toList()..sort(),
+        additionalBaggageCount: _additionalBaggageCount,
       );
 
       if (!mounted) {
@@ -163,6 +166,18 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
     });
   }
 
+  double _selectedSeatsTotal(MobileFlightDetails details) {
+    return details.basePrice * _selectedSeats.length;
+  }
+
+  double _selectedBaggageTotal(MobileFlightDetails details) {
+    return details.additionalBaggageUnitPrice * _additionalBaggageCount;
+  }
+
+  double _reservationTotal(MobileFlightDetails details) {
+    return _selectedSeatsTotal(details) + _selectedBaggageTotal(details);
+  }
+
   @override
   Widget build(BuildContext context) {
     final details = _details;
@@ -197,7 +212,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                 label: Text(
                   _isSubmitting
                       ? 'Kreiranje...'
-                      : 'Rezervisi ${_selectedSeats.length} sjedista',
+                      : 'Rezervisi (${_selectedSeats.length}) · ${MobileDisplay.formatMoney(_reservationTotal(details), details.currency)}',
                 ),
               ),
             ),
@@ -266,6 +281,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                     'Cijena po sjedistu: ${MobileDisplay.formatMoney(details.basePrice, details.currency)}',
                   ),
                   Text(
+                    'Dodatni prtljag po komadu: ${MobileDisplay.formatMoney(details.additionalBaggageUnitPrice, details.currency)}',
+                  ),
+                  Text(
                     'Slobodna sjedista: ${details.availableSeats}/${details.totalSeats}',
                   ),
                 ],
@@ -306,6 +324,79 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                           )
                           .toList(),
                     ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dodatni prtljag',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Po jednoj rezervaciji mozete dodati do 6 dodatnih komada prtljaga.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int>(
+                    initialValue: _additionalBaggageCount,
+                    decoration: const InputDecoration(
+                      labelText: 'Broj dodatnih komada',
+                    ),
+                    items: List.generate(
+                      7,
+                      (index) => DropdownMenuItem<int>(
+                        value: index,
+                        child: Text(index == 0 ? 'Bez dodatnog prtljaga' : '$index kom.'),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+
+                      setState(() {
+                        _additionalBaggageCount = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pregled cijene',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Sjedista: ${_selectedSeats.length} · ${MobileDisplay.formatMoney(_selectedSeatsTotal(details), details.currency)}',
+                        ),
+                        Text(
+                          'Dodatni prtljag: $_additionalBaggageCount · ${MobileDisplay.formatMoney(_selectedBaggageTotal(details), details.currency)}',
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ukupno za rezervaciju: ${MobileDisplay.formatMoney(_reservationTotal(details), details.currency)}',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

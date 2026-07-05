@@ -14,6 +14,8 @@ public interface IReservationService
 
     Task<ReservationDetailsDto> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
+    Task<ReservationDetailsDto> UpdateBaggageAsync(int id, UpdateReservationBaggageRequest request, CancellationToken cancellationToken = default);
+
     Task<ReservationDetailsDto> ConfirmAsync(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken = default);
 
     Task<ReservationDetailsDto> CancelAsync(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken = default);

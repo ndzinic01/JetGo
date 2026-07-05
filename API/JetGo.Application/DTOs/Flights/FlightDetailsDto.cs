@@ -29,6 +29,8 @@ public sealed class FlightDetailsDto
 
     public string Currency { get; init; } = "BAM";
 
+    public decimal AdditionalBaggageUnitPrice { get; init; }
+
     public int AvailableSeats { get; init; }
 
     public int TotalSeats { get; init; }

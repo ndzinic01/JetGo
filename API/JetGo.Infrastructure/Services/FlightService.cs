@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using JetGo.Application.Constants;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.Flights;
@@ -116,6 +117,7 @@ public sealed class FlightService : IFlightService
                 ArrivalAtUtc = x.ArrivalAtUtc,
                 DurationMinutes = EF.Functions.DateDiffMinute(x.DepartureAtUtc, x.ArrivalAtUtc),
                 BasePrice = x.BasePrice,
+                AdditionalBaggageUnitPrice = ReservationPricingConstants.AdditionalBaggagePricePerPiece,
                 AvailableSeats = x.AvailableSeats,
                 TotalSeats = x.TotalSeats,
                 ReservedSeats = x.TotalSeats - x.AvailableSeats,

@@ -58,4 +58,27 @@ class AuthController extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  void updateCurrentUser({
+    required String firstName,
+    required String lastName,
+    required String email,
+    String? phoneNumber,
+  }) {
+    final session = _session;
+    if (session == null) {
+      return;
+    }
+
+    _session = session.copyWith(
+      user: session.user.copyWith(
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        phoneNumber: phoneNumber,
+      ),
+    );
+
+    notifyListeners();
+  }
 }

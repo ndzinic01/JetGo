@@ -83,6 +83,7 @@ class MobileDataService {
     required String token,
     required int flightId,
     required List<String> seatNumbers,
+    required int additionalBaggageCount,
   }) async {
     final response = await _apiClient.postJson(
       '/api/Reservations',
@@ -90,6 +91,23 @@ class MobileDataService {
       body: <String, dynamic>{
         'flightId': flightId,
         'seatNumbers': seatNumbers,
+        'additionalBaggageCount': additionalBaggageCount,
+      },
+    );
+
+    return MobileReservationDetails.fromJson(response);
+  }
+
+  Future<MobileReservationDetails> updateReservationBaggage({
+    required String token,
+    required int reservationId,
+    required int additionalBaggageCount,
+  }) async {
+    final response = await _apiClient.putJson(
+      '/api/Reservations/$reservationId/baggage',
+      token: token,
+      body: <String, dynamic>{
+        'additionalBaggageCount': additionalBaggageCount,
       },
     );
 

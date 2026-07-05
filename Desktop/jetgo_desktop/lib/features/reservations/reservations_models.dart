@@ -15,6 +15,7 @@ class ReservationItem {
     required this.paymentStatus,
     required this.isPaid,
     required this.seatsCount,
+    required this.additionalBaggageCount,
     required this.createdAtUtc,
     required this.customerName,
   });
@@ -34,6 +35,7 @@ class ReservationItem {
   final PaymentStatusValue? paymentStatus;
   final bool isPaid;
   final int seatsCount;
+  final int additionalBaggageCount;
   final DateTime createdAtUtc;
   final String customerName;
 
@@ -56,6 +58,7 @@ class ReservationItem {
           : PaymentStatusValue.fromValue(json['paymentStatus'] as int),
       isPaid: json['isPaid'] as bool? ?? false,
       seatsCount: json['seatsCount'] as int? ?? 0,
+      additionalBaggageCount: json['additionalBaggageCount'] as int? ?? 0,
       createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
       customerName: json['customerName'] as String? ?? '',
     );
@@ -76,6 +79,10 @@ class ReservationDetails {
     required this.status,
     required this.totalAmount,
     required this.currency,
+    required this.seatsTotalAmount,
+    required this.additionalBaggageCount,
+    required this.additionalBaggageUnitPrice,
+    required this.additionalBaggageTotalAmount,
     required this.paymentId,
     required this.paymentStatus,
     required this.isPaid,
@@ -90,6 +97,7 @@ class ReservationDetails {
     required this.canBeCompleted,
     required this.canInitiatePayment,
     required this.canBeRefunded,
+    required this.canUpdateBaggage,
   });
 
   final int id;
@@ -104,6 +112,10 @@ class ReservationDetails {
   final ReservationStatusValue status;
   final double totalAmount;
   final String currency;
+  final double seatsTotalAmount;
+  final int additionalBaggageCount;
+  final double additionalBaggageUnitPrice;
+  final double additionalBaggageTotalAmount;
   final int? paymentId;
   final PaymentStatusValue? paymentStatus;
   final bool isPaid;
@@ -118,6 +130,7 @@ class ReservationDetails {
   final bool canBeCompleted;
   final bool canInitiatePayment;
   final bool canBeRefunded;
+  final bool canUpdateBaggage;
 
   factory ReservationDetails.fromJson(Map<String, dynamic> json) {
     return ReservationDetails(
@@ -133,6 +146,12 @@ class ReservationDetails {
       status: ReservationStatusValue.fromValue(json['status'] as int? ?? 1),
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? 'BAM',
+      seatsTotalAmount: (json['seatsTotalAmount'] as num?)?.toDouble() ?? 0,
+      additionalBaggageCount: json['additionalBaggageCount'] as int? ?? 0,
+      additionalBaggageUnitPrice:
+          (json['additionalBaggageUnitPrice'] as num?)?.toDouble() ?? 0,
+      additionalBaggageTotalAmount:
+          (json['additionalBaggageTotalAmount'] as num?)?.toDouble() ?? 0,
       paymentId: json['paymentId'] as int?,
       paymentStatus: json['paymentStatus'] == null
           ? null
@@ -155,6 +174,7 @@ class ReservationDetails {
       canBeCompleted: json['canBeCompleted'] as bool? ?? false,
       canInitiatePayment: json['canInitiatePayment'] as bool? ?? false,
       canBeRefunded: json['canBeRefunded'] as bool? ?? false,
+      canUpdateBaggage: json['canUpdateBaggage'] as bool? ?? false,
     );
   }
 }

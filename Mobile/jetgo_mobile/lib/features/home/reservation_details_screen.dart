@@ -31,6 +31,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   MobilePaymentDetails? _paymentDetails;
   bool _isLoading = true;
   bool _isPaymentSubmitting = false;
+  bool _isBaggageSubmitting = false;
   String? _errorMessage;
   bool _markDirtyOnPop = false;
 
@@ -205,6 +206,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
             _buildPaymentCard(context, details),
           ],
           const SizedBox(height: 12),
+          _buildPricingCard(context, details),
+          const SizedBox(height: 12),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -225,6 +228,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          _buildBaggageCard(context, details),
           const SizedBox(height: 12),
           Card(
             child: Padding(
@@ -324,6 +329,13 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               const SizedBox(height: 8),
               Text(statusReason),
             ],
+            if (details.canUpdateBaggage && !details.isPaid) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Ako promijenite dodatni prtljag, ukupni iznos ce se preracunati. Ako je PayPal placanje vec bilo pokrenuto, trebate ga otvoriti ponovo za novi iznos.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
             if (approvalUrl != null && approvalUrl.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
@@ -386,6 +398,93 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                     : 'Trenutno nema dostupnih payment akcija za ovu rezervaciju.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPricingCard(
+    BuildContext context,
+    MobileReservationDetails details,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Cijena rezervacije',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Sjedista: ${MobileDisplay.formatMoney(details.seatsTotalAmount, details.currency)}',
+            ),
+            Text(
+              'Dodatni prtljag: ${MobileDisplay.formatMoney(details.additionalBaggageTotalAmount, details.currency)}',
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Ukupno: ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBaggageCard(
+    BuildContext context,
+    MobileReservationDetails details,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Dodatni prtljag',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (details.canUpdateBaggage)
+                  OutlinedButton.icon(
+                    onPressed: _isBaggageSubmitting
+                        ? null
+                        : () => _openBaggageDialog(details),
+                    icon: _isBaggageSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.luggage_rounded),
+                    label: const Text('Izmijeni'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Komada: ${details.additionalBaggageCount}'),
+            Text(
+              'Cijena po komadu: ${MobileDisplay.formatMoney(details.additionalBaggageUnitPrice, details.currency)}',
+            ),
+            Text(
+              'Ukupno za prtljag: ${MobileDisplay.formatMoney(details.additionalBaggageTotalAmount, details.currency)}',
+            ),
+            if (!details.canUpdateBaggage) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Prtljag vise nije moguce mijenjati za ovu rezervaciju.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ],
         ),
       ),
@@ -522,6 +621,73 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     }
   }
 
+  Future<void> _openBaggageDialog(MobileReservationDetails details) async {
+    final selectedCount = await showDialog<int>(
+      context: context,
+      builder: (context) => _BaggageCountDialog(
+        initialValue: details.additionalBaggageCount,
+      ),
+    );
+
+    if (selectedCount == null || selectedCount == details.additionalBaggageCount) {
+      return;
+    }
+
+    setState(() {
+      _isBaggageSubmitting = true;
+    });
+
+    try {
+      final updated = await _dataService.updateReservationBaggage(
+        token: widget.token,
+        reservationId: details.id,
+        additionalBaggageCount: selectedCount,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _details = updated;
+        _paymentDetails = null;
+        _markDirtyOnPop = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Dodatni prtljag je azuriran. Ako je placanje bilo pokrenuto, otvorite PayPal ponovo za novi iznos.',
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Dodatni prtljag trenutno nije moguce azurirati.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBaggageSubmitting = false;
+        });
+      }
+    }
+  }
+
   Future<void> _openApprovalUrl(String approvalUrl) async {
     final uri = Uri.tryParse(approvalUrl);
     if (uri == null) {
@@ -565,6 +731,67 @@ class _StatusChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+    );
+  }
+}
+
+class _BaggageCountDialog extends StatefulWidget {
+  const _BaggageCountDialog({required this.initialValue});
+
+  final int initialValue;
+
+  @override
+  State<_BaggageCountDialog> createState() => _BaggageCountDialogState();
+}
+
+class _BaggageCountDialogState extends State<_BaggageCountDialog> {
+  late int _selectedValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedValue = widget.initialValue;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Dodatni prtljag'),
+      content: SizedBox(
+        width: 360,
+        child: DropdownButtonFormField<int>(
+          initialValue: _selectedValue,
+          decoration: const InputDecoration(
+            labelText: 'Broj dodatnih komada',
+          ),
+          items: List.generate(
+            7,
+            (index) => DropdownMenuItem<int>(
+              value: index,
+              child: Text(index == 0 ? 'Bez dodatnog prtljaga' : '$index kom.'),
+            ),
+          ),
+          onChanged: (value) {
+            if (value == null) {
+              return;
+            }
+
+            setState(() {
+              _selectedValue = value;
+            });
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Odustani'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_selectedValue),
+          child: const Text('Sacuvaj'),
+        ),
+      ],
     );
   }
 }

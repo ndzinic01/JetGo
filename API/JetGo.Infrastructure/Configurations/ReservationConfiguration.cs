@@ -17,6 +17,8 @@ public sealed class ReservationConfiguration : AuditableEntityConfiguration<Rese
         builder.Property(x => x.UserId).IsRequired().HasMaxLength(450);
         builder.Property(x => x.Currency).IsRequired().HasMaxLength(3);
         builder.Property(x => x.TotalAmount).HasPrecision(18, 2);
+        builder.Property(x => x.AdditionalBaggageUnitPrice).HasPrecision(18, 2);
+        builder.Property(x => x.AdditionalBaggageTotalPrice).HasPrecision(18, 2);
         builder.Property(x => x.Status).HasConversion<int>();
         builder.Property(x => x.StatusChangedByUserId).HasMaxLength(450);
         builder.Property(x => x.StatusReason).HasMaxLength(500);

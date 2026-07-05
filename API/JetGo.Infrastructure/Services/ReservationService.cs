@@ -118,9 +118,14 @@ public sealed class ReservationService : IReservationService
             ReservationCode = GenerateReservationCode(),
             UserId = currentUserId,
             FlightId = flight.Id,
-            TotalAmount = flight.BasePrice * selectedSeats.Count,
+            AdditionalBaggageCount = request.AdditionalBaggageCount,
+            AdditionalBaggageUnitPrice = ReservationPricingConstants.AdditionalBaggagePricePerPiece,
+            AdditionalBaggageTotalPrice = CalculateAdditionalBaggageTotal(request.AdditionalBaggageCount),
             Currency = "BAM"
         };
+
+        reservation.TotalAmount =
+            (flight.BasePrice * selectedSeats.Count) + reservation.AdditionalBaggageTotalPrice;
 
         _stateMachine.MarkCreated(reservation, currentUserId, nowUtc);
 
@@ -188,8 +193,72 @@ public sealed class ReservationService : IReservationService
         reservation.CanBeCompleted = isAdmin && _stateMachine.CanComplete(reservation.Status);
         reservation.CanInitiatePayment = reservation.Status == ReservationStatus.Confirmed && !reservation.IsPaid;
         reservation.CanBeRefunded = isAdmin && reservation.PaymentStatus == PaymentStatus.Paid && reservation.Status != ReservationStatus.Completed;
+        reservation.CanUpdateBaggage = CanUpdateBaggage(reservation.Status, reservation.PaymentStatus, reservation.IsPaid);
 
         return reservation;
+    }
+
+    public async Task<ReservationDetailsDto> UpdateBaggageAsync(int id, UpdateReservationBaggageRequest request, CancellationToken cancellationToken = default)
+    {
+        var actorUserId = GetRequiredCurrentUserId();
+        var isAdmin = CurrentUserIsAdmin();
+        var nowUtc = DateTime.UtcNow;
+
+        var reservation = await _dbContext.Reservations
+            .Include(x => x.Payment)
+            .Include(x => x.Items)
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (reservation is null)
+        {
+            throw new NotFoundException($"Rezervacija sa ID vrijednoscu {id} nije pronadjena.");
+        }
+
+        if (!isAdmin && reservation.UserId != actorUserId)
+        {
+            throw new ForbiddenException("Mozete mijenjati dodatni prtljag samo na vlastitoj rezervaciji.");
+        }
+
+        if (reservation.Status is ReservationStatus.Cancelled or ReservationStatus.Completed)
+        {
+            throw new ValidationException(
+                "Dodatni prtljag nije moguce mijenjati za zavrsenu ili otkazanu rezervaciju.",
+                new Dictionary<string, string[]>
+                {
+                    ["additionalBaggageCount"] = ["Dodatni prtljag mozete mijenjati samo dok je rezervacija aktivna."]
+                });
+        }
+
+        if (reservation.Payment?.Status is PaymentStatus.Paid or PaymentStatus.Refunded)
+        {
+            throw new ConflictException("Dodatni prtljag nije moguce mijenjati nakon uspjesnog placanja ili refundacije.");
+        }
+
+        reservation.AdditionalBaggageCount = request.AdditionalBaggageCount;
+        reservation.AdditionalBaggageUnitPrice = ReservationPricingConstants.AdditionalBaggagePricePerPiece;
+        reservation.AdditionalBaggageTotalPrice = CalculateAdditionalBaggageTotal(request.AdditionalBaggageCount);
+        reservation.TotalAmount = CalculateSeatsTotalAmount(reservation) + reservation.AdditionalBaggageTotalPrice;
+        reservation.UpdatedAtUtc = nowUtc;
+
+        if (reservation.Payment?.Status == PaymentStatus.Pending)
+        {
+            reservation.Payment.Status = PaymentStatus.Failed;
+            reservation.Payment.StatusReason =
+                "Prethodno PayPal placanje je ponisteno jer je izmijenjen dodatni prtljag. Pokrenite placanje ponovo za novi iznos.";
+            reservation.Payment.PaidAtUtc = null;
+            reservation.Payment.RefundedAtUtc = null;
+            reservation.Payment.UpdatedAtUtc = nowUtc;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
+            reservation.UserId,
+            "Dodatni prtljag azuriran",
+            $"Rezervacija {reservation.ReservationCode} sada ima {request.AdditionalBaggageCount} dodatnih komada prtljaga.",
+            nowUtc,
+            cancellationToken);
+
+        return await GetByIdAsync(id, cancellationToken);
     }
 
     public async Task<ReservationDetailsDto> ConfirmAsync(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken = default)
@@ -338,6 +407,7 @@ public sealed class ReservationService : IReservationService
                 PaymentStatus = x.Payment != null ? x.Payment.Status : null,
                 IsPaid = x.Payment != null && x.Payment.Status == PaymentStatus.Paid,
                 SeatsCount = x.Items.Count,
+                AdditionalBaggageCount = x.AdditionalBaggageCount,
                 CreatedAtUtc = x.CreatedAtUtc,
                 CustomerName = _dbContext.UserProfiles
                     .Where(p => p.UserId == x.UserId)
@@ -414,6 +484,10 @@ public sealed class ReservationService : IReservationService
                 Status = x.Status,
                 TotalAmount = x.TotalAmount,
                 Currency = x.Currency,
+                SeatsTotalAmount = x.Items.Sum(i => i.Price),
+                AdditionalBaggageCount = x.AdditionalBaggageCount,
+                AdditionalBaggageUnitPrice = x.AdditionalBaggageUnitPrice,
+                AdditionalBaggageTotalAmount = x.AdditionalBaggageTotalPrice,
                 PaymentId = x.Payment != null ? x.Payment.Id : null,
                 PaymentStatus = x.Payment != null ? x.Payment.Status : null,
                 IsPaid = x.Payment != null && x.Payment.Status == PaymentStatus.Paid,
@@ -502,6 +576,29 @@ public sealed class ReservationService : IReservationService
     private static string GenerateReservationCode()
     {
         return $"RSV-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..28].ToUpperInvariant();
+    }
+
+    private static decimal CalculateAdditionalBaggageTotal(int additionalBaggageCount)
+    {
+        return additionalBaggageCount * ReservationPricingConstants.AdditionalBaggagePricePerPiece;
+    }
+
+    private static decimal CalculateSeatsTotalAmount(Reservation reservation)
+    {
+        return reservation.Items.Sum(x => x.Price);
+    }
+
+    private static bool CanUpdateBaggage(
+        ReservationStatus reservationStatus,
+        PaymentStatus? paymentStatus,
+        bool isPaid)
+    {
+        if (isPaid || paymentStatus is PaymentStatus.Paid or PaymentStatus.Refunded)
+        {
+            return false;
+        }
+
+        return reservationStatus is ReservationStatus.Pending or ReservationStatus.Confirmed;
     }
 
     private string GetRequiredCurrentUserId()

@@ -9,6 +9,18 @@ class AuthSession {
   final DateTime expiresAtUtc;
   final AuthUser user;
 
+  AuthSession copyWith({
+    String? accessToken,
+    DateTime? expiresAtUtc,
+    AuthUser? user,
+  }) {
+    return AuthSession(
+      accessToken: accessToken ?? this.accessToken,
+      expiresAtUtc: expiresAtUtc ?? this.expiresAtUtc,
+      user: user ?? this.user,
+    );
+  }
+
   factory AuthSession.fromJson(Map<String, dynamic> json) {
     return AuthSession(
       accessToken: json['accessToken'] as String? ?? '',
@@ -36,6 +48,26 @@ class AuthUser {
   final String lastName;
   final String? phoneNumber;
   final List<String> roles;
+
+  AuthUser copyWith({
+    String? userId,
+    String? username,
+    String? email,
+    String? firstName,
+    String? lastName,
+    String? phoneNumber,
+    List<String>? roles,
+  }) {
+    return AuthUser(
+      userId: userId ?? this.userId,
+      username: username ?? this.username,
+      email: email ?? this.email,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      roles: roles ?? this.roles,
+    );
+  }
 
   String get fullName {
     final value = '$firstName $lastName'.trim();

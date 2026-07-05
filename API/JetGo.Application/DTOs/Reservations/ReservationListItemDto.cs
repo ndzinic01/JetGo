@@ -34,6 +34,8 @@ public sealed class ReservationListItemDto
 
     public int SeatsCount { get; init; }
 
+    public int AdditionalBaggageCount { get; init; }
+
     public DateTime CreatedAtUtc { get; init; }
 
     public string CustomerName { get; init; } = string.Empty;
