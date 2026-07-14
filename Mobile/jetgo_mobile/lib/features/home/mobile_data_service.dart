@@ -15,7 +15,7 @@ class MobileDataService {
       token: token,
       queryParameters: <String, String>{
         'page': '1',
-        'pageSize': '20',
+        'pageSize': '100',
         if (searchText != null && searchText.trim().isNotEmpty)
           'searchText': searchText.trim(),
       },

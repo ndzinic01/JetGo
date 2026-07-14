@@ -26,12 +26,16 @@ class _HomeScreenState extends State<HomeScreen> {
       'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=80';
 
   final MobileDataService _dataService = MobileDataService();
-  final TextEditingController _flightSearchController = TextEditingController();
+  final TextEditingController _departureSearchController =
+      TextEditingController();
+  final TextEditingController _arrivalSearchController =
+      TextEditingController();
 
   int _currentIndex = 0;
   bool _isLoading = true;
   String? _errorMessage;
 
+  List<MobileFlight> _allFlights = const [];
   List<MobileFlight> _flights = const [];
   List<MobileRecommendedFlight> _recommendedFlights = const [];
   List<MobileReservation> _reservations = const [];
@@ -39,6 +43,9 @@ class _HomeScreenState extends State<HomeScreen> {
   MobileProfile? _profile;
   MobileNotificationSummary? _notificationSummary;
   String? _recommendationsErrorMessage;
+  DateTime? _departureFromDate;
+  DateTime? _departureToDate;
+  String? _selectedAirlineCode;
 
   String get _token => widget.authController.session?.accessToken ?? '';
 
@@ -50,7 +57,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _flightSearchController.dispose();
+    _departureSearchController.dispose();
+    _arrivalSearchController.dispose();
     super.dispose();
   }
 
@@ -69,9 +77,9 @@ class _HomeScreenState extends State<HomeScreen> {
         case 0:
           final flights = await _dataService.fetchFlights(
             token: _token,
-            searchText: _flightSearchController.text,
           );
-          _flights = flights.items;
+          _allFlights = flights.items;
+          _flights = _filterFlights(_allFlights);
           try {
             final recommendations = await _dataService.fetchRecommendedFlights(
               token: _token,
@@ -145,18 +153,168 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCurrentTab();
   }
 
-  Future<void> _openFlightDetails(MobileFlight flight) async {
-    final changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => FlightDetailsScreen(
-          token: _token,
-          flightId: flight.id,
-        ),
-      ),
+  List<MobileFlight> get _airlineSortedFlights {
+    final flights = _allFlights.toList()
+      ..sort((left, right) => left.airline.name.compareTo(right.airline.name));
+    return flights;
+  }
+
+  List<AirlineSummary> get _availableAirlines {
+    final unique = <String, AirlineSummary>{};
+    for (final flight in _airlineSortedFlights) {
+      unique.putIfAbsent(flight.airline.code, () => flight.airline);
+    }
+
+    return unique.values.toList();
+  }
+
+  List<MobileFlight> _filterFlights(List<MobileFlight> flights) {
+    final departureQuery = _departureSearchController.text.trim().toLowerCase();
+    final arrivalQuery = _arrivalSearchController.text.trim().toLowerCase();
+
+    return flights.where((flight) {
+      final matchesDeparture =
+          departureQuery.isEmpty ||
+          _matchFlightLocation(
+            query: departureQuery,
+            cityName: flight.departureAirport.cityName,
+            airportCode: flight.departureAirport.iataCode,
+            airportName: flight.departureAirport.name,
+          );
+      final matchesArrival =
+          arrivalQuery.isEmpty ||
+          _matchFlightLocation(
+            query: arrivalQuery,
+            cityName: flight.arrivalAirport.cityName,
+            airportCode: flight.arrivalAirport.iataCode,
+            airportName: flight.arrivalAirport.name,
+          );
+      final matchesAirline =
+          _selectedAirlineCode == null ||
+          flight.airline.code == _selectedAirlineCode;
+      final departureDate = flight.departureAtUtc.toLocal();
+      final matchesFromDate =
+          _departureFromDate == null || !_isBeforeDate(departureDate, _departureFromDate!);
+      final matchesToDate =
+          _departureToDate == null || !_isAfterDate(departureDate, _departureToDate!);
+
+      return matchesDeparture &&
+          matchesArrival &&
+          matchesAirline &&
+          matchesFromDate &&
+          matchesToDate;
+    }).toList();
+  }
+
+  bool _matchFlightLocation({
+    required String query,
+    required String cityName,
+    required String airportCode,
+    required String airportName,
+  }) {
+    final haystack =
+        '${cityName.toLowerCase()} ${airportCode.toLowerCase()} ${airportName.toLowerCase()}';
+    return haystack.contains(query);
+  }
+
+  bool _isBeforeDate(DateTime candidate, DateTime filterDate) {
+    final candidateOnly = DateTime(
+      candidate.year,
+      candidate.month,
+      candidate.day,
+    );
+    final filterOnly = DateTime(
+      filterDate.year,
+      filterDate.month,
+      filterDate.day,
+    );
+    return candidateOnly.isBefore(filterOnly);
+  }
+
+  bool _isAfterDate(DateTime candidate, DateTime filterDate) {
+    final candidateOnly = DateTime(
+      candidate.year,
+      candidate.month,
+      candidate.day,
+    );
+    final filterOnly = DateTime(
+      filterDate.year,
+      filterDate.month,
+      filterDate.day,
+    );
+    return candidateOnly.isAfter(filterOnly);
+  }
+
+  void _applyFlightFilters() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _flights = _filterFlights(_allFlights);
+    });
+  }
+
+  void _clearFlightFilters() {
+    _departureSearchController.clear();
+    _arrivalSearchController.clear();
+    setState(() {
+      _departureFromDate = null;
+      _departureToDate = null;
+      _selectedAirlineCode = null;
+      _flights = _filterFlights(_allFlights);
+    });
+  }
+
+  Future<void> _pickFlightDate({required bool isFromDate}) async {
+    final initialDate = isFromDate
+        ? (_departureFromDate ?? DateTime.now())
+        : (_departureToDate ?? _departureFromDate ?? DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
     );
 
-    if (changed == true && mounted) {
-      await _loadCurrentTab();
+    if (picked == null) {
+      return;
+    }
+
+    setState(() {
+      if (isFromDate) {
+        _departureFromDate = picked;
+        if (_departureToDate != null && _departureToDate!.isBefore(picked)) {
+          _departureToDate = picked;
+        }
+      } else {
+        _departureToDate = picked;
+      }
+      _flights = _filterFlights(_allFlights);
+    });
+  }
+
+  Future<void> _openFlightDetails(MobileFlight flight) async {
+    try {
+      final changed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => FlightDetailsScreen(
+            token: _token,
+            flightId: flight.id,
+          ),
+        ),
+      );
+
+      if (changed == true && mounted) {
+        await _loadCurrentTab();
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Detalji leta se trenutno ne mogu otvoriti.'),
+        ),
+      );
     }
   }
 
@@ -459,12 +617,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String userFriendlySearchLabel() {
-    final query = _flightSearchController.text.trim();
-    if (query.isEmpty) {
-      return 'Pregled svih aktivnih i dostupnih opcija za putovanje.';
+    final hasDeparture = _departureSearchController.text.trim().isNotEmpty;
+    final hasArrival = _arrivalSearchController.text.trim().isNotEmpty;
+    final hasDate = _departureFromDate != null || _departureToDate != null;
+    final hasAirline = _selectedAirlineCode != null;
+
+    if (!hasDeparture && !hasArrival && !hasDate && !hasAirline) {
+      return 'Pregled svih dostupnih letova za odabrani period.';
     }
 
-    return 'Rezultati za pojam: "$query".';
+    return 'Prikaz letova prema odabranim filterima i kriterijima putovanja.';
   }
 
   Widget _buildFlightsHero(BuildContext context) {
@@ -527,7 +689,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Brza pretraga letova, rezervacija i preporuka na jednom mjestu.',
+                    'Pretraga destinacija, preporuke i rezervacije na jednom mjestu.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.9),
                     ),
@@ -542,6 +704,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSearchPanel(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -549,35 +713,112 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Pretraga letova',
-              style: Theme.of(context).textTheme.titleLarge,
+              'Planirajte putovanje',
+              style: theme.textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _flightSearchController,
-              textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _loadCurrentTab(),
-              decoration: InputDecoration(
-                labelText: 'Grad, aerodrom ili oznaka rute',
-                hintText: 'npr. Sarajevo, VIE ili BNX-VIE',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: IconButton(
-                  tooltip: 'Pokreni pretragu',
-                  onPressed: _loadCurrentTab,
-                  icon: const Icon(Icons.arrow_forward_rounded),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _LabeledField(
+                    label: 'Polaziste',
+                    child: TextField(
+                      controller: _departureSearchController,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _applyFlightFilters(),
+                      decoration: const InputDecoration(
+                        hintText: 'Grad ili aerodrom',
+                        suffixIcon: Icon(Icons.location_on_outlined),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _LabeledField(
+                    label: 'Odrediste',
+                    child: TextField(
+                      controller: _arrivalSearchController,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => _applyFlightFilters(),
+                      decoration: const InputDecoration(
+                        hintText: 'Grad ili aerodrom',
+                        suffixIcon: Icon(Icons.place_outlined),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    'Prijavljeni ste kao ${_profile?.fullName ?? widget.authController.session?.user.fullName ?? 'korisnik'}',
+                  child: _DateFieldButton(
+                    label: 'Od',
+                    value: _departureFromDate == null
+                        ? 'MM.DD.YYYY'
+                        : _formatShortDate(_departureFromDate!),
+                    onPressed: () => _pickFlightDate(isFromDate: true),
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DateFieldButton(
+                    label: 'Do',
+                    value: _departureToDate == null
+                        ? 'MM.DD.YYYY'
+                        : _formatShortDate(_departureToDate!),
+                    onPressed: () => _pickFlightDate(isFromDate: false),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _LabeledField(
+              label: 'Aviokompanija',
+              child: DropdownButtonFormField<String>(
+                initialValue: _selectedAirlineCode,
+                decoration: const InputDecoration(
+                  hintText: 'Sve aviokompanije',
+                ),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('Sve aviokompanije'),
+                  ),
+                  ..._availableAirlines.map(
+                    (airline) => DropdownMenuItem<String>(
+                      value: airline.code,
+                      child: Text('${airline.name} (${airline.code})'),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedAirlineCode = value;
+                    _flights = _filterFlights(_allFlights);
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Prijavljeni ste kao ${_profile?.fullName ?? widget.authController.session?.user.fullName ?? 'korisnik'}',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: _clearFlightFilters,
+                  child: const Text('Ocisti'),
+                ),
+                const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: _loadCurrentTab,
+                  onPressed: _applyFlightFilters,
                   child: const Text('Pretrazi'),
                 ),
               ],
@@ -654,28 +895,27 @@ class _HomeScreenState extends State<HomeScreen> {
       routeCode: flight.routeCode,
     );
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => _openFlightDetails(
-        MobileFlight(
-          id: flight.id,
-          flightNumber: flight.flightNumber,
-          routeCode: flight.routeCode,
-          airline: flight.airline,
-          departureAirport: flight.departureAirport,
-          arrivalAirport: flight.arrivalAirport,
-          departureAtUtc: flight.departureAtUtc,
-          arrivalAtUtc: flight.arrivalAtUtc,
-          durationMinutes: flight.durationMinutes,
-          basePrice: flight.basePrice,
-          currency: flight.currency,
-          availableSeats: flight.availableSeats,
-          totalSeats: flight.totalSeats,
-          status: flight.status,
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openFlightDetails(
+          MobileFlight(
+            id: flight.id,
+            flightNumber: flight.flightNumber,
+            routeCode: flight.routeCode,
+            airline: flight.airline,
+            departureAirport: flight.departureAirport,
+            arrivalAirport: flight.arrivalAirport,
+            departureAtUtc: flight.departureAtUtc,
+            arrivalAtUtc: flight.arrivalAtUtc,
+            durationMinutes: flight.durationMinutes,
+            basePrice: flight.basePrice,
+            currency: flight.currency,
+            availableSeats: flight.availableSeats,
+            totalSeats: flight.totalSeats,
+            status: flight.status,
+          ),
         ),
-      ),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -722,7 +962,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -737,10 +977,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     '${flight.routeCode}  |  ${flight.flightNumber}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    MobileDisplay.formatDateTime(flight.departureAtUtc),
-                    style: Theme.of(context).textTheme.bodySmall,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          MobileDisplay.formatDateTime(flight.departureAtUtc),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.receipt_long_outlined,
+                        size: 18,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1097,18 +1350,16 @@ class _HomeScreenState extends State<HomeScreen> {
       routeCode: flight.routeCode,
     );
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => _openFlightDetails(flight),
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        clipBehavior: Clip.antiAlias,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openFlightDetails(flight),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              height: 112,
-              width: double.infinity,
+            AspectRatio(
+              aspectRatio: 16 / 9,
               child: Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
@@ -1122,7 +1373,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1134,26 +1385,27 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
-                      _StatusChip(
-                        label: MobileDisplay.flightStatusLabel(flight.status),
-                      ),
+                      const Icon(Icons.receipt_long_outlined, size: 18),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    MobileDisplay.formatMoney(flight.basePrice, flight.currency),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${flight.routeCode}  |  ${flight.flightNumber}  |  ${flight.airline.name}',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${flight.flightNumber}  |  ${flight.airline.name}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Polazak: ${MobileDisplay.formatDateTime(flight.departureAtUtc)}',
+                    'Polazak ${MobileDisplay.formatDateTime(flight.departureAtUtc)}',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   Text(
-                    'Dolazak: ${MobileDisplay.formatDateTime(flight.arrivalAtUtc)}',
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${MobileDisplay.formatMoney(flight.basePrice, flight.currency)}  |  Slobodna sjedista ${flight.availableSeats}/${flight.totalSeats}',
+                    'Slobodna sjedista ${flight.availableSeats}/${flight.totalSeats}  |  ${MobileDisplay.flightStatusLabel(flight.status)}',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -1200,6 +1452,69 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return _heroImageUrl;
+  }
+
+  String _formatShortDate(DateTime value) {
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day.$month.${local.year}';
+  }
+}
+
+class _LabeledField extends StatelessWidget {
+  const _LabeledField({
+    required this.label,
+    required this.child,
+  });
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+}
+
+class _DateFieldButton extends StatelessWidget {
+  const _DateFieldButton({
+    required this.label,
+    required this.value,
+    required this.onPressed,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LabeledField(
+      label: label,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onPressed,
+        child: InputDecorator(
+          decoration: const InputDecoration(
+            suffixIcon: Icon(Icons.calendar_month_outlined),
+          ),
+          child: Text(value),
+        ),
+      ),
+    );
   }
 }
 

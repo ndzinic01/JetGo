@@ -147,6 +147,7 @@ class MobileFlightDetails {
     required this.totalSeats,
     required this.reservedSeats,
     required this.status,
+    required this.seatNumbers,
     required this.availableSeatNumbers,
   });
 
@@ -167,6 +168,7 @@ class MobileFlightDetails {
   final int totalSeats;
   final int reservedSeats;
   final int status;
+  final List<String> seatNumbers;
   final List<String> availableSeatNumbers;
 
   factory MobileFlightDetails.fromJson(Map<String, dynamic> json) {
@@ -197,6 +199,9 @@ class MobileFlightDetails {
       totalSeats: json['totalSeats'] as int? ?? 0,
       reservedSeats: json['reservedSeats'] as int? ?? 0,
       status: json['status'] as int? ?? 0,
+      seatNumbers: ((json['seatNumbers'] as List<dynamic>?) ?? const [])
+          .map((item) => item.toString())
+          .toList(),
       availableSeatNumbers:
           ((json['availableSeatNumbers'] as List<dynamic>?) ?? const [])
               .map((item) => item.toString())

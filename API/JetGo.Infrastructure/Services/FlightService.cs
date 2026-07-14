@@ -118,10 +118,14 @@ public sealed class FlightService : IFlightService
                 DurationMinutes = EF.Functions.DateDiffMinute(x.DepartureAtUtc, x.ArrivalAtUtc),
                 BasePrice = x.BasePrice,
                 AdditionalBaggageUnitPrice = ReservationPricingConstants.AdditionalBaggagePricePerPiece,
-                AvailableSeats = x.AvailableSeats,
-                TotalSeats = x.TotalSeats,
-                ReservedSeats = x.TotalSeats - x.AvailableSeats,
+                AvailableSeats = x.Seats.Count(s => !s.IsReserved),
+                TotalSeats = x.Seats.Count(),
+                ReservedSeats = x.Seats.Count(s => s.IsReserved),
                 Status = x.Status,
+                SeatNumbers = x.Seats
+                    .OrderBy(s => s.SeatNumber)
+                    .Select(s => s.SeatNumber)
+                    .ToArray(),
                 AvailableSeatNumbers = x.Seats
                     .Where(s => !s.IsReserved)
                     .OrderBy(s => s.SeatNumber)

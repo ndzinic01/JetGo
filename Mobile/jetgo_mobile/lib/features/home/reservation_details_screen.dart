@@ -301,7 +301,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     final statusReason = _paymentDetails?.statusReason;
     final canInitializePayment =
         !details.isPaid && (details.canInitiatePayment || _hasPendingPayment(details));
-    final canConfirmPayment = !details.isPaid && effectivePaymentId != null;
+    final canConfirmPayment =
+        !details.isPaid && effectivePaymentId != null && effectivePaymentStatus == 1;
 
     return Card(
       child: Padding(
@@ -346,6 +347,13 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
+            if (!hasApprovalUrl && canConfirmPayment) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Ako ste PayPal odobrenje vec uradili ranije, sada mozete kliknuti "2. Zavrsi placanje".',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: 16),
             if (canInitializePayment || canConfirmPayment)
               Wrap(
@@ -369,10 +377,13 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                       label: Text(
                         hasApprovalUrl
                             ? '1. Otvori PayPal'
-                            : '1. Pokreni PayPal',
+                            : _hasPendingPayment(details)
+                                ? 'Provjeri PayPal link'
+                                : '1. Pokreni PayPal',
                       ),
                     ),
-                  if (canConfirmPayment && _hasOpenedPayPalApproval)
+                  if (canConfirmPayment &&
+                      (_hasOpenedPayPalApproval || !hasApprovalUrl))
                     OutlinedButton.icon(
                       onPressed: _isPaymentSubmitting
                           ? null
@@ -528,9 +539,11 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         await _openApprovalUrl(approvalUrl);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Placanje je inicirano, ali approval link trenutno nije dostupan.',
+              payment.status == 1
+                  ? 'Approval link trenutno nije dostupan. Ako ste PayPal vec odobrili ranije, kliknite "2. Zavrsi placanje".'
+                  : 'Placanje je inicirano, ali approval link trenutno nije dostupan.',
             ),
           ),
         );
