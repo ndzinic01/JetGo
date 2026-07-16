@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -48,6 +50,21 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedAirlineCode;
 
   String get _token => widget.authController.session?.accessToken ?? '';
+
+  String get _currentSectionTitle {
+    switch (_currentIndex) {
+      case 0:
+        return 'Letovi';
+      case 1:
+        return 'Rezervacije';
+      case 2:
+        return 'Novosti';
+      case 3:
+        return 'Moj profil';
+      default:
+        return 'JetGo Mobile';
+    }
+  }
 
   @override
   void initState() {
@@ -153,6 +170,73 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCurrentTab();
   }
 
+  Future<void> _handleMenuAction(_HomeMenuAction action) async {
+    switch (action) {
+      case _HomeMenuAction.letovi:
+        _changeTab(0);
+        break;
+      case _HomeMenuAction.rezervacije:
+        _changeTab(1);
+        break;
+      case _HomeMenuAction.novosti:
+        _changeTab(2);
+        break;
+      case _HomeMenuAction.profil:
+        _changeTab(3);
+        break;
+      case _HomeMenuAction.podrska:
+        await _openSupportMessages();
+        break;
+      case _HomeMenuAction.odjava:
+        widget.authController.logout();
+        break;
+    }
+  }
+
+  Future<void> _trackRecommendationSearchSignal() async {
+    final searchText = _buildRecommendationSearchText();
+    if (searchText == null || _token.isEmpty) {
+      return;
+    }
+
+    try {
+      await _dataService.fetchFlights(
+        token: _token,
+        searchText: searchText,
+      );
+
+      final recommendations = await _dataService.fetchRecommendedFlights(
+        token: _token,
+        pageSize: 6,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _recommendedFlights = recommendations.items;
+        _recommendationsErrorMessage = null;
+      });
+    } catch (_) {
+      // Ignorisemo problem pri pracenju preporuka da ne prekidamo korisnika.
+    }
+  }
+
+  String? _buildRecommendationSearchText() {
+    final parts = <String>[
+      _departureSearchController.text.trim(),
+      _arrivalSearchController.text.trim(),
+      _selectedAirlineCode?.trim() ?? '',
+    ].where((value) => value.isNotEmpty).toList();
+
+    if (parts.isEmpty) {
+      return null;
+    }
+
+    return parts.join(' ');
+  }
+
   List<MobileFlight> get _airlineSortedFlights {
     final flights = _allFlights.toList()
       ..sort((left, right) => left.airline.name.compareTo(right.airline.name));
@@ -250,6 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _flights = _filterFlights(_allFlights);
     });
+    unawaited(_trackRecommendationSearchSignal());
   }
 
   void _clearFlightFilters() {
@@ -503,7 +588,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('JetGo Mobile'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('JetGo Mobile'),
+            Text(
+              _currentSectionTitle,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Notifikacije',
@@ -512,15 +609,59 @@ class _HomeScreenState extends State<HomeScreen> {
               unreadCount: notificationSummary?.unreadCount ?? 0,
             ),
           ),
-          IconButton(
-            tooltip: 'Osvjezi',
-            onPressed: _isLoading ? null : _loadCurrentTab,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          IconButton(
-            tooltip: 'Odjava',
-            onPressed: widget.authController.logout,
-            icon: const Icon(Icons.logout_rounded),
+          PopupMenuButton<_HomeMenuAction>(
+            tooltip: 'Meni',
+            onSelected: _handleMenuAction,
+            icon: const Icon(Icons.menu_rounded),
+            itemBuilder: (context) => [
+              PopupMenuItem<_HomeMenuAction>(
+                value: _HomeMenuAction.letovi,
+                child: _HomeMenuItem(
+                  icon: Icons.flight_takeoff_rounded,
+                  label: 'Letovi',
+                  selected: _currentIndex == 0,
+                ),
+              ),
+              PopupMenuItem<_HomeMenuAction>(
+                value: _HomeMenuAction.rezervacije,
+                child: _HomeMenuItem(
+                  icon: Icons.confirmation_num_outlined,
+                  label: 'Rezervacije',
+                  selected: _currentIndex == 1,
+                ),
+              ),
+              PopupMenuItem<_HomeMenuAction>(
+                value: _HomeMenuAction.novosti,
+                child: _HomeMenuItem(
+                  icon: Icons.article_outlined,
+                  label: 'Novosti',
+                  selected: _currentIndex == 2,
+                ),
+              ),
+              PopupMenuItem<_HomeMenuAction>(
+                value: _HomeMenuAction.profil,
+                child: _HomeMenuItem(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Moj profil',
+                  selected: _currentIndex == 3,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<_HomeMenuAction>(
+                value: _HomeMenuAction.podrska,
+                child: _HomeMenuItem(
+                  icon: Icons.support_agent_rounded,
+                  label: 'Podrska',
+                ),
+              ),
+              const PopupMenuItem<_HomeMenuAction>(
+                value: _HomeMenuAction.odjava,
+                child: _HomeMenuItem(
+                  icon: Icons.logout_rounded,
+                  label: 'Odjava',
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -529,28 +670,6 @@ class _HomeScreenState extends State<HomeScreen> {
           onRefresh: _loadCurrentTab,
           child: _buildBody(context),
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: _changeTab,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.flight_takeoff_rounded),
-            label: 'Letovi',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.confirmation_num_outlined),
-            label: 'Rezervacije',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.article_outlined),
-            label: 'Novosti',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            label: 'Profil',
-          ),
-        ],
       ),
     );
   }
@@ -664,23 +783,9 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Spacer(),
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.82),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.menu_rounded),
-                      ),
-                    ],
-                  ),
                   const Spacer(),
                   Text(
-                    'Find your flight',
+                    'Pronadjite svoj let',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontSize: 32,
@@ -855,8 +960,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_recommendedFlights.isEmpty) {
       return const _EmptyState(
         icon: Icons.travel_explore_rounded,
-        title: 'Preporuke jos nisu spremne',
-        message: 'Nakon nekoliko pretraga i rezervacija ovdje ce se pojaviti personalizovani prijedlozi.',
+        title: 'Trenutno nema prijedloga',
+        message:
+            'Preporuke se pune nakon pretraga kroz pretragu letova. Ako ste vec rezervisali slicne ili sve trenutno dostupne letove, ovdje privremeno nece biti prijedloga.',
       );
     }
 
@@ -974,7 +1080,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${flight.routeCode}  |  ${flight.flightNumber}',
+                    '${flight.routeCode}  |  ${MobileDisplay.flightNumberLabel(flight.flightNumber)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
@@ -1052,7 +1158,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${reservation.flightNumber} - ${reservation.routeCode}',
+                    '${MobileDisplay.flightNumberLabel(reservation.flightNumber)} - ${reservation.routeCode}',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 4),
@@ -1265,7 +1371,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(
                   children: [
                     CircleAvatar(
-                      radius: 26,
+                      radius: 30,
                       child: Text(MobileDisplay.initials(profile.fullName)),
                     ),
                     const SizedBox(width: 16),
@@ -1278,21 +1384,69 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 4),
-                          Text('@${profile.username}'),
+                          Text(
+                            '@${profile.username}',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
-                _InfoRow(label: 'Email', value: profile.email),
-                _InfoRow(label: 'Telefon', value: profile.phoneNumber ?? '-'),
-                _InfoRow(label: 'Uloge', value: profile.roles.join(', ')),
-                _InfoRow(
-                  label: 'Neprocitane notifikacije',
-                  value: (_notificationSummary?.unreadCount ?? 0).toString(),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: profile.roles
+                      .map(
+                        (role) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .secondaryContainer,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            MobileDisplay.roleLabel(role),
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
-                _InfoRow(label: 'ID korisnika', value: profile.userId),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    children: [
+                      _InfoRow(label: 'Email', value: profile.email),
+                      _InfoRow(
+                        label: 'Telefon',
+                        value: profile.phoneNumber ?? 'Nije uneseno',
+                      ),
+                      _InfoRow(
+                        label: 'Neprocitane notifikacije',
+                        value: (_notificationSummary?.unreadCount ?? 0)
+                            .toString(),
+                      ),
+                      _InfoRow(label: 'ID korisnika', value: profile.userId),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -1305,8 +1459,14 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Brze akcije',
+                  'Moj nalog i akcije',
                   style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(label: 'Korisnicko ime', value: '@${profile.username}'),
+                _InfoRow(
+                  label: 'Uloga',
+                  value: profile.roles.map(MobileDisplay.roleLabel).join(', '),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -1395,7 +1555,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${flight.routeCode}  |  ${flight.flightNumber}  |  ${flight.airline.name}',
+                    '${flight.routeCode}  |  ${MobileDisplay.flightNumberLabel(flight.flightNumber)}  |  ${flight.airline.name}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 6),
@@ -1424,13 +1584,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final key = '${cityName.toLowerCase()} ${airportCode.toLowerCase()} ${routeCode.toLowerCase()}';
 
     if (key.contains('paris') || key.contains('cdg')) {
-      return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=900&q=80';
     }
-    if (key.contains('rome') || key.contains('fco')) {
-      return 'https://images.unsplash.com/photo-1525874684015-58379d421a52?auto=format&fit=crop&w=900&q=80';
+    if (key.contains('rome') || key.contains('rim') || key.contains('fco')) {
+      return 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=900&q=80';
     }
     if (key.contains('istanbul') || key.contains('ist')) {
-      return 'https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.unsplash.com/photo-1527838832700-5059252407fa?auto=format&fit=crop&w=900&q=80';
     }
     if (key.contains('berlin') || key.contains('ber')) {
       return 'https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&w=900&q=80';
@@ -1438,8 +1598,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (key.contains('vienna') || key.contains('vie') || key.contains('bec')) {
       return 'https://images.unsplash.com/photo-1516550893923-42d28e5677af?auto=format&fit=crop&w=900&q=80';
     }
-    if (key.contains('zurich') || key.contains('zrh')) {
-      return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=80';
+    if (key.contains('zurich') || key.contains('cirih') || key.contains('zrh')) {
+      return 'https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=900&q=80';
     }
     if (key.contains('zagreb') || key.contains('zag')) {
       return 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=900&q=80';
@@ -1460,6 +1620,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final month = local.month.toString().padLeft(2, '0');
     return '$day.$month.${local.year}';
   }
+}
+
+enum _HomeMenuAction {
+  letovi,
+  rezervacije,
+  novosti,
+  profil,
+  podrska,
+  odjava,
 }
 
 class _LabeledField extends StatelessWidget {
@@ -1484,6 +1653,43 @@ class _LabeledField extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         child,
+      ],
+    );
+  }
+}
+
+class _HomeMenuItem extends StatelessWidget {
+  const _HomeMenuItem({
+    required this.icon,
+    required this.label,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        Icon(
+          selected ? Icons.check_circle_rounded : icon,
+          size: 18,
+          color: selected ? theme.colorScheme.primary : null,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? theme.colorScheme.primary : null,
+                ),
+          ),
+        ),
       ],
     );
   }

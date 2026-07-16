@@ -117,11 +117,6 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
             onPressed: _isLoading ? null : _load,
             icon: const Icon(Icons.refresh_rounded),
           ),
-          IconButton(
-            tooltip: 'Novi upit',
-            onPressed: _openComposer,
-            icon: const Icon(Icons.add_comment_rounded),
-          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(

@@ -169,7 +169,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text('${details.flightNumber} - ${details.routeCode}'),
+                  Text(
+                    '${MobileDisplay.flightNumberLabel(details.flightNumber)} - ${details.routeCode}',
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     '${details.departureAirportCode} -> ${details.arrivalAirportCode}',
@@ -390,12 +392,6 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                           : () => _confirmPayment(effectivePaymentId),
                       icon: const Icon(Icons.verified_rounded),
                       label: const Text('2. Zavrsi placanje'),
-                    ),
-                  if (hasApprovalUrl)
-                    OutlinedButton.icon(
-                      onPressed: () => _copyApprovalUrl(approvalUrl),
-                      icon: const Icon(Icons.copy_rounded),
-                      label: const Text('Kopiraj link'),
                     ),
                 ],
               )

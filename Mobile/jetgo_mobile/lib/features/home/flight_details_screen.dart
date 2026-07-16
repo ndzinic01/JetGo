@@ -325,7 +325,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            details.flightNumber,
+                            MobileDisplay.flightNumberLabel(
+                              details.flightNumber,
+                            ),
                             style: theme.textTheme.labelLarge?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
@@ -412,7 +414,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                     Expanded(
                       child: _InfoBlock(
                         title: 'Broj leta',
-                        value: details.flightNumber,
+                        value: MobileDisplay.flightNumberLabel(
+                          details.flightNumber,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -726,7 +730,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 10),
-                  Text('Broj leta: ${details.flightNumber}'),
+                  Text(
+                    'Broj leta: ${MobileDisplay.flightNumberLabel(details.flightNumber)}',
+                  ),
                   Text(
                     'Broj sjedista: ${_selectedSeats.isEmpty ? '-' : (_selectedSeats.toList()..sort()).join(', ')}',
                   ),

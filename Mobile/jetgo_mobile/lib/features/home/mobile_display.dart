@@ -1,4 +1,25 @@
 class MobileDisplay {
+  static String flightNumberLabel(String value) {
+    final normalized = value.trim();
+
+    if (normalized.isEmpty || normalized.toLowerCase() == 'string') {
+      return 'Broj leta nije unesen';
+    }
+
+    return normalized.toUpperCase();
+  }
+
+  static String roleLabel(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'user':
+        return 'Korisnik';
+      case 'admin':
+        return 'Administrator';
+      default:
+        return value;
+    }
+  }
+
   static String flightStatusLabel(int status) {
     switch (status) {
       case 1:

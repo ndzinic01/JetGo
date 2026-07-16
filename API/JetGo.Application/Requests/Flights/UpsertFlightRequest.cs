@@ -13,6 +13,7 @@ public sealed class UpsertFlightRequest
 
     [Required(ErrorMessage = "Broj leta je obavezan.")]
     [MaxLength(20, ErrorMessage = "Broj leta moze sadrzavati maksimalno 20 karaktera.")]
+    [RegularExpression("^[A-Za-z]{1,3}[- ]?\\d{1,4}[A-Za-z]?$", ErrorMessage = "Broj leta mora biti u formatu poput JG101 ili OU-215.")]
     public string FlightNumber { get; init; } = string.Empty;
 
     public DateTime DepartureAtUtc { get; init; }
