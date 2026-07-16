@@ -984,7 +984,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 0.78,
+            childAspectRatio: 0.70,
           ),
           itemBuilder: (context, index) {
             return _buildRecommendedFlightCard(topRecommendations[index]);
@@ -1026,7 +1026,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
-              aspectRatio: 1.08,
+              aspectRatio: 1.05,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -1043,8 +1043,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                   ),
-                  Positioned(
+                  const Positioned(
                     left: 8,
+                    top: 8,
+                    child: _FlightOverlayBadge(
+                      label: 'Preporuka',
+                      icon: Icons.auto_awesome_rounded,
+                    ),
+                  ),
+                  Positioned(
+                    right: 8,
                     top: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1064,6 +1072,34 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
+                  Positioned(
+                    left: 10,
+                    right: 10,
+                    bottom: 10,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${flight.departureAirport.cityName} - ${flight.arrivalAirport.cityName}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${flight.departureAirport.iataCode} -> ${flight.arrivalAirport.iataCode}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.92),
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1073,33 +1109,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${flight.departureAirport.cityName} -> ${flight.arrivalAirport.cityName}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
                     '${flight.routeCode}  |  ${MobileDisplay.flightNumberLabel(flight.flightNumber)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          MobileDisplay.formatDateTime(flight.departureAtUtc),
-                          style: Theme.of(context).textTheme.bodySmall,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                  _FlightTimeSummary(
+                    departureTime: _formatTimeLabel(flight.departureAtUtc),
+                    arrivalTime: _formatTimeLabel(flight.arrivalAtUtc),
+                    middleLabel: '${flight.durationMinutes} min',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _formatShortDate(flight.departureAtUtc),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.receipt_long_outlined,
-                        size: 18,
-                      ),
-                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    flight.recommendationReason,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
                 ],
               ),
@@ -1520,52 +1555,134 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Theme.of(context).colorScheme.secondaryContainer,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.flight_rounded, size: 34),
-                  );
-                },
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Theme.of(context).colorScheme.secondaryContainer,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.flight_rounded, size: 34),
+                      );
+                    },
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.12),
+                          Colors.black.withValues(alpha: 0.55),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 10,
+                    top: 10,
+                    child: _FlightOverlayBadge(
+                      label: MobileDisplay.flightStatusLabel(flight.status),
+                      icon: Icons.schedule_rounded,
+                    ),
+                  ),
+                  Positioned(
+                    right: 10,
+                    top: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        MobileDisplay.formatMoney(
+                          flight.basePrice,
+                          flight.currency,
+                        ),
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${flight.departureAirport.cityName} - ${flight.arrivalAirport.cityName}',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${flight.departureAirport.iataCode} -> ${flight.arrivalAirport.iataCode}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.92),
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${flight.departureAirport.cityName} -> ${flight.arrivalAirport.cityName}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      const Icon(Icons.receipt_long_outlined, size: 18),
-                    ],
+                  _FlightTimeSummary(
+                    departureTime: _formatTimeLabel(flight.departureAtUtc),
+                    arrivalTime: _formatTimeLabel(flight.arrivalAtUtc),
+                    middleLabel: '${flight.durationMinutes} min',
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    MobileDisplay.formatMoney(flight.basePrice, flight.currency),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
                     '${flight.routeCode}  |  ${MobileDisplay.flightNumberLabel(flight.flightNumber)}  |  ${flight.airline.name}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Polazak ${MobileDisplay.formatDateTime(flight.departureAtUtc)}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    'Polazak ${_formatShortDate(flight.departureAtUtc)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
-                  Text(
-                    'Slobodna sjedista ${flight.availableSeats}/${flight.totalSeats}  |  ${MobileDisplay.flightStatusLabel(flight.status)}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _FlightFactChip(
+                        icon: Icons.airlines_rounded,
+                        label: flight.airline.code,
+                      ),
+                      _FlightFactChip(
+                        icon: Icons.event_seat_rounded,
+                        label:
+                            '${flight.availableSeats}/${flight.totalSeats} slobodno',
+                      ),
+                      _FlightFactChip(
+                        icon: Icons.confirmation_num_outlined,
+                        label: MobileDisplay.flightNumberLabel(
+                          flight.flightNumber,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1619,6 +1736,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
     return '$day.$month.${local.year}';
+  }
+
+  String _formatTimeLabel(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 }
 
@@ -1689,6 +1813,168 @@ class _HomeMenuItem extends StatelessWidget {
                   color: selected ? theme.colorScheme.primary : null,
                 ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FlightOverlayBadge extends StatelessWidget {
+  const _FlightOverlayBadge({
+    required this.label,
+    required this.icon,
+  });
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlightFactChip extends StatelessWidget {
+  const _FlightFactChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlightTimeSummary extends StatelessWidget {
+  const _FlightTimeSummary({
+    required this.departureTime,
+    required this.arrivalTime,
+    required this.middleLabel,
+  });
+
+  final String departureTime;
+  final String arrivalTime;
+  final String middleLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        Expanded(
+          child: _FlightTimePoint(
+            label: 'Polazak',
+            value: departureTime,
+            alignment: CrossAxisAlignment.start,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            children: [
+              Icon(
+                Icons.flight_takeoff_rounded,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                middleLabel,
+                style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _FlightTimePoint(
+            label: 'Dolazak',
+            value: arrivalTime,
+            alignment: CrossAxisAlignment.end,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FlightTimePoint extends StatelessWidget {
+  const _FlightTimePoint({
+    required this.label,
+    required this.value,
+    required this.alignment,
+  });
+
+  final String label;
+  final String value;
+  final CrossAxisAlignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: alignment,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: theme.textTheme.titleMedium,
         ),
       ],
     );

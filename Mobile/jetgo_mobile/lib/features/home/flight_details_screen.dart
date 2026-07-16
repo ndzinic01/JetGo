@@ -313,27 +313,22 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
+                      Row(
+                        children: [
+                          _HeroBadge(
+                            label: MobileDisplay.flightStatusLabel(
+                              details.status,
+                            ),
+                            icon: Icons.schedule_rounded,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            MobileDisplay.flightNumberLabel(
+                          const Spacer(),
+                          _HeroBadge(
+                            label: MobileDisplay.flightNumberLabel(
                               details.flightNumber,
                             ),
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            icon: Icons.confirmation_num_outlined,
                           ),
-                        ),
+                        ],
                       ),
                       const Spacer(),
                       Text(
@@ -345,7 +340,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${details.departureAirport.iataCode} -> ${details.arrivalAirport.iataCode}  •  ${_formatShortDate(details.departureAtUtc)}',
+                        '${details.departureAirport.iataCode} -> ${details.arrivalAirport.iataCode}  |  ${_formatShortDate(details.departureAtUtc)}',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white.withValues(alpha: 0.92),
                         ),
@@ -366,16 +361,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                   runSpacing: 8,
                   children: [
                     _MetaBadge(
-                      icon: Icons.flight_takeoff_rounded,
+                      icon: Icons.airlines_rounded,
                       label: details.airline.name,
-                    ),
-                    _MetaBadge(
-                      icon: Icons.schedule_rounded,
-                      label: '${details.durationMinutes} min',
-                    ),
-                    _MetaBadge(
-                      icon: Icons.event_seat_rounded,
-                      label: '${_displayAvailableSeats(details)}/${_displayTotalSeats(details)}',
                     ),
                     _MetaBadge(
                       icon: Icons.sell_outlined,
@@ -384,25 +371,41 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                         details.currency,
                       ),
                     ),
+                    _MetaBadge(
+                      icon: Icons.event_seat_rounded,
+                      label: '${_displayAvailableSeats(details)}/${_displayTotalSeats(details)}',
+                    ),
+                    _MetaBadge(
+                      icon: Icons.route_rounded,
+                      label: details.routeCode,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
+                _JourneyOverviewCard(
+                  departureCity: details.departureAirport.cityName,
+                  departureCode: details.departureAirport.iataCode,
+                  departureTime: _formatTime(details.departureAtUtc),
+                  arrivalCity: details.arrivalAirport.cityName,
+                  arrivalCode: details.arrivalAirport.iataCode,
+                  arrivalTime: _formatTime(details.arrivalAtUtc),
+                  durationLabel: '${details.durationMinutes} min',
+                ),
+                const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: _InfoBlock(
-                        title: 'Polazak',
-                        value:
-                            '${details.departureAirport.cityName} (${details.departureAirport.iataCode})\n${_formatTime(details.departureAtUtc)}\n${details.departureAirport.name}',
+                        title: 'Aerodrom polaska',
+                        value: details.departureAirport.name,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _InfoBlock(
-                        title: 'Dolazak',
-                        value:
-                            '${details.arrivalAirport.cityName} (${details.arrivalAirport.iataCode})\n${_formatTime(details.arrivalAtUtc)}\n${details.arrivalAirport.name}',
+                        title: 'Aerodrom dolaska',
+                        value: details.arrivalAirport.name,
                       ),
                     ),
                   ],
@@ -477,9 +480,30 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Izaberite svoje sjediste',
-              style: Theme.of(context).textTheme.titleMedium,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Izaberite svoje sjediste',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (_selectedSeats.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${_selectedSeats.length} odabrano',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             Text(
@@ -581,6 +605,39 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                 ),
               ],
             ),
+            if (_selectedSeats.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Odabrana sjedista',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      (_selectedSeats.toList()..sort()).join(', '),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Cijena sjedista: ${MobileDisplay.formatMoney(_selectedSeatsTotal(details), details.currency)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -680,8 +737,15 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Dodatni prtljag',
+              'Dodatni prtljag i pregled rezervacije',
               style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Kabinski prtljag je ukljucen, a ovdje po potrebi dodajete dodatne kofere prije placanja.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
@@ -876,13 +940,13 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
         '${cityName.toLowerCase()} ${airportCode.toLowerCase()} ${routeCode.toLowerCase()}';
 
     if (key.contains('paris') || key.contains('cdg')) {
-      return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=900&q=80';
     }
-    if (key.contains('rome') || key.contains('fco')) {
-      return 'https://images.unsplash.com/photo-1525874684015-58379d421a52?auto=format&fit=crop&w=900&q=80';
+    if (key.contains('rome') || key.contains('rim') || key.contains('fco')) {
+      return 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=900&q=80';
     }
     if (key.contains('istanbul') || key.contains('ist')) {
-      return 'https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.unsplash.com/photo-1527838832700-5059252407fa?auto=format&fit=crop&w=900&q=80';
     }
     if (key.contains('berlin') || key.contains('ber')) {
       return 'https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&w=900&q=80';
@@ -893,8 +957,14 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
     if (key.contains('zagreb') || key.contains('zag')) {
       return 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=900&q=80';
     }
-    if (key.contains('zurich') || key.contains('zrh')) {
-      return 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80';
+    if (key.contains('frankfurt') || key.contains('fra')) {
+      return 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('belgrade') || key.contains('beograd') || key.contains('beg')) {
+      return 'https://images.unsplash.com/photo-1578922746465-3a80a228f223?auto=format&fit=crop&w=900&q=80';
+    }
+    if (key.contains('zurich') || key.contains('cirih') || key.contains('zrh')) {
+      return 'https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=900&q=80';
     }
 
     return _heroImageUrl;
@@ -926,6 +996,156 @@ class _MetaBadge extends StatelessWidget {
           Text(label, style: Theme.of(context).textTheme.labelMedium),
         ],
       ),
+    );
+  }
+}
+
+class _HeroBadge extends StatelessWidget {
+  const _HeroBadge({
+    required this.label,
+    required this.icon,
+  });
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JourneyOverviewCard extends StatelessWidget {
+  const _JourneyOverviewCard({
+    required this.departureCity,
+    required this.departureCode,
+    required this.departureTime,
+    required this.arrivalCity,
+    required this.arrivalCode,
+    required this.arrivalTime,
+    required this.durationLabel,
+  });
+
+  final String departureCity;
+  final String departureCode;
+  final String departureTime;
+  final String arrivalCity;
+  final String arrivalCode;
+  final String arrivalTime;
+  final String durationLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _JourneyPoint(
+              title: 'Polazak',
+              primary: departureTime,
+              secondary: '$departureCity ($departureCode)',
+              alignEnd: false,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.flight_takeoff_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  durationLabel,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _JourneyPoint(
+              title: 'Dolazak',
+              primary: arrivalTime,
+              secondary: '$arrivalCity ($arrivalCode)',
+              alignEnd: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JourneyPoint extends StatelessWidget {
+  const _JourneyPoint({
+    required this.title,
+    required this.primary,
+    required this.secondary,
+    required this.alignEnd,
+  });
+
+  final String title;
+  final String primary;
+  final String secondary;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          primary,
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          secondary,
+          textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }
