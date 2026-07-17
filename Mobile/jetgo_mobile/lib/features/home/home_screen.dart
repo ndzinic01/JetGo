@@ -1160,73 +1160,60 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return ListView.builder(
+    final paidCount = _reservations.where((item) => item.isPaid).length;
+    final upcomingCount = _reservations
+        .where((item) => item.departureAtUtc.isAfter(DateTime.now()))
+        .length;
+
+    return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
-      itemCount: _reservations.length,
-      itemBuilder: (context, index) {
-        final reservation = _reservations[index];
-        return InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => _openReservationDetails(reservation),
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Moje rezervacije',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Pregled svih aktivnih i ranijih putovanja, sa placanjem i dodatnim prtljagom na jednom mjestu.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          reservation.reservationCode,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      _StatusChip(
-                        label: MobileDisplay.reservationStatusLabel(
-                          reservation.status,
-                        ),
-                      ),
-                    ],
+                  _FlightFactChip(
+                    icon: Icons.confirmation_num_outlined,
+                    label: '${_reservations.length} rezervacija',
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${MobileDisplay.flightNumberLabel(reservation.flightNumber)} - ${reservation.routeCode}',
-                    style: Theme.of(context).textTheme.bodyLarge,
+                  _FlightFactChip(
+                    icon: Icons.verified_rounded,
+                    label: '$paidCount placeno',
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${reservation.departureAirportCode} -> ${reservation.arrivalAirportCode}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Polazak: ${MobileDisplay.formatDateTime(reservation.departureAtUtc)}',
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Ukupno: ${MobileDisplay.formatMoney(reservation.totalAmount, reservation.currency)} - Sjedista: ${reservation.seatsCount}',
-                  ),
-                  if (reservation.additionalBaggageCount > 0) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Dodatni prtljag: ${MobileDisplay.baggageOfferLabel(reservation.additionalBaggageCount)}',
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    reservation.isPaid
-                        ? 'Placanje evidentirano'
-                        : 'Placanje jos nije evidentirano',
+                  _FlightFactChip(
+                    icon: Icons.flight_takeoff_rounded,
+                    label: '$upcomingCount predstojecih',
                   ),
                 ],
               ),
-            ),
+            ],
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 16),
+        ..._reservations.map(
+          (reservation) => _buildReservationCard(context, reservation),
+        ),
+      ],
     );
   }
 
@@ -1244,6 +1231,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       );
     }
+
+    final featuredArticle = _news.first;
+    final remainingArticles = _news.skip(1).toList();
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -1271,8 +1261,242 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        ..._news.map(_buildNewsCard),
+        _buildFeaturedNewsCard(featuredArticle),
+        if (remainingArticles.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          const _SectionHeader(
+            title: 'Ostale objave',
+            subtitle:
+                'Najnovije informacije iz administracije i svijeta putovanja.',
+          ),
+          const SizedBox(height: 10),
+          ...remainingArticles.map(_buildNewsCard),
+        ],
       ],
+    );
+  }
+
+  Widget _buildReservationCard(
+    BuildContext context,
+    MobileReservation reservation,
+  ) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _openReservationDetails(reservation),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 14),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.75),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          reservation.reservationCode,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${MobileDisplay.flightNumberLabel(reservation.flightNumber)}  |  ${reservation.routeCode}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _StatusChip(
+                    label: MobileDisplay.reservationStatusLabel(
+                      reservation.status,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _FlightTimeSummary(
+                    departureTime: _formatTimeLabel(reservation.departureAtUtc),
+                    arrivalTime: '--:--',
+                    middleLabel: '${reservation.departureAirportCode} -> ${reservation.arrivalAirportCode}',
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Polazak ${MobileDisplay.formatDateTime(reservation.departureAtUtc)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _FlightFactChip(
+                        icon: Icons.sell_outlined,
+                        label: MobileDisplay.formatMoney(
+                          reservation.totalAmount,
+                          reservation.currency,
+                        ),
+                      ),
+                      _FlightFactChip(
+                        icon: Icons.event_seat_rounded,
+                        label: '${reservation.seatsCount} sjed.',
+                      ),
+                      _FlightFactChip(
+                        icon: reservation.isPaid
+                            ? Icons.verified_rounded
+                            : Icons.schedule_rounded,
+                        label: reservation.isPaid
+                            ? 'Placanje evidentirano'
+                            : 'Ceka placanje',
+                      ),
+                    ],
+                  ),
+                  if (reservation.additionalBaggageCount > 0) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Dodatni prtljag: ${MobileDisplay.baggageOfferLabel(reservation.additionalBaggageCount)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeaturedNewsCard(NewsArticleSummary article) {
+    final imageUrl = article.imageUrl?.trim();
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => _openNewsPreview(article),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (hasImage)
+                    Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) {
+                          return child;
+                        }
+
+                        return Container(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                          alignment: Alignment.center,
+                          child: const CircularProgressIndicator(),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return const _NewsImagePlaceholder(
+                          icon: Icons.image_not_supported_rounded,
+                          message: 'Slika nije dostupna.',
+                        );
+                      },
+                    )
+                  else
+                    const _NewsImagePlaceholder(
+                      icon: Icons.article_rounded,
+                      message: 'Objava bez naslovne slike',
+                    ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.10),
+                          Colors.black.withValues(alpha: 0.62),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Positioned(
+                    left: 12,
+                    top: 12,
+                    child: _FlightOverlayBadge(
+                      label: 'Istaknuto',
+                      icon: Icons.campaign_rounded,
+                    ),
+                  ),
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    bottom: 14,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          article.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          MobileDisplay.formatDateTime(article.publishedAtUtc),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.92),
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Text(
+                'Dodirnite istaknutu objavu za pregled detalja i naslovne fotografije.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1286,89 +1510,96 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Card(
         margin: const EdgeInsets.only(bottom: 14),
         clipBehavior: Clip.antiAlias,
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (hasImage)
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) {
-                      return child;
-                    }
+            SizedBox(
+              width: 116,
+              height: 116,
+              child: hasImage
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) {
+                          return child;
+                        }
 
-                    return Container(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      alignment: Alignment.center,
-                      child: const CircularProgressIndicator(),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return const _NewsImagePlaceholder(
-                      icon: Icons.image_not_supported_rounded,
-                      message: 'Slika nije dostupna.',
-                    );
-                  },
+                        return Container(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                          alignment: Alignment.center,
+                          child: const CircularProgressIndicator(),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return const _NewsImagePlaceholder(
+                          icon: Icons.image_not_supported_rounded,
+                          message: 'Slika nije dostupna.',
+                        );
+                      },
+                    )
+                  : const _NewsImagePlaceholder(
+                      icon: Icons.article_rounded,
+                      message: 'Objava bez naslovne slike',
+                    ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(context).colorScheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'Novost',
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            MobileDisplay.formatDateTime(article.publishedAtUtc),
+                            textAlign: TextAlign.end,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      article.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Dodirnite karticu za pregled objave.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
                 ),
-              )
-            else
-              const _NewsImagePlaceholder(
-                icon: Icons.article_rounded,
-                message: 'Objava bez naslovne slike',
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              Theme.of(context).colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          'Novost',
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          MobileDisplay.formatDateTime(article.publishedAtUtc),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    article.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Dodirnite karticu za pregled objave.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
               ),
             ),
           ],
