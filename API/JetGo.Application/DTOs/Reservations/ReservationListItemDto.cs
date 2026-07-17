@@ -20,6 +20,8 @@ public sealed class ReservationListItemDto
 
     public DateTime DepartureAtUtc { get; init; }
 
+    public DateTime ArrivalAtUtc { get; init; }
+
     public ReservationStatus Status { get; init; }
 
     public decimal TotalAmount { get; init; }

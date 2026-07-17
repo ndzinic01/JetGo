@@ -220,6 +220,7 @@ class MobileReservation {
     required this.departureAirportCode,
     required this.arrivalAirportCode,
     required this.departureAtUtc,
+    required this.arrivalAtUtc,
     required this.status,
     required this.totalAmount,
     required this.currency,
@@ -240,6 +241,7 @@ class MobileReservation {
   final String departureAirportCode;
   final String arrivalAirportCode;
   final DateTime departureAtUtc;
+  final DateTime? arrivalAtUtc;
   final int status;
   final double totalAmount;
   final String currency;
@@ -261,6 +263,9 @@ class MobileReservation {
       departureAirportCode: json['departureAirportCode'] as String? ?? '',
       arrivalAirportCode: json['arrivalAirportCode'] as String? ?? '',
       departureAtUtc: DateTime.parse(json['departureAtUtc'] as String),
+      arrivalAtUtc: json['arrivalAtUtc'] != null
+          ? DateTime.parse(json['arrivalAtUtc'] as String)
+          : null,
       status: json['status'] as int? ?? 0,
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? '',

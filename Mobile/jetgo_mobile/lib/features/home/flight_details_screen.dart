@@ -750,8 +750,19 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               initialValue: _additionalBaggageCount,
+              isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Odaberite ponudu',
+              ),
+              selectedItemBuilder: (context) => List.generate(
+                7,
+                (index) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    MobileDisplay.baggageOfferLabel(index),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ),
               items: List.generate(
                 7,
@@ -795,7 +806,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Broj leta: ${MobileDisplay.flightNumberLabel(details.flightNumber)}',
+                    'Broj leta: ${details.flightNumber.trim().isEmpty || details.flightNumber.trim().toLowerCase() == 'string' ? 'Nije unesen' : details.flightNumber.trim().toUpperCase()}',
                   ),
                   Text(
                     'Broj sjedista: ${_selectedSeats.isEmpty ? '-' : (_selectedSeats.toList()..sort()).join(', ')}',

@@ -1332,7 +1332,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _FlightTimeSummary(
                     departureTime: _formatTimeLabel(reservation.departureAtUtc),
-                    arrivalTime: '--:--',
+                    arrivalTime: reservation.arrivalAtUtc != null
+                        ? _formatTimeLabel(reservation.arrivalAtUtc!)
+                        : '--:--',
                     middleLabel: '${reservation.departureAirportCode} -> ${reservation.arrivalAirportCode}',
                   ),
                   const SizedBox(height: 10),
@@ -1759,18 +1761,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _InfoRow(label: 'Email', value: profile.email),
-                      _InfoRow(
+                      _ProfileInfoTile(
+                        icon: Icons.alternate_email_rounded,
+                        label: 'Email',
+                        value: profile.email,
+                      ),
+                      const SizedBox(height: 10),
+                      _ProfileInfoTile(
+                        icon: Icons.phone_rounded,
                         label: 'Telefon',
                         value: profile.phoneNumber ?? 'Nije uneseno',
                       ),
-                      _InfoRow(
+                      const SizedBox(height: 10),
+                      _ProfileInfoTile(
+                        icon: Icons.notifications_none_rounded,
                         label: 'Neprocitane notifikacije',
-                        value: (_notificationSummary?.unreadCount ?? 0)
-                            .toString(),
+                        value:
+                            '${_notificationSummary?.unreadCount ?? 0}',
                       ),
-                      _InfoRow(label: 'ID korisnika', value: profile.userId),
                     ],
                   ),
                 ),
@@ -2167,6 +2177,70 @@ class _ProfileActionButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProfileInfoTile extends StatelessWidget {
+  const _ProfileInfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              icon,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyLarge,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -364,6 +364,7 @@ public sealed class ReservationService : IReservationService
                 DepartureAirportCode = x.Flight.Destination.DepartureAirport.IataCode,
                 ArrivalAirportCode = x.Flight.Destination.ArrivalAirport.IataCode,
                 DepartureAtUtc = x.Flight.DepartureAtUtc,
+                ArrivalAtUtc = x.Flight.ArrivalAtUtc,
                 Status = x.Status == ReservationStatus.Pending
                     ? ReservationStatus.Confirmed
                     : x.Status,
