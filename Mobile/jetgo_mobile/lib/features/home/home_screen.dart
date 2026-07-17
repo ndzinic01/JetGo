@@ -1628,6 +1628,48 @@ class _HomeScreenState extends State<HomeScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Moj profil',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Upravljajte licnim podacima, lozinkom, notifikacijama i kontaktom sa podrskom iz jednog mjesta.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _FlightFactChip(
+                    icon: Icons.person_outline_rounded,
+                    label: profile.roles.map(MobileDisplay.roleLabel).join(', '),
+                  ),
+                  _FlightFactChip(
+                    icon: Icons.notifications_outlined,
+                    label:
+                        '${_notificationSummary?.unreadCount ?? 0} neprocitanih',
+                  ),
+                  const _FlightFactChip(
+                    icon: Icons.support_agent_rounded,
+                    label: 'Podrska dostupna',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -1636,9 +1678,18 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 30,
-                      child: Text(MobileDisplay.initials(profile.fullName)),
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        MobileDisplay.initials(profile.fullName),
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -1653,6 +1704,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             '@${profile.username}',
                             style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            profile.email,
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: Theme.of(context)
                                       .colorScheme
@@ -1736,28 +1797,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                  spacing: 10,
+                  runSpacing: 10,
                   children: [
-                    OutlinedButton.icon(
+                    _ProfileActionButton(
+                      label: 'Uredi profil',
+                      icon: Icons.edit_rounded,
                       onPressed: _openEditProfile,
-                      icon: const Icon(Icons.edit_rounded),
-                      label: const Text('Uredi profil'),
                     ),
-                    OutlinedButton.icon(
+                    _ProfileActionButton(
+                      label: 'Promijeni lozinku',
+                      icon: Icons.lock_reset_rounded,
                       onPressed: _openChangePassword,
-                      icon: const Icon(Icons.lock_reset_rounded),
-                      label: const Text('Promijeni lozinku'),
                     ),
-                    OutlinedButton.icon(
+                    _ProfileActionButton(
+                      label: 'Podrska',
+                      icon: Icons.support_agent_rounded,
                       onPressed: _openSupportMessages,
-                      icon: const Icon(Icons.support_agent_rounded),
-                      label: const Text('Podrska'),
                     ),
-                    OutlinedButton.icon(
+                    _ProfileActionButton(
+                      label: 'Notifikacije',
+                      icon: Icons.notifications_rounded,
                       onPressed: _openNotifications,
-                      icon: const Icon(Icons.notifications_rounded),
-                      label: const Text('Notifikacije'),
                     ),
                   ],
                 ),
@@ -2046,6 +2107,67 @@ class _HomeMenuItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProfileActionButton extends StatelessWidget {
+  const _ProfileActionButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      width: 156,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          alignment: Alignment.centerLeft,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                icon,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

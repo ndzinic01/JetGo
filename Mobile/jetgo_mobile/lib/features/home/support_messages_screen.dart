@@ -164,45 +164,61 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
       );
     }
 
-    return ListView.builder(
+    final repliedCount = _messages.where((item) => item.isReplied).length;
+    final pendingCount = _messages.length - repliedCount;
+
+    return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-      itemCount: _messages.length,
-      itemBuilder: (context, index) {
-        final item = _messages[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            onTap: () => _openDetails(item),
-            title: Text(item.subject),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Centar podrske',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Ovdje pratite svoje upite, odgovore administracije i tok komunikacije oko rezervacija, placanja ili naloga.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Text(
-                    item.messagePreview,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  _SupportFactChip(
+                    icon: Icons.mail_outline_rounded,
+                    label: '${_messages.length} upita',
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Poslano: ${MobileDisplay.formatDateTime(item.createdAtUtc)}',
+                  _SupportFactChip(
+                    icon: Icons.verified_outlined,
+                    label: '$repliedCount odgovoreno',
                   ),
-                  if (item.repliedAtUtc != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Odgovoreno: ${MobileDisplay.formatDateTime(item.repliedAtUtc!)}',
-                    ),
-                  ],
+                  _SupportFactChip(
+                    icon: Icons.schedule_rounded,
+                    label: '$pendingCount na cekanju',
+                  ),
                 ],
               ),
-            ),
-            trailing: _ReplyBadge(isReplied: item.isReplied),
+            ],
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 16),
+        ..._messages.map(
+          (item) => _SupportMessageCard(
+            item: item,
+            onTap: () => _openDetails(item),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -225,6 +241,151 @@ class _ReplyBadge extends StatelessWidget {
       child: Text(
         isReplied ? 'Odgovor' : 'Ceka',
         style: Theme.of(context).textTheme.labelMedium,
+      ),
+    );
+  }
+}
+
+class _SupportFactChip extends StatelessWidget {
+  const _SupportFactChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(label, style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupportMessageCard extends StatelessWidget {
+  const _SupportMessageCard({
+    required this.item,
+    required this.onTap,
+  });
+
+  final MobileSupportMessageSummary item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 14),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.75),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.subject,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                  _ReplyBadge(isReplied: item.isReplied),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.messagePreview,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _SupportInlineChip(
+                        icon: Icons.schedule_send_rounded,
+                        label:
+                            'Poslano ${MobileDisplay.formatDateTime(item.createdAtUtc)}',
+                      ),
+                      if (item.repliedAtUtc != null)
+                        _SupportInlineChip(
+                          icon: Icons.mark_email_read_rounded,
+                          label:
+                              'Odgovor ${MobileDisplay.formatDateTime(item.repliedAtUtc!)}',
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportInlineChip extends StatelessWidget {
+  const _SupportInlineChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }

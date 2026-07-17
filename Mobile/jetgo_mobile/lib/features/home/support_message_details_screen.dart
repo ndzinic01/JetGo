@@ -134,34 +134,64 @@ class _SupportMessageDetailsScreenState extends State<SupportMessageDetailsScree
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      details.subject,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  _ReplyChip(isReplied: details.isReplied),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Pregled kompletnog toka komunikacije sa podrskom za ovaj upit.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _SupportMetaChip(
+                    icon: Icons.schedule_send_rounded,
+                    label:
+                        'Poslano ${MobileDisplay.formatDateTime(details.createdAtUtc)}',
+                  ),
+                  if (details.repliedAtUtc != null)
+                    _SupportMetaChip(
+                      icon: Icons.mark_email_read_rounded,
+                      label:
+                          'Odgovor ${MobileDisplay.formatDateTime(details.repliedAtUtc!)}',
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        details.subject,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    _ReplyChip(isReplied: details.isReplied),
-                  ],
+                Text(
+                  'Vasa poruka',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Poslano: ${MobileDisplay.formatDateTime(details.createdAtUtc)}',
-                ),
-                if (details.repliedAtUtc != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Odgovoreno: ${MobileDisplay.formatDateTime(details.repliedAtUtc!)}',
-                  ),
-                ],
-                const SizedBox(height: 16),
                 Text(
                   details.message,
                   style: Theme.of(context).textTheme.bodyLarge,
@@ -182,11 +212,9 @@ class _SupportMessageDetailsScreenState extends State<SupportMessageDetailsScree
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
-                Text(details.customer.fullName),
-                const SizedBox(height: 4),
-                Text('@${details.customer.username}'),
-                const SizedBox(height: 4),
-                Text(details.customer.email),
+                _DetailInfoRow(label: 'Ime i prezime', value: details.customer.fullName),
+                _DetailInfoRow(label: 'Korisnicko ime', value: '@${details.customer.username}'),
+                _DetailInfoRow(label: 'Email', value: details.customer.email),
               ],
             ),
           ),
@@ -203,10 +231,21 @@ class _SupportMessageDetailsScreenState extends State<SupportMessageDetailsScree
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  details.adminReply?.trim().isNotEmpty == true
-                      ? details.adminReply!
-                      : 'Podrska jos nije odgovorila na ovaj upit.',
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    details.adminReply?.trim().isNotEmpty == true
+                        ? details.adminReply!
+                        : 'Podrska jos nije odgovorila na ovaj upit.',
+                  ),
                 ),
               ],
             ),
@@ -235,6 +274,76 @@ class _ReplyChip extends StatelessWidget {
       child: Text(
         isReplied ? 'Odgovoreno' : 'Na cekanju',
         style: Theme.of(context).textTheme.labelMedium,
+      ),
+    );
+  }
+}
+
+class _SupportMetaChip extends StatelessWidget {
+  const _SupportMetaChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(label, style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailInfoRow extends StatelessWidget {
+  const _DetailInfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
       ),
     );
   }

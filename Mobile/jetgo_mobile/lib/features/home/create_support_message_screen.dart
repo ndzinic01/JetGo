@@ -79,36 +79,86 @@ class _CreateSupportMessageScreenState extends State<CreateSupportMessageScreen>
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              TextFormField(
-                controller: _subjectController,
-                maxLength: 200,
-                decoration: const InputDecoration(
-                  labelText: 'Naslov',
-                  hintText: 'Npr. Problem sa rezervacijom',
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Naslov je obavezan.';
-                  }
-                  return null;
-                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kontaktirajte podrsku',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Napisite problem ili pitanje sto konkretnije kako bi administracija mogla brze odgovoriti.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 14),
+                    const Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _ComposerTipChip(
+                          icon: Icons.confirmation_num_outlined,
+                          label: 'Spomenite sifru rezervacije',
+                        ),
+                        _ComposerTipChip(
+                          icon: Icons.payments_outlined,
+                          label: 'Navedite payment problem ako postoji',
+                        ),
+                        _ComposerTipChip(
+                          icon: Icons.schedule_rounded,
+                          label: 'Dodajte bitan datum ili vrijeme',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _messageController,
-                maxLength: 4000,
-                minLines: 6,
-                maxLines: 10,
-                decoration: const InputDecoration(
-                  labelText: 'Poruka',
-                  hintText: 'Opisite problem ili pitanje sto preciznije.',
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _subjectController,
+                        maxLength: 200,
+                        decoration: const InputDecoration(
+                          labelText: 'Naslov',
+                          hintText: 'Npr. Problem sa rezervacijom',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Naslov je obavezan.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _messageController,
+                        maxLength: 4000,
+                        minLines: 6,
+                        maxLines: 10,
+                        decoration: const InputDecoration(
+                          labelText: 'Poruka',
+                          hintText: 'Opisite problem ili pitanje sto preciznije.',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Poruka je obavezna.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Poruka je obavezna.';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
@@ -125,6 +175,40 @@ class _CreateSupportMessageScreenState extends State<CreateSupportMessageScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ComposerTipChip extends StatelessWidget {
+  const _ComposerTipChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }
