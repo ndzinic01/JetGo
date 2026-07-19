@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/network/api_exception.dart';
 import 'payments_models.dart';
@@ -510,18 +511,6 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                   _DetailsRow('ID placanja', details.id.toString()),
                   _DetailsRow('Servis placanja', details.provider),
                   _DetailsRow(
-                    'Referenca servisa',
-                    details.providerReference?.trim().isNotEmpty == true
-                        ? details.providerReference!
-                        : '-',
-                  ),
-                  _DetailsRow(
-                    'URL odobrenja',
-                    details.approvalUrl?.trim().isNotEmpty == true
-                        ? details.approvalUrl!
-                        : '-',
-                  ),
-                  _DetailsRow(
                     'Iznos',
                     '${details.amount.toStringAsFixed(2)} ${details.currency}',
                   ),
@@ -613,20 +602,6 @@ class _PaymentsSectionState extends State<PaymentsSection> {
         ),
         const SizedBox(height: 12),
         _DetailsBlock(
-          title: 'Debug linkovi',
-          rows: debug.links.isEmpty
-              ? const [_DetailsRow('Linkovi', 'Nema linkova.')]
-              : debug.links
-                  .map(
-                    (link) => _DetailsRow(
-                      '${link.rel} (${link.method})',
-                      link.href,
-                    ),
-                  )
-                  .toList(),
-        ),
-        const SizedBox(height: 12),
-        _DetailsBlock(
           title: 'Capture zapisi',
           rows: debug.captures.isEmpty
               ? const [_DetailsRow('Capture zapisi', 'Nema capture zapisa.')]
@@ -634,7 +609,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                   .map(
                     (capture) => _DetailsRow(
                       capture.id,
-                      '${capture.status} - ${capture.amount.toStringAsFixed(2)} ${capture.currency} - ${_formatDateTime(capture.createTimeUtc)}',
+                      '${_localizePayPalStatus(capture.status)} - ${capture.amount.toStringAsFixed(2)} ${capture.currency} - ${_formatDateTime(capture.createTimeUtc)}',
                     ),
                   )
                   .toList(),
@@ -666,24 +641,55 @@ class _PaymentsSectionState extends State<PaymentsSection> {
         isCapture ? 'Status capture zapisa' : 'Status narudzbe';
 
     return [
-      _DetailsRow('Tip resursa', debug.payPalResourceType),
+      _DetailsRow('Tip resursa', _localizePayPalResourceType(debug.payPalResourceType)),
       _DetailsRow(resourceIdLabel, debug.payPalOrderId),
-      _DetailsRow(resourceStatusLabel, debug.payPalOrderStatus),
-      _DetailsRow(
-        'Sacuvana referenca',
-        debug.storedProviderReference.trim().isNotEmpty
-            ? debug.storedProviderReference
-            : '-',
-      ),
-      _DetailsRow('Povratni token', debug.callbackToken ?? '-'),
-      _DetailsRow(
-        'Poklapanje tokena',
-        debug.callbackTokenMatchesStoredReference ? 'Da' : 'Ne',
-      ),
+      _DetailsRow(resourceStatusLabel, _localizePayPalStatus(debug.payPalOrderStatus)),
       _DetailsRow('Status placanja', debug.paymentStatus.label),
       _DetailsRow('Status rezervacije', debug.reservationStatus.label),
-      _DetailsRow('URL odobrenja', debug.approvalUrl ?? '-'),
+      _DetailsRow(
+        'URL odobrenja',
+        debug.approvalUrl ?? '-',
+        linkUrl: debug.approvalUrl,
+      ),
     ];
+  }
+
+  String _localizePayPalResourceType(String resourceType) {
+    switch (resourceType.trim().toUpperCase()) {
+      case 'CAPTURE':
+        return 'PayPal naplata';
+      case 'ORDER':
+        return 'PayPal narudzba';
+      default:
+        return resourceType;
+    }
+  }
+
+  String _localizePayPalStatus(String status) {
+    switch (status.trim().toUpperCase()) {
+      case 'CREATED':
+        return 'Kreirano';
+      case 'SAVED':
+        return 'Sacuvano';
+      case 'APPROVED':
+        return 'Odobreno';
+      case 'COMPLETED':
+        return 'Zavrseno';
+      case 'VOIDED':
+        return 'Ponisteno';
+      case 'PAYER_ACTION_REQUIRED':
+        return 'Potrebna akcija kupca';
+      case 'PENDING':
+        return 'Na cekanju';
+      case 'DECLINED':
+        return 'Odbijeno';
+      case 'REFUNDED':
+        return 'Refundirano';
+      case 'FAILED':
+        return 'Neuspjelo';
+      default:
+        return status;
+    }
   }
 
   String _formatDateTime(DateTime? value) {
@@ -790,7 +796,18 @@ class _DetailsBlock extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: Text(row.value)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(row.value),
+                      if (row.linkUrl?.trim().isNotEmpty == true) ...[
+                        const SizedBox(height: 6),
+                        _OpenLinkButton(url: row.linkUrl!),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -801,10 +818,49 @@ class _DetailsBlock extends StatelessWidget {
 }
 
 class _DetailsRow {
-  const _DetailsRow(this.label, this.value);
+  const _DetailsRow(this.label, this.value, {this.linkUrl});
 
   final String label;
   final String value;
+  final String? linkUrl;
+}
+
+class _OpenLinkButton extends StatelessWidget {
+  const _OpenLinkButton({required this.url});
+
+  final String url;
+
+  Future<void> _open(BuildContext context) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link nije validan za otvaranje.')),
+      );
+      return;
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Otvaranje linka trenutno nije dostupno.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: () => _open(context),
+      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+      label: const Text('Otvori'),
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        alignment: Alignment.centerLeft,
+      ),
+    );
+  }
 }
 
 class _RefundDialog extends StatefulWidget {
