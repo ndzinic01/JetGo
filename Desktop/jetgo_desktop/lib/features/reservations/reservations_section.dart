@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -19,6 +21,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
   final ReservationsService _service = ReservationsService();
   final FlightsRoutesService _flightsService = FlightsRoutesService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   bool _isLoading = true;
   bool _isDetailsLoading = false;
@@ -36,13 +39,26 @@ class _ReservationsSectionState extends State<ReservationsSection> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_handleSearchChanged);
     _loadInitial();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      _loadReservations(showLoader: false);
+    });
   }
 
   Future<void> _loadInitial() async {
@@ -539,19 +555,6 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                 icon: const Icon(Icons.cancel_outlined),
                 label: const Text('Otkazi'),
               ),
-            if (details.canBeCompleted)
-              FilledButton.tonalIcon(
-                onPressed: () => _changeStatus(
-                  title: 'Zavrsi rezervaciju',
-                  action: (reason) => _service.completeReservation(
-                    token: widget.token,
-                    id: details.id,
-                    reason: reason,
-                  ),
-                ),
-                icon: const Icon(Icons.task_alt_rounded),
-                label: const Text('Zavrsi'),
-              ),
           ],
         ),
         const SizedBox(height: 20),
@@ -582,14 +585,16 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                     'Ponuda prtljaga',
                     _baggageOfferLabel(details.additionalBaggageCount),
                   ),
-                  _DetailsRow(
-                    'Cijena po komadu',
-                    '${details.additionalBaggageUnitPrice.toStringAsFixed(2)} ${details.currency}',
-                  ),
-                  _DetailsRow(
-                    'Ukupno prtljag',
-                    '${details.additionalBaggageTotalAmount.toStringAsFixed(2)} ${details.currency}',
-                  ),
+                  if (details.additionalBaggageCount > 0)
+                    _DetailsRow(
+                      'Cijena po komadu',
+                      '${details.additionalBaggageUnitPrice.toStringAsFixed(2)} ${details.currency}',
+                    ),
+                  if (details.additionalBaggageCount > 0)
+                    _DetailsRow(
+                      'Ukupno prtljag',
+                      '${details.additionalBaggageTotalAmount.toStringAsFixed(2)} ${details.currency}',
+                    ),
                   _DetailsRow(
                     'Ukupno',
                     '${details.totalAmount.toStringAsFixed(2)} ${details.currency}',

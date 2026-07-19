@@ -342,13 +342,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       case AdminSection.users:
         return 'Upravljanje korisnicima i pristupima.';
       case AdminSection.support:
-        return 'Desktop support inbox za odgovore i pregled upita.';
+        return 'Pregled korisnickih upita i odgovora administracije.';
       case AdminSection.news:
         return 'Kreiranje i uredjivanje novosti koje korisnici vide u mobile aplikaciji.';
       case AdminSection.reports:
         return 'Preuzimanje i kontrola PDF izvjestaja.';
       case AdminSection.payments:
-        return 'Pregled payment workflow-a i refund stanja.';
+        return 'Pregled placanja, PayPal provjera i refund zahtjeva.';
     }
   }
 }

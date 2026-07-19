@@ -157,7 +157,9 @@ class _DashboardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final rolesLabel = roles.isEmpty ? 'Admin' : roles.join(', ');
+    final rolesLabel = roles.isEmpty
+        ? 'Administrator'
+        : roles.map(_roleLabel).join(', ');
 
     return Card(
       child: Padding(
@@ -224,15 +226,15 @@ class _SnapshotCard extends StatelessWidget {
       ),
       _MetricData(
         icon: Icons.flight_takeoff_rounded,
-        title: 'Planirani letovi',
+        title: 'Predstojeci letovi',
         value: summary.upcomingFlightsCount.toString(),
         detail: 'Kasnjenja: ${summary.delayedFlightsCount}',
       ),
       _MetricData(
         icon: Icons.confirmation_num_rounded,
-        title: 'Cekaju potvrdu',
-        value: summary.pendingReservationsCount.toString(),
-        detail: 'Sve rezervacije: ${summary.totalReservationsCount}',
+        title: 'Ukupne rezervacije',
+        value: summary.totalReservationsCount.toString(),
+        detail: 'Na cekanju: ${summary.pendingReservationsCount}',
       ),
       _MetricData(
         icon: Icons.support_agent_rounded,
@@ -242,7 +244,7 @@ class _SnapshotCard extends StatelessWidget {
       ),
       _MetricData(
         icon: Icons.payments_rounded,
-        title: 'Placena placanja',
+        title: 'Uspjesna placanja',
         value: summary.paidPaymentsCount.toString(),
         detail: 'Na cekanju: ${summary.pendingPaymentsCount}',
       ),
@@ -297,7 +299,7 @@ class _AttentionCard extends StatelessWidget {
           icon: Icons.schedule_rounded,
           title: 'Rezervacije na cekanju',
           message:
-              '${summary.pendingReservationsCount} rezervacija jos ceka admin potvrdu.',
+              '${summary.pendingReservationsCount} rezervacija trenutno ima status na cekanju.',
         ),
       if (summary.delayedFlightsCount > 0)
         _FocusItem(
@@ -309,7 +311,7 @@ class _AttentionCard extends StatelessWidget {
       if (summary.openSupportMessagesCount > 0)
         _FocusItem(
           icon: Icons.mark_email_unread_rounded,
-          title: 'Podrska ceka odgovor',
+          title: 'Upiti bez odgovora',
           message:
               '${summary.openSupportMessagesCount} korisnickih upita jos nije zatvoreno.',
         ),
@@ -375,7 +377,7 @@ class _RevenueCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (amounts.isEmpty)
-              const Text('Jos nema evidentiranih paid uplata za prikaz.')
+              const Text('Jos nema evidentiranih uplata za prikaz.')
             else
               Wrap(
                 spacing: 10,
@@ -398,6 +400,17 @@ class _RevenueCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+String _roleLabel(String value) {
+  switch (value.trim().toLowerCase()) {
+    case 'admin':
+      return 'Administrator';
+    case 'user':
+      return 'Korisnik';
+    default:
+      return value;
   }
 }
 

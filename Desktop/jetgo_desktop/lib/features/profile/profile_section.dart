@@ -238,7 +238,9 @@ class _ProfileSectionState extends State<ProfileSection> {
                     rows: [
                       _DetailsRow(
                         'Uloge',
-                        profile.roles.isEmpty ? '-' : profile.roles.join(', '),
+                        profile.roles.isEmpty
+                            ? '-'
+                            : profile.roles.map(_roleLabel).join(', '),
                       ),
                       _DetailsRow('ID korisnika', profile.userId),
                       _DetailsRow(
@@ -256,6 +258,17 @@ class _ProfileSectionState extends State<ProfileSection> {
         ),
       ],
     );
+  }
+}
+
+String _roleLabel(String value) {
+  switch (value.trim().toLowerCase()) {
+    case 'admin':
+      return 'Administrator';
+    case 'user':
+      return 'Korisnik';
+    default:
+      return value;
   }
 }
 

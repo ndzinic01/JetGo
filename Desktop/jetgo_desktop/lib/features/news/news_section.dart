@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -16,6 +18,7 @@ class NewsSection extends StatefulWidget {
 class _NewsSectionState extends State<NewsSection> {
   final NewsService _service = NewsService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   bool _isLoading = true;
   bool _isDetailsLoading = false;
@@ -30,13 +33,26 @@ class _NewsSectionState extends State<NewsSection> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_handleSearchChanged);
     _loadArticles();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      _loadArticles(showLoader: false);
+    });
   }
 
   Future<void> _loadArticles({bool showLoader = true}) async {

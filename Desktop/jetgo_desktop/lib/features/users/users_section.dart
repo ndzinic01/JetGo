@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -23,6 +25,7 @@ class _UsersSectionState extends State<UsersSection> {
 
   final UsersService _service = UsersService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   bool _isLoading = true;
   bool _isDetailsLoading = false;
@@ -39,13 +42,26 @@ class _UsersSectionState extends State<UsersSection> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_handleSearchChanged);
     _loadUsers();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      _loadUsers(showLoader: false);
+    });
   }
 
   Future<void> _loadUsers({bool showLoader = true}) async {

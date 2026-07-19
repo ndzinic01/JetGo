@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -26,6 +28,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
   final TextEditingController _destinationSearchController =
       TextEditingController();
   final TextEditingController _flightSearchController = TextEditingController();
+  Timer? _searchDebounce;
 
   FlightsRoutesTab _selectedTab = FlightsRoutesTab.destinations;
   bool _isLoading = true;
@@ -50,14 +53,28 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
   @override
   void initState() {
     super.initState();
+    _destinationSearchController.addListener(_handleSearchChanged);
+    _flightSearchController.addListener(_handleSearchChanged);
     _loadInitial();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _destinationSearchController.dispose();
     _flightSearchController.dispose();
     super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      _loadCurrentTab(showLoader: false);
+    });
   }
 
   Future<void> _loadInitial() async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -16,9 +18,11 @@ class SupportSection extends StatefulWidget {
 class _SupportSectionState extends State<SupportSection> {
   final SupportService _service = SupportService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   bool _isLoading = true;
   bool _isDetailsLoading = false;
+  bool _isReplySubmitting = false;
   String? _errorMessage;
   String? _detailsErrorMessage;
 
@@ -31,13 +35,26 @@ class _SupportSectionState extends State<SupportSection> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_handleSearchChanged);
     _loadMessages();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      _loadMessages(showLoader: false);
+    });
   }
 
   Future<void> _loadMessages({bool showLoader = true}) async {
@@ -74,7 +91,7 @@ class _SupportSectionState extends State<SupportSection> {
     } on ApiException catch (error) {
       _errorMessage = error.message;
     } catch (_) {
-      _errorMessage = 'Support poruke trenutno nisu dostupne. Pokusajte ponovo.';
+      _errorMessage = 'Poruke podrske trenutno nisu dostupne. Pokusajte ponovo.';
     } finally {
       if (mounted) {
         setState(() {
@@ -164,6 +181,10 @@ class _SupportSectionState extends State<SupportSection> {
       return;
     }
 
+    setState(() {
+      _isReplySubmitting = true;
+    });
+
     try {
       final updated = await _service.replyToMessage(
         token: widget.token,
@@ -178,16 +199,22 @@ class _SupportSectionState extends State<SupportSection> {
       setState(() {
         _selectedDetails = updated;
       });
-      await _loadMessages(showLoader: false);
       _showMessage(
         details.isReplied
             ? 'Admin odgovor je uspjesno azuriran.'
             : 'Admin odgovor je uspjesno poslan.',
       );
+      unawaited(_loadMessages(showLoader: false));
     } on ApiException catch (error) {
       _showMessage(error.message);
     } catch (_) {
       _showMessage('Slanje odgovora trenutno nije dostupno.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isReplySubmitting = false;
+        });
+      }
     }
   }
 
@@ -237,7 +264,7 @@ class _SupportSectionState extends State<SupportSection> {
                 controller: _searchController,
                 onSubmitted: (_) => _loadMessages(),
                 decoration: const InputDecoration(
-                  labelText: 'Pretraga support poruka',
+                  labelText: 'Pretraga poruka podrske',
                   hintText: 'Naslov, sadrzaj, korisnik ili email',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
@@ -295,7 +322,7 @@ class _SupportSectionState extends State<SupportSection> {
     if (_errorMessage != null) {
       return _CenteredMessage(
         icon: Icons.cloud_off_rounded,
-        title: 'Nije moguce ucitati support poruke',
+        title: 'Nije moguce ucitati poruke podrske',
         message: _errorMessage!,
       );
     }
@@ -312,7 +339,7 @@ class _SupportSectionState extends State<SupportSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Support inbox (${_messages.length})',
+          'Upiti podrske (${_messages.length})',
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 12),
@@ -436,11 +463,17 @@ class _SupportSectionState extends State<SupportSection> {
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
-          onPressed: _openReplyDialog,
+          onPressed: _isReplySubmitting ? null : _openReplyDialog,
           icon: Icon(
             details.isReplied ? Icons.edit_note_rounded : Icons.reply_rounded,
           ),
-          label: Text(details.isReplied ? 'Uredi odgovor' : 'Odgovori'),
+          label: Text(
+            _isReplySubmitting
+                ? 'Slanje...'
+                : details.isReplied
+                ? 'Uredi odgovor'
+                : 'Odgovori',
+          ),
         ),
         const SizedBox(height: 20),
         Expanded(

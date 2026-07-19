@@ -133,7 +133,7 @@ class _ReportsSectionState extends State<ReportsSection> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Pregled prikazuje broj payment stavki, statuse i valute koje ulaze u PDF.',
+              'Pregled prikazuje broj stavki placanja, statuse i valute koje ulaze u PDF.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -300,7 +300,7 @@ class _ReportsSectionState extends State<ReportsSection> {
     if (_isReservationsPreviewLoading) {
       return const _PreviewStatePanel(
         icon: Icons.hourglass_top_rounded,
-        title: 'Ucitavanje preview-a',
+        title: 'Ucitavanje pregleda',
         message: 'Pripremamo pregled rezervacija za odabrane filtere.',
         isLoading: true,
       );
@@ -309,7 +309,7 @@ class _ReportsSectionState extends State<ReportsSection> {
     if (_reservationsPreviewError != null) {
       return _PreviewStatePanel(
         icon: Icons.cloud_off_rounded,
-        title: 'Preview nije dostupan',
+        title: 'Pregled nije dostupan',
         message: _reservationsPreviewError!,
       );
     }
@@ -318,8 +318,8 @@ class _ReportsSectionState extends State<ReportsSection> {
     if (preview == null) {
       return const _PreviewStatePanel(
         icon: Icons.info_outline_rounded,
-        title: 'Preview nije ucitan',
-        message: 'Kliknite "Osvjezi preview" da povucemo pregled.',
+        title: 'Pregled nije ucitan',
+        message: 'Kliknite "Osvjezi pregled" da povucemo pregled.',
       );
     }
 
@@ -352,9 +352,9 @@ class _ReportsSectionState extends State<ReportsSection> {
             (item) => _PreviewSampleRow(
               title: item.reservationCode,
               subtitle:
-                  '${_safeText(item.customerName)} • ${item.routeCode} • ${item.statusLabel}',
+                  '${_safeText(item.customerName)} | ${item.routeCode} | ${item.statusLabel}',
               meta:
-                  '${item.amount.toStringAsFixed(2)} ${item.currency} • ${_formatDateTime(item.createdAtUtc.toLocal())}',
+                  '${item.amount.toStringAsFixed(2)} ${item.currency} | ${_formatDateTime(item.createdAtUtc.toLocal())}',
             ),
           )
           .toList(),
@@ -365,8 +365,8 @@ class _ReportsSectionState extends State<ReportsSection> {
     if (_isPaymentsPreviewLoading) {
       return const _PreviewStatePanel(
         icon: Icons.hourglass_top_rounded,
-        title: 'Ucitavanje preview-a',
-        message: 'Pripremamo pregled payment stavki za odabrane filtere.',
+        title: 'Ucitavanje pregleda',
+        message: 'Pripremamo pregled stavki placanja za odabrane filtere.',
         isLoading: true,
       );
     }
@@ -374,7 +374,7 @@ class _ReportsSectionState extends State<ReportsSection> {
     if (_paymentsPreviewError != null) {
       return _PreviewStatePanel(
         icon: Icons.cloud_off_rounded,
-        title: 'Preview nije dostupan',
+        title: 'Pregled nije dostupan',
         message: _paymentsPreviewError!,
       );
     }
@@ -383,8 +383,8 @@ class _ReportsSectionState extends State<ReportsSection> {
     if (preview == null) {
       return const _PreviewStatePanel(
         icon: Icons.info_outline_rounded,
-        title: 'Preview nije ucitan',
-        message: 'Kliknite "Osvjezi preview" da povucemo pregled.',
+        title: 'Pregled nije ucitan',
+        message: 'Kliknite "Osvjezi pregled" da povucemo pregled.',
       );
     }
 
@@ -411,15 +411,15 @@ class _ReportsSectionState extends State<ReportsSection> {
       ],
       amounts: preview.amounts,
       emptyMessage:
-          'Nema payment stavki za trenutne filtere. PDF ce se svejedno generisati, ali bez konkretnih redova.',
+          'Nema stavki placanja za trenutne filtere. PDF ce se svejedno generisati, ali bez konkretnih redova.',
       sampleItems: preview.sampleItems
           .map(
             (item) => _PreviewSampleRow(
               title: item.reservationCode,
               subtitle:
-                  '${_safeText(item.customerName)} • ${item.routeCode} • ${item.statusLabel}',
+                  '${_safeText(item.customerName)} | ${item.routeCode} | ${item.statusLabel}',
               meta:
-                  '${item.amount.toStringAsFixed(2)} ${item.currency} • ${_formatDateTime(item.createdAtUtc.toLocal())}',
+                  '${item.amount.toStringAsFixed(2)} ${item.currency} | ${_formatDateTime(item.createdAtUtc.toLocal())}',
             ),
           )
           .toList(),
@@ -452,7 +452,7 @@ class _ReportsSectionState extends State<ReportsSection> {
         OutlinedButton.icon(
           onPressed: isDownloading ? null : onRefreshPreview,
           icon: const Icon(Icons.preview_rounded),
-          label: const Text('Osvjezi preview'),
+          label: const Text('Osvjezi pregled'),
         ),
         OutlinedButton.icon(
           onPressed: isDownloading ? null : onReset,
@@ -577,7 +577,7 @@ class _ReportsSectionState extends State<ReportsSection> {
 
       setState(() {
         _reservationsPreviewError =
-            'Preview rezervacija trenutno nije moguce ucitati.';
+            'Pregled rezervacija trenutno nije moguce ucitati.';
       });
     } finally {
       if (mounted) {
@@ -634,7 +634,7 @@ class _ReportsSectionState extends State<ReportsSection> {
 
       setState(() {
         _paymentsPreviewError =
-            'Preview placanja trenutno nije moguce ucitati.';
+            'Pregled placanja trenutno nije moguce ucitati.';
       });
     } finally {
       if (mounted) {
@@ -737,7 +737,7 @@ class _ReportsSectionState extends State<ReportsSection> {
       }
 
       setState(() {
-        _paymentsError = 'Payments report trenutno nije moguce preuzeti.';
+        _paymentsError = 'Izvjestaj placanja trenutno nije moguce preuzeti.';
       });
     } finally {
       if (mounted) {
@@ -1239,3 +1239,4 @@ class _ResultRow extends StatelessWidget {
     );
   }
 }
+

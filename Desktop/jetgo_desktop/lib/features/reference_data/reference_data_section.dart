@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -29,6 +31,7 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
       TextEditingController();
   final TextEditingController _airlineSearchController =
       TextEditingController();
+  Timer? _searchDebounce;
 
   ReferenceDataTab _selectedTab = ReferenceDataTab.countries;
   bool _isLoading = true;
@@ -50,16 +53,32 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
   @override
   void initState() {
     super.initState();
+    _countrySearchController.addListener(_handleSearchChanged);
+    _citySearchController.addListener(_handleSearchChanged);
+    _airportSearchController.addListener(_handleSearchChanged);
+    _airlineSearchController.addListener(_handleSearchChanged);
     _loadInitial();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _countrySearchController.dispose();
     _citySearchController.dispose();
     _airportSearchController.dispose();
     _airlineSearchController.dispose();
     super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      _loadCurrentTab(showLoader: false);
+    });
   }
 
   Future<void> _loadInitial() async {
@@ -217,6 +236,14 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  Widget _dropdownItemLabel(String value) {
+    return Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 
@@ -613,16 +640,19 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
               child: DropdownButtonFormField<int?>(
                 key: ValueKey<int?>(_cityCountryFilter),
                 initialValue: _cityCountryFilter,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Drzava'),
                 items: [
-                  const DropdownMenuItem<int?>(
+                  DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('Sve drzave'),
+                    child: _dropdownItemLabel('Sve drzave'),
                   ),
                   ..._allCountries.map(
                     (country) => DropdownMenuItem<int?>(
                       value: country.id,
-                      child: Text('${country.name} (${country.isoCode})'),
+                      child: _dropdownItemLabel(
+                        '${country.name} (${country.isoCode})',
+                      ),
                     ),
                   ),
                 ],
@@ -671,16 +701,19 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
               child: DropdownButtonFormField<int?>(
                 key: ValueKey<int?>(_airportCountryFilter),
                 initialValue: _airportCountryFilter,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Drzava'),
                 items: [
-                  const DropdownMenuItem<int?>(
+                  DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('Sve drzave'),
+                    child: _dropdownItemLabel('Sve drzave'),
                   ),
                   ..._allCountries.map(
                     (country) => DropdownMenuItem<int?>(
                       value: country.id,
-                      child: Text('${country.name} (${country.isoCode})'),
+                      child: _dropdownItemLabel(
+                        '${country.name} (${country.isoCode})',
+                      ),
                     ),
                   ),
                 ],
@@ -697,16 +730,19 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
                   'airport-city-${_airportCountryFilter ?? 'all'}-${_airportCityFilter ?? 'all'}',
                 ),
                 initialValue: _airportCityFilter,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Grad'),
                 items: [
-                  const DropdownMenuItem<int?>(
+                  DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('Svi gradovi'),
+                    child: _dropdownItemLabel('Svi gradovi'),
                   ),
                   ...filteredCities.map(
                     (city) => DropdownMenuItem<int?>(
                       value: city.id,
-                      child: Text('${city.name} / ${city.countryIsoCode}'),
+                      child: _dropdownItemLabel(
+                        '${city.name} / ${city.countryIsoCode}',
+                      ),
                     ),
                   ),
                 ],

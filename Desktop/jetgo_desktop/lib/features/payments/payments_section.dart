@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -16,6 +18,7 @@ class PaymentsSection extends StatefulWidget {
 class _PaymentsSectionState extends State<PaymentsSection> {
   final PaymentsService _service = PaymentsService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   bool _isLoading = true;
   bool _isDetailsLoading = false;
@@ -33,13 +36,26 @@ class _PaymentsSectionState extends State<PaymentsSection> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_handleSearchChanged);
     _loadPayments();
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      _loadPayments(showLoader: false);
+    });
   }
 
   Future<void> _loadPayments({bool showLoader = true}) async {
@@ -202,15 +218,6 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       return;
     }
 
-    final callbackToken = await showDialog<String?>(
-      context: context,
-      builder: (context) => const _PayPalDebugDialog(),
-    );
-
-    if (callbackToken == null) {
-      return;
-    }
-
     setState(() {
       _isDebugLoading = true;
       _debugErrorMessage = null;
@@ -220,7 +227,6 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       final snapshot = await _service.getPayPalDebugSnapshot(
         token: widget.token,
         id: details.id,
-        callbackToken: callbackToken,
       );
 
       if (!mounted) {
@@ -448,7 +454,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       return const _CenteredMessage(
         icon: Icons.touch_app_rounded,
         title: 'Odaberite placanje',
-        message: 'Kliknite red iz tabele da otvorite detalje i admin akcije.',
+        message: 'Kliknite red iz tabele da otvorite detalje i dostupne akcije.',
       );
     }
 
@@ -874,59 +880,6 @@ class _RefundDialogState extends State<_RefundDialog> {
             Navigator.of(context).pop(_reasonController.text.trim());
           },
           child: const Text('Potvrdi refund'),
-        ),
-      ],
-    );
-  }
-}
-
-class _PayPalDebugDialog extends StatefulWidget {
-  const _PayPalDebugDialog();
-
-  @override
-  State<_PayPalDebugDialog> createState() => _PayPalDebugDialogState();
-}
-
-class _PayPalDebugDialogState extends State<_PayPalDebugDialog> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('PayPal provjera'),
-      content: SizedBox(
-        width: 460,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Ako imate token narudzbe sa PayPal povratne stranice, unesite ga ovdje. Polje je opcionalno.',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                labelText: 'Povratni token',
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(null),
-          child: const Text('Odustani'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('Ucitaj provjeru'),
         ),
       ],
     );
