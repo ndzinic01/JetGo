@@ -200,6 +200,7 @@ public sealed class ReservationService : IReservationService
         var reservation = await _dbContext.Reservations
             .Include(x => x.Payment)
             .Include(x => x.Items)
+            .Include(x => x.Flight)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (reservation is null)
@@ -212,7 +213,9 @@ public sealed class ReservationService : IReservationService
             throw new ForbiddenException("Mozete mijenjati dodatni prtljag samo na vlastitoj rezervaciji.");
         }
 
-        if (reservation.Status is ReservationStatus.Cancelled or ReservationStatus.Completed)
+        var effectiveStatus = GetEffectiveReservationStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc);
+
+        if (effectiveStatus is ReservationStatus.Cancelled or ReservationStatus.Completed)
         {
             throw new ValidationException(
                 "Dodatni prtljag nije moguce mijenjati za zavrsenu ili otkazanu rezervaciju.",
@@ -287,6 +290,18 @@ public sealed class ReservationService : IReservationService
             throw new ForbiddenException("Mozete otkazati samo vlastitu rezervaciju.");
         }
 
+        var effectiveStatus = GetEffectiveReservationStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc);
+
+        if (effectiveStatus == ReservationStatus.Completed)
+        {
+            throw new ValidationException(
+                "Rezervacija se ne moze otkazati nakon sto je let zavrsen.",
+                new Dictionary<string, string[]>
+                {
+                    ["reservation"] = ["Otkazivanje nije dozvoljeno nakon planiranog dolaska leta."]
+                });
+        }
+
         var hasCompletedPayment = reservation.Payment?.Status == PaymentStatus.Paid;
         _stateMachine.Cancel(reservation, actorUserId, request.Reason, nowUtc, hasCompletedPayment);
 
@@ -310,34 +325,16 @@ public sealed class ReservationService : IReservationService
         return await GetByIdAsync(id, cancellationToken);
     }
 
-    public async Task<ReservationDetailsDto> CompleteAsync(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken = default)
+    public Task<ReservationDetailsDto> CompleteAsync(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken = default)
     {
         EnsureCurrentUserIsAdmin();
-        var actorUserId = GetRequiredCurrentUserId();
-        var nowUtc = DateTime.UtcNow;
-
-        var reservation = await _dbContext.Reservations
-            .Include(x => x.Flight)
-            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-
-        if (reservation is null)
-        {
-            throw new NotFoundException($"Rezervacija sa ID vrijednoscu {id} nije pronadjena.");
-        }
-
-        _stateMachine.Complete(reservation, actorUserId, request.Reason, nowUtc);
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        await PublishNotificationSafelyAsync(
-            reservation.UserId,
-            "Rezervacija zavrsena",
-            $"Rezervacija {reservation.ReservationCode} je oznacena kao zavrsena.",
-            nowUtc,
-            cancellationToken);
-
-        _logger.LogInformation("Reservation {ReservationCode} completed by {UserId}.", reservation.ReservationCode, actorUserId);
-
-        return await GetByIdAsync(id, cancellationToken);
+        return Task.FromException<ReservationDetailsDto>(
+            new ValidationException(
+                "Rezervacija se vise ne zavrsava rucno.",
+                new Dictionary<string, string[]>
+                {
+                    ["reservation"] = ["Rezervacija automatski prelazi u status Completed nakon planiranog vremena dolaska leta."]
+                }));
     }
 
     private async Task<PagedResponseDto<ReservationListItemDto>> GetPagedInternalAsync(
@@ -346,6 +343,7 @@ public sealed class ReservationService : IReservationService
         bool includeAllUsers,
         CancellationToken cancellationToken)
     {
+        var nowUtc = DateTime.UtcNow;
         var query = BuildListQuery(request, userIdFilter, includeAllUsers);
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -365,7 +363,11 @@ public sealed class ReservationService : IReservationService
                 ArrivalAirportCode = x.Flight.Destination.ArrivalAirport.IataCode,
                 DepartureAtUtc = x.Flight.DepartureAtUtc,
                 ArrivalAtUtc = x.Flight.ArrivalAtUtc,
-                Status = x.Status == ReservationStatus.Pending
+                Status = x.Status == ReservationStatus.Cancelled
+                    ? ReservationStatus.Cancelled
+                    : x.Status == ReservationStatus.Completed || x.Flight.ArrivalAtUtc <= nowUtc
+                        ? ReservationStatus.Completed
+                        : x.Status == ReservationStatus.Pending
                     ? ReservationStatus.Confirmed
                     : x.Status,
                 TotalAmount = x.TotalAmount,
@@ -388,6 +390,7 @@ public sealed class ReservationService : IReservationService
 
     private IQueryable<Reservation> BuildListQuery(ReservationSearchRequest request, string? userIdFilter, bool includeAllUsers)
     {
+        var nowUtc = DateTime.UtcNow;
         var query = _dbContext.Reservations.AsNoTracking().AsQueryable();
 
         if (!includeAllUsers && !string.IsNullOrWhiteSpace(userIdFilter))
@@ -397,7 +400,21 @@ public sealed class ReservationService : IReservationService
 
         if (request.Status.HasValue)
         {
-            query = query.Where(x => x.Status == request.Status.Value);
+            query = request.Status.Value switch
+            {
+                ReservationStatus.Completed => query.Where(x =>
+                    x.Status == ReservationStatus.Completed ||
+                    (x.Status != ReservationStatus.Cancelled && x.Flight.ArrivalAtUtc <= nowUtc)),
+                ReservationStatus.Cancelled => query.Where(x => x.Status == ReservationStatus.Cancelled),
+                ReservationStatus.Confirmed => query.Where(x =>
+                    x.Status != ReservationStatus.Cancelled &&
+                    x.Status != ReservationStatus.Completed &&
+                    x.Flight.ArrivalAtUtc > nowUtc),
+                ReservationStatus.Pending => query.Where(x =>
+                    x.Status == ReservationStatus.Pending &&
+                    x.Flight.ArrivalAtUtc > nowUtc),
+                _ => query.Where(x => x.Status == request.Status.Value)
+            };
         }
 
         if (request.FlightId.HasValue)
@@ -570,7 +587,8 @@ public sealed class ReservationService : IReservationService
 
     private ReservationDetailsDto BuildVisibleReservationDetails(ReservationDetailsDto reservation, bool isAdmin)
     {
-        var actualStatus = reservation.Status;
+        var nowUtc = DateTime.UtcNow;
+        var actualStatus = GetEffectiveReservationStatus(reservation.Status, reservation.ArrivalAtUtc, nowUtc);
 
         return new ReservationDetailsDto
         {
@@ -596,19 +614,20 @@ public sealed class ReservationService : IReservationService
             CreatedAtUtc = reservation.CreatedAtUtc,
             StatusChangedAtUtc = reservation.StatusChangedAtUtc,
             StatusChangedByUserId = reservation.StatusChangedByUserId,
-            StatusReason = GetDisplayStatusReason(actualStatus, reservation.StatusReason),
+            StatusReason = GetDisplayStatusReason(reservation.Status, actualStatus, reservation.StatusReason),
             Customer = reservation.Customer,
             Seats = reservation.Seats,
             CanBeCancelled = _stateMachine.CanCancel(actualStatus),
             CanBeConfirmed = false,
-            CanBeCompleted = isAdmin && _stateMachine.CanComplete(actualStatus),
+            CanBeCompleted = false,
             CanInitiatePayment =
                 (actualStatus is ReservationStatus.Pending or ReservationStatus.Confirmed) &&
                 !reservation.IsPaid,
             CanBeRefunded =
                 isAdmin &&
                 reservation.PaymentStatus == PaymentStatus.Paid &&
-                actualStatus != ReservationStatus.Completed,
+                actualStatus != ReservationStatus.Completed &&
+                reservation.DepartureAtUtc > nowUtc.AddHours(48),
             CanUpdateBaggage = CanUpdateBaggage(actualStatus, reservation.PaymentStatus, reservation.IsPaid)
         };
     }
@@ -620,9 +639,33 @@ public sealed class ReservationService : IReservationService
             : reservationStatus;
     }
 
-    private static string? GetDisplayStatusReason(ReservationStatus reservationStatus, string? statusReason)
+    private static ReservationStatus GetEffectiveReservationStatus(
+        ReservationStatus reservationStatus,
+        DateTime arrivalAtUtc,
+        DateTime nowUtc)
     {
-        return reservationStatus == ReservationStatus.Pending
+        if (reservationStatus is ReservationStatus.Cancelled or ReservationStatus.Completed)
+        {
+            return reservationStatus;
+        }
+
+        return arrivalAtUtc <= nowUtc
+            ? ReservationStatus.Completed
+            : reservationStatus;
+    }
+
+    private static string? GetDisplayStatusReason(
+        ReservationStatus storedReservationStatus,
+        ReservationStatus effectiveReservationStatus,
+        string? statusReason)
+    {
+        if (effectiveReservationStatus == ReservationStatus.Completed &&
+            storedReservationStatus != ReservationStatus.Completed)
+        {
+            return "Putovanje je zavrseno jer je proslo planirano vrijeme dolaska leta.";
+        }
+
+        return storedReservationStatus == ReservationStatus.Pending
             ? "Rezervacija je automatski potvrdjena i spremna za placanje."
             : statusReason;
     }
