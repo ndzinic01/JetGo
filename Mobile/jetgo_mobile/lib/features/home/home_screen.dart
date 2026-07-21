@@ -2011,25 +2011,25 @@ class _HomeScreenState extends State<HomeScreen> {
       return 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=900&q=80';
     }
     if (key.contains('istanbul') || key.contains('ist')) {
-      return 'https://images.unsplash.com/photo-1527838832700-5059252407fa?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.pexels.com/photos/28879119/pexels-photo-28879119.jpeg?cs=srgb&dl=pexels-reojuve-28879119.jpg&fm=jpg';
     }
     if (key.contains('berlin') || key.contains('ber')) {
       return 'https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&w=900&q=80';
     }
     if (key.contains('vienna') || key.contains('vie') || key.contains('bec')) {
-      return 'https://images.unsplash.com/photo-1516550893923-42d28e5677af?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.pexels.com/photos/31725340/pexels-photo-31725340.jpeg?cs=srgb&dl=pexels-bidbtc-31725340.jpg&fm=jpg';
     }
     if (key.contains('zurich') || key.contains('cirih') || key.contains('zrh')) {
       return 'https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=900&q=80';
     }
     if (key.contains('zagreb') || key.contains('zag')) {
-      return 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.pexels.com/photos/27401067/pexels-photo-27401067.jpeg?cs=srgb&dl=pexels-damir-27401067.jpg&fm=jpg';
     }
     if (key.contains('frankfurt') || key.contains('fra')) {
-      return 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.pexels.com/photos/19335682/pexels-photo-19335682.jpeg?cs=srgb&dl=pexels-masoodaslami-19335682.jpg&fm=jpg';
     }
     if (key.contains('belgrade') || key.contains('beograd') || key.contains('beg')) {
-      return 'https://images.unsplash.com/photo-1578922746465-3a80a228f223?auto=format&fit=crop&w=900&q=80';
+      return 'https://images.pexels.com/photos/32237254/pexels-photo-32237254.jpeg?cs=srgb&dl=pexels-borishamer-32237254.jpg&fm=jpg';
     }
 
     return _heroImageUrl;
