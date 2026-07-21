@@ -4,9 +4,16 @@ import '../../core/network/api_exception.dart';
 import 'mobile_data_service.dart';
 
 class CreateSupportMessageScreen extends StatefulWidget {
-  const CreateSupportMessageScreen({required this.token, super.key});
+  const CreateSupportMessageScreen({
+    required this.token,
+    this.initialSubject,
+    this.initialMessage,
+    super.key,
+  });
 
   final String token;
+  final String? initialSubject;
+  final String? initialMessage;
 
   @override
   State<CreateSupportMessageScreen> createState() =>
@@ -20,6 +27,13 @@ class _CreateSupportMessageScreenState extends State<CreateSupportMessageScreen>
   final TextEditingController _messageController = TextEditingController();
 
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _subjectController.text = widget.initialSubject ?? '';
+    _messageController.text = widget.initialMessage ?? '';
+  }
 
   @override
   void dispose() {

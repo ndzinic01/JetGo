@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/network/api_exception.dart';
+import 'create_support_message_screen.dart';
 import 'mobile_data_service.dart';
 import 'mobile_display.dart';
 import 'mobile_models.dart';
@@ -342,6 +343,13 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
+            if (details.canBeRefunded) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Ako odustanete od putovanja, ovdje mozete poslati zahtjev za refund. Administracija zatim provjerava uslove i odobrava povrat sredstava.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
             if (hasApprovalUrl) ...[
               const SizedBox(height: 8),
               Text(
@@ -357,7 +365,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               ),
             ],
             const SizedBox(height: 16),
-            if (canInitializePayment || canConfirmPayment)
+            if (canInitializePayment || canConfirmPayment || details.canBeRefunded)
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -392,6 +400,17 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                           : () => _confirmPayment(effectivePaymentId),
                       icon: const Icon(Icons.verified_rounded),
                       label: const Text('2. Zavrsi placanje'),
+                    ),
+                  if (details.canBeRefunded)
+                    OutlinedButton.icon(
+                      onPressed: _isPaymentSubmitting
+                          ? null
+                          : () => _openRefundRequestComposer(
+                                details,
+                                effectivePaymentId,
+                              ),
+                      icon: const Icon(Icons.support_agent_rounded),
+                      label: const Text('Zatrazi refund'),
                     ),
                 ],
               )
@@ -626,6 +645,37 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         });
       }
     }
+  }
+
+  Future<void> _openRefundRequestComposer(
+    MobileReservationDetails details,
+    int? paymentId,
+  ) async {
+    final created = await Navigator.of(context).push<MobileSupportMessageDetails>(
+      MaterialPageRoute<MobileSupportMessageDetails>(
+        builder: (_) => CreateSupportMessageScreen(
+          token: widget.token,
+          initialSubject: 'Zahtjev za refund - ${details.reservationCode}',
+          initialMessage:
+              'Postovani,\n\n'
+              'zelim podnijeti zahtjev za refund za rezervaciju ${details.reservationCode} '
+              'na relaciji ${details.routeCode} (${MobileDisplay.flightNumberLabel(details.flightNumber)}).\n'
+              '${paymentId != null ? 'ID placanja: $paymentId.\n' : ''}'
+              'Molim provjeru uslova i eventualno odobrenje povrata sredstava.\n\n'
+              'Hvala.',
+        ),
+      ),
+    );
+
+    if (!mounted || created == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Zahtjev za refund je poslan podrsci.'),
+      ),
+    );
   }
 
   Future<void> _openBaggageDialog(MobileReservationDetails details) async {

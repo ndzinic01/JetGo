@@ -624,7 +624,6 @@ public sealed class ReservationService : IReservationService
                 (actualStatus is ReservationStatus.Pending or ReservationStatus.Confirmed) &&
                 !reservation.IsPaid,
             CanBeRefunded =
-                isAdmin &&
                 reservation.PaymentStatus == PaymentStatus.Paid &&
                 actualStatus != ReservationStatus.Completed &&
                 reservation.DepartureAtUtc > nowUtc.AddHours(48),

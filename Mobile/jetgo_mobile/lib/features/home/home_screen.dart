@@ -984,7 +984,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 0.70,
+            mainAxisExtent: 292,
           ),
           itemBuilder: (context, index) {
             return _buildRecommendedFlightCard(topRecommendations[index]);
@@ -1026,7 +1026,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
-              aspectRatio: 1.05,
+              aspectRatio: 1.22,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -1111,6 +1111,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     '${flight.routeCode}  |  ${MobileDisplay.flightNumberLabel(flight.flightNumber)}',
                     style: Theme.of(context).textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   _FlightTimeSummary(
@@ -1129,7 +1131,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 8),
                   Text(
                     flight.recommendationReason,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color:
