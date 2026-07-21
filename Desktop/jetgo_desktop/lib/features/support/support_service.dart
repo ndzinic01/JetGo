@@ -45,7 +45,7 @@ class SupportService {
     required int id,
     required String adminReply,
   }) async {
-    final response = await _apiClient.postJson(
+    await _apiClient.postJson(
       '/api/SupportMessages/$id/reply',
       token: token,
       body: <String, dynamic>{
@@ -53,7 +53,12 @@ class SupportService {
       },
     );
 
-    return SupportMessageDetails.fromJson(response);
+    final refreshed = await _apiClient.getJson(
+      '/api/SupportMessages/$id',
+      token: token,
+    );
+
+    return SupportMessageDetails.fromJson(refreshed);
   }
 
   PagedResult<T> _mapPagedResult<T>(

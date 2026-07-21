@@ -204,7 +204,7 @@ class _SupportSectionState extends State<SupportSection> {
             ? 'Admin odgovor je uspjesno azuriran.'
             : 'Admin odgovor je uspjesno poslan.',
       );
-      unawaited(_loadMessages(showLoader: false));
+      await _loadMessages(showLoader: false);
     } on ApiException catch (error) {
       _showMessage(error.message);
     } catch (_) {
