@@ -35,7 +35,7 @@ public sealed class IdentityDataSeeder
 
         await EnsureUserAsync(
             username: "desktop",
-            roleName: RoleNames.Admin,
+            roleNames: [RoleNames.Admin],
             firstName: "Desktop",
             lastName: "Admin",
             email: "desktop@jetgo.local",
@@ -44,11 +44,20 @@ public sealed class IdentityDataSeeder
 
         await EnsureUserAsync(
             username: "mobile",
-            roleName: RoleNames.User,
+            roleNames: [RoleNames.User],
             firstName: "Mobile",
             lastName: "User",
             email: "mobile@jetgo.local",
             phoneNumber: "+38761000002",
+            cancellationToken);
+
+        await EnsureUserAsync(
+            username: "mobile2",
+            roleNames: [RoleNames.User],
+            firstName: "Mobile",
+            lastName: "Test",
+            email: "mobile2@jetgo.local",
+            phoneNumber: "+38761000003",
             cancellationToken);
     }
 
@@ -70,7 +79,7 @@ public sealed class IdentityDataSeeder
 
     private async Task EnsureUserAsync(
         string username,
-        string roleName,
+        IReadOnlyCollection<string> roleNames,
         string firstName,
         string lastName,
         string email,
@@ -100,10 +109,15 @@ public sealed class IdentityDataSeeder
             _logger.LogInformation("Created seed user {Username}.", username);
         }
 
-        var isInRole = await _userManager.IsInRoleAsync(user, roleName);
-
-        if (!isInRole)
+        foreach (var roleName in roleNames)
         {
+            var isInRole = await _userManager.IsInRoleAsync(user, roleName);
+
+            if (isInRole)
+            {
+                continue;
+            }
+
             var addToRoleResult = await _userManager.AddToRoleAsync(user, roleName);
 
             if (!addToRoleResult.Succeeded)

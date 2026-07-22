@@ -96,6 +96,9 @@ Seed podaci trenutno kreiraju sljedece naloge:
 - Mobile korisnik
   - username: `mobile`
   - password: `test`
+- Dodatni mobile test korisnik
+  - username: `mobile2`
+  - password: `test`
 
 Role nazivi koji se koriste u sistemu:
 
