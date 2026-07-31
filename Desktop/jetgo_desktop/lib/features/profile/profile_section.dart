@@ -242,7 +242,6 @@ class _ProfileSectionState extends State<ProfileSection> {
                             ? '-'
                             : profile.roles.map(_roleLabel).join(', '),
                       ),
-                      _DetailsRow('ID korisnika', profile.userId),
                       _DetailsRow(
                         'URL slike',
                         profile.imageUrl?.trim().isNotEmpty == true

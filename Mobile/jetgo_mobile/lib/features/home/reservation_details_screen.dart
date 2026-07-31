@@ -330,7 +330,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
             Text(
               effectivePaymentId == null
                   ? 'Placanje jos nije inicirano.'
-                  : 'ID placanja: $effectivePaymentId',
+                  : 'Placanje je inicirano i ceka zavrsetak.',
             ),
             if (statusReason != null && statusReason.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -405,10 +405,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                     OutlinedButton.icon(
                       onPressed: _isPaymentSubmitting
                           ? null
-                          : () => _openRefundRequestComposer(
-                                details,
-                                effectivePaymentId,
-                              ),
+                          : () => _openRefundRequestComposer(details),
                       icon: const Icon(Icons.support_agent_rounded),
                       label: const Text('Zatrazi refund'),
                     ),
@@ -649,7 +646,6 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
   Future<void> _openRefundRequestComposer(
     MobileReservationDetails details,
-    int? paymentId,
   ) async {
     final created = await Navigator.of(context).push<MobileSupportMessageDetails>(
       MaterialPageRoute<MobileSupportMessageDetails>(
@@ -660,7 +656,6 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               'Postovani,\n\n'
               'zelim podnijeti zahtjev za refund za rezervaciju ${details.reservationCode} '
               'na relaciji ${details.routeCode} (${MobileDisplay.flightNumberLabel(details.flightNumber)}).\n'
-              '${paymentId != null ? 'ID placanja: $paymentId.\n' : ''}'
               'Molim provjeru uslova i eventualno odobrenje povrata sredstava.\n\n'
               'Hvala.',
         ),

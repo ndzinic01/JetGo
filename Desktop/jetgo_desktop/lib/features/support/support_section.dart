@@ -485,7 +485,6 @@ class _SupportSectionState extends State<SupportSection> {
                   _DetailsRow('Ime i prezime', details.customer.fullName),
                   _DetailsRow('Korisnicko ime', '@${details.customer.username}'),
                   _DetailsRow('Email', details.customer.email),
-                  _DetailsRow('ID korisnika', details.customer.userId),
                 ],
                 body: 'Profil korisnika koji je poslao upit podrsci.',
               ),

@@ -685,7 +685,6 @@ class _UsersSectionState extends State<UsersSection> {
               _DetailsBlock(
                 title: 'Audit',
                 rows: [
-                  _DetailsRow('ID korisnika', details.userId),
                   _DetailsRow('Kreiran', _formatDateTime(details.createdAtUtc)),
                   _DetailsRow(
                     'Zadnji update',

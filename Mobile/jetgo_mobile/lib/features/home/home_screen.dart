@@ -97,17 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
           _allFlights = flights.items;
           _flights = _filterFlights(_allFlights);
-          try {
-            final recommendations = await _dataService.fetchRecommendedFlights(
-              token: _token,
-            );
-            _recommendedFlights = recommendations.items;
-            _recommendationsErrorMessage = null;
-          } catch (_) {
-            _recommendedFlights = const [];
-            _recommendationsErrorMessage =
-                'Preporuke trenutno nisu dostupne.';
-          }
+          unawaited(_loadRecommendations());
           break;
         case 1:
           final reservations =
@@ -123,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
           break;
       }
 
-      await _loadNotificationSummary(silent: true);
+      unawaited(_loadNotificationSummary(silent: true));
     } on ApiException catch (error) {
       _errorMessage = error.message;
     } catch (_) {
@@ -134,6 +124,33 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadRecommendations() async {
+    try {
+      final recommendations = await _dataService.fetchRecommendedFlights(
+        token: _token,
+      );
+
+      if (!mounted || _currentIndex != 0) {
+        return;
+      }
+
+      setState(() {
+        _recommendedFlights = recommendations.items;
+        _recommendationsErrorMessage = null;
+      });
+    } catch (_) {
+      if (!mounted || _currentIndex != 0) {
+        return;
+      }
+
+      setState(() {
+        _recommendedFlights = const [];
+        _recommendationsErrorMessage =
+            'Preporuke trenutno nisu dostupne.';
+      });
     }
   }
 

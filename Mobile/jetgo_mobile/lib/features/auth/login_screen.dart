@@ -37,6 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    FocusScope.of(context).unfocus();
+
     final success = await widget.authController.login(
       username: _usernameController.text,
       password: _passwordController.text,

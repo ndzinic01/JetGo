@@ -508,7 +508,6 @@ class _PaymentsSectionState extends State<PaymentsSection> {
               _DetailsBlock(
                 title: 'Placanje',
                 rows: [
-                  _DetailsRow('ID placanja', details.id.toString()),
                   _DetailsRow('Servis placanja', details.provider),
                   _DetailsRow(
                     'Iznos',
@@ -541,7 +540,6 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                   _DetailsRow('Ime i prezime', details.customer.fullName),
                   _DetailsRow('Korisnicko ime', '@${details.customer.username}'),
                   _DetailsRow('Email', details.customer.email),
-                  _DetailsRow('ID korisnika', details.customer.userId),
                 ],
               ),
               const SizedBox(height: 16),

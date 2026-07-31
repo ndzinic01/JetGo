@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -5,9 +6,11 @@ import '../config/app_config.dart';
 import 'api_exception.dart';
 
 class ApiClient {
+  static const Duration _requestTimeout = Duration(seconds: 20);
+
   ApiClient()
       : _httpClient = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 20);
+          ..connectionTimeout = _requestTimeout;
 
   final HttpClient _httpClient;
 
@@ -84,32 +87,56 @@ class ApiClient {
     Map<String, dynamic>? body,
     Map<String, String>? queryParameters,
   }) async {
-    final requestUri = _buildUri(path, queryParameters);
-    final request = await _httpClient.openUrl(method, requestUri);
+    try {
+      final requestUri = _buildUri(path, queryParameters);
+      final request = await _httpClient
+          .openUrl(method, requestUri)
+          .timeout(_requestTimeout);
 
-    request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-    request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
 
-    if (token != null && token.isNotEmpty) {
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      if (token != null && token.isNotEmpty) {
+        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      }
+
+      if (body != null) {
+        request.write(jsonEncode(body));
+      }
+
+      final response = await request.close().timeout(_requestTimeout);
+      final responseBody = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(_requestTimeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw _buildApiException(response.statusCode, responseBody);
+      }
+
+      if (responseBody.trim().isEmpty) {
+        return <String, dynamic>{};
+      }
+
+      return jsonDecode(responseBody);
+    } on TimeoutException {
+      throw ApiException(
+        statusCode: 408,
+        message:
+            'Veza sa serverom je istekla. Provjerite da li je API pokrenut i da li koristite ispravnu adresu aplikacije.',
+      );
+    } on SocketException {
+      throw ApiException(
+        statusCode: 503,
+        message:
+            'Nije moguce povezati se sa serverom. Provjerite Docker/API i API adresu aplikacije.',
+      );
+    } on HttpException catch (error) {
+      throw ApiException(
+        statusCode: 503,
+        message: 'Mrezna greska: ${error.message}',
+      );
     }
-
-    if (body != null) {
-      request.write(jsonEncode(body));
-    }
-
-    final response = await request.close();
-    final responseBody = await response.transform(utf8.decoder).join();
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw _buildApiException(response.statusCode, responseBody);
-    }
-
-    if (responseBody.trim().isEmpty) {
-      return <String, dynamic>{};
-    }
-
-    return jsonDecode(responseBody);
   }
 
   Uri _buildUri(String path, Map<String, String>? queryParameters) {
