@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -23,9 +25,13 @@ class SupportMessageDetailsScreen extends StatefulWidget {
 }
 
 class _SupportMessageDetailsScreenState extends State<SupportMessageDetailsScreen> {
+  static const Duration _autoRefreshInterval = Duration(seconds: 20);
+
   final MobileDataService _dataService = MobileDataService();
+  Timer? _autoRefreshTimer;
 
   bool _isLoading = true;
+  bool _isPolling = false;
   String? _errorMessage;
   MobileSupportMessageDetails? _details;
 
@@ -35,6 +41,48 @@ class _SupportMessageDetailsScreenState extends State<SupportMessageDetailsScree
     _details = widget.initialDetails;
     _isLoading = widget.initialDetails == null;
     _load();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      unawaited(_refreshSilently());
+    });
+  }
+
+  Future<void> _refreshSilently() async {
+    if (!mounted || _isLoading || _isPolling) {
+      return;
+    }
+
+    _isPolling = true;
+
+    try {
+      final details = await _dataService.fetchSupportMessageDetails(
+        token: widget.token,
+        supportMessageId: widget.supportMessageId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _details = details;
+        _errorMessage = null;
+      });
+    } catch (_) {
+      // Tihi polling ne prekida korisnika porukama.
+    } finally {
+      _isPolling = false;
+    }
   }
 
   Future<void> _load() async {

@@ -16,13 +16,17 @@ class SupportSection extends StatefulWidget {
 }
 
 class _SupportSectionState extends State<SupportSection> {
+  static const Duration _autoRefreshInterval = Duration(seconds: 20);
+
   final SupportService _service = SupportService();
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
+  Timer? _autoRefreshTimer;
 
   bool _isLoading = true;
   bool _isDetailsLoading = false;
   bool _isReplySubmitting = false;
+  bool _isPolling = false;
   String? _errorMessage;
   String? _detailsErrorMessage;
 
@@ -37,13 +41,41 @@ class _SupportSectionState extends State<SupportSection> {
     super.initState();
     _searchController.addListener(_handleSearchChanged);
     _loadMessages();
+    _startAutoRefresh();
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
     _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      unawaited(_refreshSilently());
+    });
+  }
+
+  Future<void> _refreshSilently() async {
+    if (!mounted ||
+        _isLoading ||
+        _isDetailsLoading ||
+        _isReplySubmitting ||
+        _isPolling ||
+        (_searchDebounce?.isActive ?? false)) {
+      return;
+    }
+
+    _isPolling = true;
+
+    try {
+      await _loadMessages(showLoader: false);
+    } finally {
+      _isPolling = false;
+    }
   }
 
   void _handleSearchChanged() {

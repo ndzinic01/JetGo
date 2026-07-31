@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -17,11 +19,14 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   static const _heroImageUrl =
       'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=80';
+  static const Duration _autoRefreshInterval = Duration(seconds: 20);
 
   final MobileDataService _dataService = MobileDataService();
 
+  Timer? _autoRefreshTimer;
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isPolling = false;
   bool _showUnreadOnly = false;
   String _typeFilter = 'Sve';
   String? _errorMessage;
@@ -32,6 +37,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _load();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      unawaited(_refreshSilently());
+    });
+  }
+
+  Future<void> _refreshSilently() async {
+    if (!mounted || _isLoading || _isSubmitting || _isPolling) {
+      return;
+    }
+
+    _isPolling = true;
+
+    try {
+      final summary = await _dataService.fetchNotificationSummary(
+        token: widget.token,
+      );
+      final notifications = await _dataService.fetchNotifications(
+        token: widget.token,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _summary = summary;
+        _notifications = notifications.items;
+        _errorMessage = null;
+      });
+    } catch (_) {
+      // Tihi polling ne prekida korisnika porukama ako backend trenutno kasni.
+    } finally {
+      _isPolling = false;
+    }
   }
 
   Future<void> _load() async {

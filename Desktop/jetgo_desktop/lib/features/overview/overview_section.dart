@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -21,9 +23,13 @@ class OverviewSection extends StatefulWidget {
 }
 
 class _OverviewSectionState extends State<OverviewSection> {
+  static const Duration _autoRefreshInterval = Duration(seconds: 20);
+
   final OverviewService _service = OverviewService();
+  Timer? _autoRefreshTimer;
 
   bool _isLoading = true;
+  bool _isPolling = false;
   String? _errorMessage;
   AdminDashboardSummary? _summary;
 
@@ -31,6 +37,34 @@ class _OverviewSectionState extends State<OverviewSection> {
   void initState() {
     super.initState();
     _loadSummary();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      unawaited(_refreshSilently());
+    });
+  }
+
+  Future<void> _refreshSilently() async {
+    if (!mounted || _isLoading || _isPolling) {
+      return;
+    }
+
+    _isPolling = true;
+
+    try {
+      await _loadSummary(showLoader: false);
+    } finally {
+      _isPolling = false;
+    }
   }
 
   Future<void> _loadSummary({bool showLoader = true}) async {

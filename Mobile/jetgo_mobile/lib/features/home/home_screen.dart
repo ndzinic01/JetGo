@@ -26,6 +26,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const _heroImageUrl =
       'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=80';
+  static const Duration _notificationPollingInterval = Duration(seconds: 20);
 
   final MobileDataService _dataService = MobileDataService();
   final TextEditingController _departureSearchController =
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _arrivalSearchController =
       TextEditingController();
 
+  Timer? _notificationPollingTimer;
   int _currentIndex = 0;
   bool _isLoading = true;
   String? _errorMessage;
@@ -70,13 +72,29 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadCurrentTab();
+    _startNotificationPolling();
   }
 
   @override
   void dispose() {
+    _notificationPollingTimer?.cancel();
     _departureSearchController.dispose();
     _arrivalSearchController.dispose();
     super.dispose();
+  }
+
+  void _startNotificationPolling() {
+    _notificationPollingTimer?.cancel();
+    _notificationPollingTimer = Timer.periodic(
+      _notificationPollingInterval,
+      (_) {
+        if (!mounted || _token.isEmpty) {
+          return;
+        }
+
+        unawaited(_loadNotificationSummary(silent: true));
+      },
+    );
   }
 
   Future<void> _loadCurrentTab() async {
