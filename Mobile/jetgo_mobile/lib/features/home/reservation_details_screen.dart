@@ -8,17 +8,24 @@ import 'mobile_data_service.dart';
 import 'mobile_display.dart';
 import 'mobile_models.dart';
 
+enum PayPalReturnStatus {
+  approved,
+  cancelled,
+}
+
 class ReservationDetailsScreen extends StatefulWidget {
   const ReservationDetailsScreen({
     required this.token,
     required this.reservationId,
     this.markDirtyOnPop = false,
+    this.payPalReturnStatus,
     super.key,
   });
 
   final String token;
   final int reservationId;
   final bool markDirtyOnPop;
+  final PayPalReturnStatus? payPalReturnStatus;
 
   @override
   State<ReservationDetailsScreen> createState() =>
@@ -41,7 +48,22 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   void initState() {
     super.initState();
     _markDirtyOnPop = widget.markDirtyOnPop;
+    _hasOpenedPayPalApproval =
+        widget.payPalReturnStatus == PayPalReturnStatus.approved;
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.payPalReturnStatus == null) {
+        return;
+      }
+
+      final message = widget.payPalReturnStatus == PayPalReturnStatus.approved
+          ? 'PayPal odobrenje je zaprimljeno. Sada kliknite "2. Zavrsi placanje".'
+          : 'PayPal placanje je prekinuto. Mozete ga pokusati ponovo kada budete spremni.';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    });
   }
 
   Future<void> _load() async {
