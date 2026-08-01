@@ -105,6 +105,40 @@ Role nazivi koji se koriste u sistemu:
 - `Admin`
 - `User`
 
+## Cisto demo stanje za finalno testiranje
+
+Nakon svjezeg resetovanja baze i ponovnog starta aplikacije seed priprema stanje pogodno za
+demonstraciju:
+
+- korisnici:
+  - `desktop` / `test`
+  - `mobile` / `test`
+  - `mobile2` / `test`
+- referentni podaci:
+  - drzave, gradovi, aerodromi, aviokompanije i destinacije
+- letovi:
+  - seed letovi `JG100` do `JG105`
+  - svi su zakazani za **decembar 2026**
+  - svi pocinju bez rezervisanih sjedista
+- novosti:
+  - dvije objavljene novosti za mobile prikaz
+- transakcijski podaci:
+  - nema seed rezervacija
+  - nema seed placanja
+  - nema seed refunda
+  - nema seed korisnickih upita podrsci
+  - nema seed notifikacija
+
+To znaci da nakon cistog reseta mozes od pocetka testirati:
+
+- kreiranje rezervacija
+- dodatni prtljag
+- PayPal placanje
+- refund
+- support tok
+- notifikacije
+- administraciju ruta, letova i novosti
+
 ## Recommender dokumentacija
 
 Posebna dokumentacija recommender sistema nalazi se u fajlu:
@@ -180,6 +214,25 @@ docker compose up --build
   - API
   - Worker
 
+### Reset na cisto demo stanje preko Dockera
+
+Ako zelis potpuno svjezu bazu bez starih rezervacija i placanja, iz root foldera pokreni:
+
+```powershell
+docker compose down -v
+docker compose up -d --build
+```
+
+Ovim se brisu Docker volumeni za SQL Server i RabbitMQ, a zatim se pri novom startu:
+
+- ponovo kreira baza
+- primijene EF migracije
+- ucitaju seed korisnici i seed referentni podaci
+
+Nakon toga Swagger je dostupan na:
+
+- `http://localhost:5000/swagger`
+
 ## Lokalno pokretanje bez Dockera
 
 ### Preduvjeti
@@ -231,6 +284,19 @@ Napomene:
 
 - `10.0.2.2` je standardna adresa kojom Android emulator pristupa host masini
 - prije pokretanja treba imati aktivan Android emulator
+
+### Reset na cisto demo stanje bez Dockera
+
+Ako radis sa lokalnim SQL Serverom ili LocalDB bazom, najjednostavniji postupak je:
+
+1. obrisati bazu `220035`
+2. ponovo pokrenuti API
+
+API ce pri startupu:
+
+- primijeniti sve migracije
+- napraviti seed korisnike
+- ucitati seed referentne podatke i letove
 
 ## Build koraci za pregled rada
 
