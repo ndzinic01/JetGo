@@ -424,8 +424,6 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
           cityId: value.cityId,
           name: value.name,
           iataCode: value.iataCode,
-          latitude: value.latitude,
-          longitude: value.longitude,
         );
       } else {
         await _service.updateAirport(
@@ -434,8 +432,6 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
           cityId: value.cityId,
           name: value.name,
           iataCode: value.iataCode,
-          latitude: value.latitude,
-          longitude: value.longitude,
         );
       }
 
@@ -991,7 +987,6 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
           DataColumn(label: Text('IATA')),
           DataColumn(label: Text('Grad')),
           DataColumn(label: Text('Drzava')),
-          DataColumn(label: Text('Koordinate')),
           DataColumn(label: Text('Destinacije')),
           DataColumn(label: Text('Akcije')),
         ],
@@ -1002,11 +997,6 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
               DataCell(Text(item.iataCode)),
               DataCell(Text(item.cityName)),
               DataCell(Text(item.countryName)),
-              DataCell(
-                Text(
-                  '${_formatNullableDouble(item.latitude)}, ${_formatNullableDouble(item.longitude)}',
-                ),
-              ),
               DataCell(Text(item.relatedDestinationsCount.toString())),
               DataCell(
                 Row(
@@ -1108,12 +1098,6 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
     );
   }
 
-  String _formatNullableDouble(double? value) {
-    if (value == null) {
-      return '-';
-    }
-    return value.toStringAsFixed(4);
-  }
 }
 
 class _TableScrollWrapper extends StatelessWidget {
@@ -1377,8 +1361,6 @@ class _AirportDialogState extends State<_AirportDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _iataController;
-  late final TextEditingController _latitudeController;
-  late final TextEditingController _longitudeController;
   late int? _cityId;
 
   @override
@@ -1387,12 +1369,6 @@ class _AirportDialogState extends State<_AirportDialog> {
     _nameController = TextEditingController(text: widget.initial?.name ?? '');
     _iataController =
         TextEditingController(text: widget.initial?.iataCode ?? '');
-    _latitudeController = TextEditingController(
-      text: widget.initial?.latitude?.toString() ?? '',
-    );
-    _longitudeController = TextEditingController(
-      text: widget.initial?.longitude?.toString() ?? '',
-    );
     _cityId = widget.initial?.cityId ??
         (widget.cities.isNotEmpty ? widget.cities.first.id : null);
   }
@@ -1401,8 +1377,6 @@ class _AirportDialogState extends State<_AirportDialog> {
   void dispose() {
     _nameController.dispose();
     _iataController.dispose();
-    _latitudeController.dispose();
-    _longitudeController.dispose();
     super.dispose();
   }
 
@@ -1463,46 +1437,6 @@ class _AirportDialogState extends State<_AirportDialog> {
                   return null;
                 },
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _latitudeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Geografska sirina',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return null;
-                        }
-                        if (double.tryParse(value.trim()) == null) {
-                          return 'Broj';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _longitudeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Geografska duzina',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return null;
-                        }
-                        if (double.tryParse(value.trim()) == null) {
-                          return 'Broj';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -1523,8 +1457,6 @@ class _AirportDialogState extends State<_AirportDialog> {
                 cityId: _cityId!,
                 name: _nameController.text,
                 iataCode: _iataController.text,
-                latitude: _parseOptionalDouble(_latitudeController.text),
-                longitude: _parseOptionalDouble(_longitudeController.text),
               ),
             );
           },
@@ -1532,14 +1464,6 @@ class _AirportDialogState extends State<_AirportDialog> {
         ),
       ],
     );
-  }
-
-  double? _parseOptionalDouble(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      return null;
-    }
-    return double.tryParse(trimmed);
   }
 }
 
@@ -1685,15 +1609,11 @@ class _AirportFormValue {
     required this.cityId,
     required this.name,
     required this.iataCode,
-    this.latitude,
-    this.longitude,
   });
 
   final int cityId;
   final String name;
   final String iataCode;
-  final double? latitude;
-  final double? longitude;
 }
 
 class _AirlineFormValue {

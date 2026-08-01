@@ -201,8 +201,6 @@ class ReferenceDataService {
     required int cityId,
     required String name,
     required String iataCode,
-    double? latitude,
-    double? longitude,
   }) async {
     final response = await _apiClient.postJson(
       '/api/admin/airports',
@@ -211,8 +209,6 @@ class ReferenceDataService {
         'cityId': cityId,
         'name': name.trim(),
         'iataCode': iataCode.trim().toUpperCase(),
-        'latitude': latitude,
-        'longitude': longitude,
       },
     );
 
@@ -225,8 +221,6 @@ class ReferenceDataService {
     required int cityId,
     required String name,
     required String iataCode,
-    double? latitude,
-    double? longitude,
   }) async {
     final response = await _apiClient.putJson(
       '/api/admin/airports/$id',
@@ -235,8 +229,6 @@ class ReferenceDataService {
         'cityId': cityId,
         'name': name.trim(),
         'iataCode': iataCode.trim().toUpperCase(),
-        'latitude': latitude,
-        'longitude': longitude,
       },
     );
 
