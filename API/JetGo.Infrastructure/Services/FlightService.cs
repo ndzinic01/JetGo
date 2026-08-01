@@ -28,6 +28,7 @@ public sealed class FlightService : IFlightService
     {
         ValidateRequest(request);
 
+        var nowUtc = DateTime.UtcNow;
         var query = BuildQuery(request);
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -70,7 +71,11 @@ public sealed class FlightService : IFlightService
                 BasePrice = x.BasePrice,
                 AvailableSeats = x.AvailableSeats,
                 TotalSeats = x.TotalSeats,
-                Status = x.Status
+                Status = x.Status == Domain.Enums.FlightStatus.Cancelled
+                    ? x.Status
+                    : x.ArrivalAtUtc < nowUtc
+                        ? Domain.Enums.FlightStatus.Completed
+                        : x.Status
             })
             .ToListAsync(cancellationToken);
 
@@ -81,6 +86,8 @@ public sealed class FlightService : IFlightService
 
     public async Task<FlightDetailsDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
+        var nowUtc = DateTime.UtcNow;
+
         var flight = await _dbContext.Flights
             .AsNoTracking()
             .Where(x => x.Id == id)
@@ -121,7 +128,11 @@ public sealed class FlightService : IFlightService
                 AvailableSeats = x.Seats.Count(s => !s.IsReserved),
                 TotalSeats = x.Seats.Count(),
                 ReservedSeats = x.Seats.Count(s => s.IsReserved),
-                Status = x.Status,
+                Status = x.Status == Domain.Enums.FlightStatus.Cancelled
+                    ? x.Status
+                    : x.ArrivalAtUtc < nowUtc
+                        ? Domain.Enums.FlightStatus.Completed
+                        : x.Status,
                 SeatNumbers = x.Seats
                     .OrderBy(s => s.SeatNumber)
                     .Select(s => s.SeatNumber)
@@ -139,6 +150,7 @@ public sealed class FlightService : IFlightService
 
     private IQueryable<JetGo.Domain.Entities.Flight> BuildQuery(FlightSearchRequest request)
     {
+        var nowUtc = DateTime.UtcNow;
         var query = _dbContext.Flights.AsNoTracking().AsQueryable();
 
         if (request.DepartureAirportId.HasValue)
@@ -178,7 +190,17 @@ public sealed class FlightService : IFlightService
 
         if (request.Status.HasValue)
         {
-            query = query.Where(x => x.Status == request.Status.Value);
+            query = request.Status.Value switch
+            {
+                Domain.Enums.FlightStatus.Completed => query.Where(x =>
+                    x.Status == Domain.Enums.FlightStatus.Completed ||
+                    (x.Status != Domain.Enums.FlightStatus.Cancelled && x.ArrivalAtUtc < nowUtc)),
+                Domain.Enums.FlightStatus.Cancelled => query.Where(x => x.Status == Domain.Enums.FlightStatus.Cancelled),
+                Domain.Enums.FlightStatus.Delayed => query.Where(x =>
+                    x.Status == Domain.Enums.FlightStatus.Delayed && x.ArrivalAtUtc >= nowUtc),
+                _ => query.Where(x =>
+                    x.Status == Domain.Enums.FlightStatus.Scheduled && x.ArrivalAtUtc >= nowUtc)
+            };
         }
 
         if (!string.IsNullOrWhiteSpace(request.SearchText))
