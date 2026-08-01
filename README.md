@@ -332,19 +332,18 @@ Generisani Windows build:
 
 - `POST /api/Auth/login`
 - `POST /api/Auth/register`
-- `POST /api/Auth/refresh`
-- `POST /api/Auth/logout`
-- `POST /api/Auth/forgot-password`
+- `POST /api/Auth/request-password-reset`
 - `POST /api/Auth/reset-password`
-- `GET /api/Profile`
-- `PUT /api/Profile`
+- `POST /api/Auth/logout`
+- `GET /api/Auth/me`
+- `GET /api/Profile/me`
+- `PUT /api/Profile/me`
 - `POST /api/Profile/change-password`
 
 ### Letovi, destinacije i preporuke
 
 - `GET /api/Flights`
 - `GET /api/Flights/{id}`
-- `GET /api/Destinations`
 - `GET /api/Recommendations/flights`
 
 ### Rezervacije i placanja
@@ -365,19 +364,17 @@ Generisani Windows build:
 - `POST /api/Notifications/{id}/read`
 - `POST /api/Notifications/read-all`
 - `GET /api/News`
-- `GET /api/SupportMessages`
+- `GET /api/SupportMessages/my`
 - `POST /api/SupportMessages`
 
 ### Admin moduli
 
-- `GET /api/AdminDashboard`
-- `GET /api/AdminCountries`
-- `GET /api/AdminCities`
-- `GET /api/AdminAirports`
-- `GET /api/AdminAirlines`
-- `GET /api/AdminDestinations`
-- `GET /api/AdminFlights`
-- `GET /api/AdminUsers`
+- `GET /api/AdminDashboard/summary`
+- `GET /api/Reservations`
+- `GET /api/SupportMessages`
+- `GET /api/News/admin`
+- `GET /api/admin/destinations`
+- `GET /api/admin/flights`
 - `GET /api/Payments`
 - `GET /api/Reports/reservations.pdf`
 - `GET /api/Reports/payments.pdf`
