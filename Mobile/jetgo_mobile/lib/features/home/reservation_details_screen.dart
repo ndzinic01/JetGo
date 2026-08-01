@@ -576,8 +576,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
           SnackBar(
             content: Text(
               payment.status == 1
-                  ? 'Approval link trenutno nije dostupan. Ako ste PayPal vec odobrili ranije, kliknite "2. Zavrsi placanje".'
-                  : 'Placanje je inicirano, ali approval link trenutno nije dostupan.',
+                  ? 'PayPal link za odobrenje trenutno nije dostupan. Ako ste placanje vec odobrili ranije, kliknite "2. Zavrsi placanje".'
+                  : 'Placanje je inicirano, ali PayPal link za odobrenje trenutno nije dostupan.',
             ),
           ),
         );
@@ -795,7 +795,11 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Approval link je kopiran.')),
+      const SnackBar(
+        content: Text(
+          'PayPal link je kopiran. Otvorite ga rucno ako se stranica nije otvorila automatski.',
+        ),
+      ),
     );
   }
 }

@@ -203,7 +203,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'API endpoint: ${AppConfig.apiBaseUrl}',
+                      'API adresa: ${AppConfig.apiBaseUrl}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

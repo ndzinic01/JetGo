@@ -164,11 +164,14 @@ class ApiClient {
       final decoded = jsonDecode(responseBody);
 
       if (decoded is Map<String, dynamic>) {
+        final baseMessage = (decoded['message'] as String?) ??
+            'Server je vratio gresku bez poruke.';
+        final errors = decoded['errors'] as Map<String, dynamic>?;
+
         return ApiException(
           statusCode: statusCode,
-          message: (decoded['message'] as String?) ??
-              'Server je vratio gresku bez poruke.',
-          errors: decoded['errors'] as Map<String, dynamic>?,
+          message: _composeUserMessage(baseMessage, errors),
+          errors: errors,
         );
       }
     } catch (_) {
@@ -181,5 +184,47 @@ class ApiClient {
           ? 'Server je vratio gresku bez sadrzaja.'
           : responseBody,
     );
+  }
+
+  String _composeUserMessage(
+    String baseMessage,
+    Map<String, dynamic>? errors,
+  ) {
+    final details = _extractErrorDetails(errors);
+    if (details.isEmpty) {
+      return baseMessage;
+    }
+
+    final firstDetail = details.join(' ');
+    if (baseMessage.contains(firstDetail)) {
+      return baseMessage;
+    }
+
+    return '$baseMessage $firstDetail';
+  }
+
+  List<String> _extractErrorDetails(Map<String, dynamic>? errors) {
+    if (errors == null || errors.isEmpty) {
+      return const [];
+    }
+
+    final details = <String>[];
+    for (final value in errors.values) {
+      if (value is List) {
+        for (final item in value) {
+          final text = item?.toString().trim() ?? '';
+          if (text.isNotEmpty && !details.contains(text)) {
+            details.add(text);
+          }
+        }
+      } else {
+        final text = value?.toString().trim() ?? '';
+        if (text.isNotEmpty && !details.contains(text)) {
+          details.add(text);
+        }
+      }
+    }
+
+    return details.take(2).toList();
   }
 }

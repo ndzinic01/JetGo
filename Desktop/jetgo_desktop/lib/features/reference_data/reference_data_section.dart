@@ -1056,7 +1056,7 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
           DataColumn(label: Text('Kod')),
           DataColumn(label: Text('Status')),
           DataColumn(label: Text('Letovi')),
-          DataColumn(label: Text('Logo URL')),
+          DataColumn(label: Text('Logo adresa')),
           DataColumn(label: Text('Akcije')),
         ],
         rows: _airlines.map((item) {
@@ -1469,7 +1469,9 @@ class _AirportDialogState extends State<_AirportDialog> {
                   Expanded(
                     child: TextFormField(
                       controller: _latitudeController,
-                      decoration: const InputDecoration(labelText: 'Latitude'),
+                      decoration: const InputDecoration(
+                        labelText: 'Geografska sirina',
+                      ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return null;
@@ -1485,7 +1487,9 @@ class _AirportDialogState extends State<_AirportDialog> {
                   Expanded(
                     child: TextFormField(
                       controller: _longitudeController,
-                      decoration: const InputDecoration(labelText: 'Longitude'),
+                      decoration: const InputDecoration(
+                        labelText: 'Geografska duzina',
+                      ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return null;
@@ -1612,7 +1616,7 @@ class _AirlineDialogState extends State<_AirlineDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _logoUrlController,
-                decoration: const InputDecoration(labelText: 'Logo URL'),
+                decoration: const InputDecoration(labelText: 'Logo adresa'),
               ),
               const SizedBox(height: 12),
               SwitchListTile(

@@ -25,7 +25,7 @@ builder.Services.AddControllers()
             return new BadRequestObjectResult(new
             {
                 statusCode = StatusCodes.Status400BadRequest,
-                message = "Validacija korisnickog unosa nije uspjesna.",
+                message = "Validacija korisnickog unosa nije uspjela.",
                 errors
             });
         };
