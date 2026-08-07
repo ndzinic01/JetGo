@@ -313,6 +313,13 @@ public sealed class AdminUserService : IAdminUserService
 
     public async Task ResetPasswordAsync(string userId, AdminResetUserPasswordRequest request, CancellationToken cancellationToken = default)
     {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId == userId)
+        {
+            throw new ForbiddenException("Vlastitu lozinku promijenite kroz Moj profil, uz unos trenutne lozinke.");
+        }
+
         var user = await _userManager.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
         if (user is null)

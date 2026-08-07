@@ -53,6 +53,59 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<PasswordResetRequestResult?> requestPasswordReset({
+    required String email,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      return await _authService.requestPasswordReset(email: email.trim());
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return null;
+    } catch (_) {
+      _errorMessage =
+          'Reset lozinke trenutno nije dostupan. Pokusajte ponovo.';
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _authService.resetPassword(
+        email: email.trim(),
+        token: token.trim(),
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      );
+      return true;
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } catch (_) {
+      _errorMessage =
+          'Reset lozinke trenutno nije dostupan. Pokusajte ponovo.';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   void logout() {
     _session = null;
     _errorMessage = null;

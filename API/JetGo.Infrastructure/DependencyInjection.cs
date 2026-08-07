@@ -28,11 +28,13 @@ public static class DependencyInjection
         JwtSettings jwtSettings,
         RabbitMqSettings rabbitMqSettings,
         PayPalSettings payPalSettings,
+        SmtpSettings smtpSettings,
         bool includeWebSecurity = true)
     {
         services.AddSingleton(jwtSettings);
         services.AddSingleton(rabbitMqSettings);
         services.AddSingleton(payPalSettings);
+        services.AddSingleton(smtpSettings);
         services.AddMemoryCache();
 
         services.AddDbContext<JetGoDbContext>(options =>
@@ -139,6 +141,7 @@ public static class DependencyInjection
         });
         services.AddSingleton<IRabbitMqPersistentConnection, RabbitMqPersistentConnection>();
         services.AddScoped<INotificationEventPublisher, RabbitMqNotificationEventPublisher>();
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IProfileService, ProfileService>();

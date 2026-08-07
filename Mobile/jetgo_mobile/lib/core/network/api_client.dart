@@ -181,9 +181,20 @@ class ApiClient {
     return ApiException(
       statusCode: statusCode,
       message: responseBody.isEmpty
-          ? 'Server je vratio gresku bez sadrzaja.'
+          ? _emptyBodyMessage(statusCode)
           : responseBody,
     );
+  }
+
+  String _emptyBodyMessage(int statusCode) {
+    switch (statusCode) {
+      case 401:
+        return 'Sesija je istekla ili vise nije vazeca. Prijavite se ponovo.';
+      case 403:
+        return 'Nemate ovlastenje za ovu akciju.';
+      default:
+        return 'Server je vratio gresku bez sadrzaja.';
+    }
   }
 
   String _composeUserMessage(

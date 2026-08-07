@@ -28,6 +28,23 @@ public static class EnvironmentVariableReader
         return parsedValue;
     }
 
+    public static int GetOptionalInt(string variableName, int defaultValue)
+    {
+        var rawValue = GetOptional(variableName);
+
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return defaultValue;
+        }
+
+        if (!int.TryParse(rawValue, out var parsedValue) || parsedValue <= 0)
+        {
+            throw new InvalidOperationException($"Environment variable '{variableName}' must be a positive integer.");
+        }
+
+        return parsedValue;
+    }
+
     public static string? GetOptional(string variableName)
     {
         var value = Environment.GetEnvironmentVariable(variableName);
@@ -46,6 +63,23 @@ public static class EnvironmentVariableReader
         if (!decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedValue) || parsedValue <= 0)
         {
             throw new InvalidOperationException($"Environment variable '{variableName}' must be a positive decimal number.");
+        }
+
+        return parsedValue;
+    }
+
+    public static bool GetOptionalBool(string variableName, bool defaultValue)
+    {
+        var rawValue = GetOptional(variableName);
+
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return defaultValue;
+        }
+
+        if (!bool.TryParse(rawValue, out var parsedValue))
+        {
+            throw new InvalidOperationException($"Environment variable '{variableName}' must be true or false.");
         }
 
         return parsedValue;

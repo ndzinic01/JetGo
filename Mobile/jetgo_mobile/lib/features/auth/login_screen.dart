@@ -56,6 +56,32 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _openPasswordResetDialog() async {
+    final newPassword = await showDialog<String>(
+      context: context,
+      builder: (context) => _PasswordResetDialog(
+        authController: widget.authController,
+      ),
+    );
+
+    if (!mounted || newPassword == null) {
+      return;
+    }
+
+    _passwordController.text = newPassword;
+    _passwordController.selection = TextSelection.collapsed(
+      offset: newPassword.length,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Lozinka je uspjesno promijenjena. Nova lozinka je upisana u polje za prijavu.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -124,6 +150,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _openPasswordResetDialog,
+                            child: const Text('Zaboravili ste lozinku?'),
+                          ),
+                        ),
                         const SizedBox(height: 24),
                         ListenableBuilder(
                           listenable: widget.authController,
@@ -164,6 +197,286 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PasswordResetDialog extends StatefulWidget {
+  const _PasswordResetDialog({required this.authController});
+
+  final AuthController authController;
+
+  @override
+  State<_PasswordResetDialog> createState() => _PasswordResetDialogState();
+}
+
+class _PasswordResetDialogState extends State<_PasswordResetDialog> {
+  final _emailFormKey = GlobalKey<FormState>();
+  final _resetFormKey = GlobalKey<FormState>();
+  late final TextEditingController _emailController;
+  late final TextEditingController _tokenController;
+  late final TextEditingController _newPasswordController;
+  late final TextEditingController _confirmPasswordController;
+
+  String? _message;
+  bool _tokenRequested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController();
+    _tokenController = TextEditingController();
+    _newPasswordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _tokenController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestToken() async {
+    final currentState = _emailFormKey.currentState;
+    if (currentState == null || !currentState.validate()) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    final result = await widget.authController.requestPasswordReset(
+      email: _emailController.text,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (result == null) {
+      _showError();
+      return;
+    }
+
+    setState(() {
+      _tokenRequested = true;
+      _message = result.message;
+    });
+  }
+
+  Future<void> _resetPassword() async {
+    final currentState = _resetFormKey.currentState;
+    if (currentState == null || !currentState.validate()) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    final success = await widget.authController.resetPassword(
+      email: _emailController.text,
+      token: _tokenController.text,
+      newPassword: _newPasswordController.text,
+      confirmPassword: _confirmPasswordController.text,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!success) {
+      _showError();
+      return;
+    }
+
+    Navigator.of(context).pop(_newPasswordController.text);
+  }
+
+  void _showError() {
+    final message = widget.authController.errorMessage ??
+        'Reset lozinke trenutno nije dostupan. Pokusajte ponovo.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) {
+      return 'Unesite email adresu.';
+    }
+    final isValid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+    if (!isValid) {
+      return 'Unesite validnu email adresu u formatu korisnik@domena.com.';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Unesite novu lozinku.';
+    }
+    if (value.length < 4) {
+      return 'Nova lozinka mora imati najmanje 4 karaktera.';
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: const Text('Reset lozinke'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Form(
+                key: _emailFormKey,
+                child: TextFormField(
+                  controller: _emailController,
+                  enabled: !_tokenRequested,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    labelText: 'Email adresa',
+                    prefixIcon: Icon(Icons.mail_outline_rounded),
+                  ),
+                  validator: _validateEmail,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (!_tokenRequested) ...[
+                Text(
+                  'Unesite email adresu naloga za koji zelite promijeniti lozinku.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () {
+                      if (_emailFormKey.currentState?.validate() ?? false) {
+                        setState(() {
+                          _tokenRequested = true;
+                        });
+                      }
+                    },
+                    child: const Text('Vec imam reset token'),
+                  ),
+                ),
+              ],
+              if (_message != null) ...[
+                Text(
+                  _message!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (_tokenRequested) ...[
+                Text(
+                  'Unesite token koji ste dobili putem email-a, zatim novu lozinku.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Form(
+                  key: _resetFormKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _tokenController,
+                        minLines: 1,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Reset token',
+                          prefixIcon: Icon(Icons.key_rounded),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Unesite reset token.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _newPasswordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Nova lozinka',
+                          prefixIcon: Icon(Icons.lock_reset_rounded),
+                        ),
+                        validator: _validatePassword,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Potvrda nove lozinke',
+                          prefixIcon: Icon(Icons.lock_outline_rounded),
+                        ),
+                        validator: (value) {
+                          final error = _validatePassword(value);
+                          if (error != null) {
+                            return error;
+                          }
+                          if (value != _newPasswordController.text) {
+                            return 'Nova lozinka i potvrda moraju biti iste.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Odustani'),
+        ),
+        ListenableBuilder(
+          listenable: widget.authController,
+          builder: (context, _) {
+            return FilledButton.icon(
+              onPressed: widget.authController.isLoading
+                  ? null
+                  : (_tokenRequested ? _resetPassword : _requestToken),
+              icon: widget.authController.isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      _tokenRequested
+                          ? Icons.check_rounded
+                          : Icons.mail_outline_rounded,
+                    ),
+              label: Text(
+                widget.authController.isLoading
+                    ? 'Obrada...'
+                    : (_tokenRequested ? 'Promijeni lozinku' : 'Posalji token'),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

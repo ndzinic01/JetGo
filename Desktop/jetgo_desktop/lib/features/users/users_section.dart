@@ -557,6 +557,7 @@ class _UsersSectionState extends State<UsersSection> {
 
     final isCurrentUser = details.userId == widget.currentUserId;
     final canDeactivate = !(isCurrentUser && details.isActive);
+    final canResetPassword = !isCurrentUser;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -610,10 +611,16 @@ class _UsersSectionState extends State<UsersSection> {
                 label: Text(details.isActive ? 'Deaktiviraj' : 'Aktiviraj'),
               ),
             ),
-            FilledButton.tonalIcon(
-              onPressed: _openResetPasswordDialog,
-              icon: const Icon(Icons.lock_reset_rounded),
-              label: const Text('Resetuj lozinku'),
+            Tooltip(
+              message: canResetPassword
+                  ? 'Resetuj lozinku odabranom korisniku'
+                  : 'Vlastitu lozinku promijenite kroz Moj profil, uz unos trenutne lozinke.',
+              child: FilledButton.tonalIcon(
+                onPressed:
+                    canResetPassword ? _openResetPasswordDialog : null,
+                icon: const Icon(Icons.lock_reset_rounded),
+                label: const Text('Resetuj lozinku'),
+              ),
             ),
           ],
         ),

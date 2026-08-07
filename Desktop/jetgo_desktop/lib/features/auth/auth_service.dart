@@ -20,4 +20,34 @@ class AuthService {
 
     return AuthSession.fromJson(response);
   }
+
+  Future<PasswordResetRequestResult> requestPasswordReset({
+    required String email,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/api/Auth/request-password-reset',
+      body: <String, dynamic>{
+        'email': email,
+      },
+    );
+
+    return PasswordResetRequestResult.fromJson(response);
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    await _apiClient.postJson(
+      '/api/Auth/reset-password',
+      body: <String, dynamic>{
+        'email': email,
+        'token': token,
+        'newPassword': newPassword,
+        'confirmPassword': confirmPassword,
+      },
+    );
+  }
 }

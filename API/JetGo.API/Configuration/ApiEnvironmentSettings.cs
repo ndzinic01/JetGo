@@ -11,4 +11,6 @@ internal sealed class ApiEnvironmentSettings
     public RabbitMqSettings RabbitMq { get; init; } = new();
 
     public PayPalSettings PayPal { get; init; } = new();
+
+    public SmtpSettings Smtp { get; init; } = new();
 }

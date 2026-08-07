@@ -30,6 +30,21 @@ class AuthSession {
   }
 }
 
+class PasswordResetRequestResult {
+  PasswordResetRequestResult({
+    required this.message,
+  });
+
+  final String message;
+
+  factory PasswordResetRequestResult.fromJson(Map<String, dynamic> json) {
+    return PasswordResetRequestResult(
+      message: json['message'] as String? ??
+          'Ako korisnik sa ovom email adresom postoji, instrukcije za reset lozinke su poslane.',
+    );
+  }
+}
+
 class AuthUser {
   AuthUser({
     required this.userId,

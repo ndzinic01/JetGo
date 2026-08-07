@@ -176,6 +176,13 @@ Najbitnije varijable:
 - `JETGO_PAYPAL_CANCEL_URL`
 - `JETGO_PAYPAL_CURRENCY_CODE`
 - `JETGO_PAYPAL_BAM_TO_CURRENCY_RATE`
+- `JETGO_SMTP_HOST`
+- `JETGO_SMTP_PORT`
+- `JETGO_SMTP_USERNAME`
+- `JETGO_SMTP_PASSWORD`
+- `JETGO_SMTP_USE_SSL`
+- `JETGO_SMTP_FROM_EMAIL`
+- `JETGO_SMTP_FROM_NAME`
 
 Napomena:
 
@@ -202,6 +209,7 @@ docker compose up --build
 
 - Swagger: `http://localhost:5000/swagger`
 - RabbitMQ Management UI: `http://localhost:15672`
+- Mailpit lokalni email inbox: `http://localhost:8025`
 - SQL Server: `localhost,1433`
 
 ### Napomene
@@ -211,8 +219,22 @@ docker compose up --build
 - Docker stack sadrzi:
   - SQL Server
   - RabbitMQ
+  - Mailpit lokalni SMTP/email inbox
   - API
   - Worker
+
+### Reset lozinke preko lokalnog email inboxa
+
+Za testiranje zaboravljene lozinke koristi se Mailpit. Backend salje reset token preko SMTP-a
+na lokalni inbox, bez potrebe za stvarnim email nalozima.
+
+Tok testiranja:
+
+1. U aplikaciji kliknuti `Zaboravili ste lozinku?`
+2. Unijeti email test korisnika, npr. `mobile@jetgo.local`
+3. Otvoriti `http://localhost:8025`
+4. Otvoriti pristigli email i kopirati reset token
+5. U aplikaciji unijeti token, novu lozinku i potvrdu lozinke
 
 ### Reset na cisto demo stanje preko Dockera
 

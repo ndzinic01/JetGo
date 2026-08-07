@@ -25,6 +25,14 @@ services:
       - jetgo-rabbitmq-data:/var/lib/rabbitmq
     restart: unless-stopped
 
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    container_name: jetgo-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+
   jetgo-api:
     build:
       context: .
@@ -33,6 +41,7 @@ services:
     depends_on:
       - sqlserver
       - rabbitmq
+      - mailpit
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://+:8080"
@@ -54,6 +63,13 @@ services:
       JETGO_PAYPAL_CANCEL_URL: "${JETGO_PAYPAL_CANCEL_URL}"
       JETGO_PAYPAL_CURRENCY_CODE: "${JETGO_PAYPAL_CURRENCY_CODE}"
       JETGO_PAYPAL_BAM_TO_CURRENCY_RATE: "${JETGO_PAYPAL_BAM_TO_CURRENCY_RATE}"
+      JETGO_SMTP_HOST: "mailpit"
+      JETGO_SMTP_PORT: "1025"
+      JETGO_SMTP_USERNAME: ""
+      JETGO_SMTP_PASSWORD: ""
+      JETGO_SMTP_USE_SSL: "false"
+      JETGO_SMTP_FROM_EMAIL: "no-reply@jetgo.local"
+      JETGO_SMTP_FROM_NAME: "JetGo"
     ports:
       - "5000:8080"
     restart: on-failure

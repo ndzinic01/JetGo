@@ -66,7 +66,8 @@ builder.Services.AddJetGoInfrastructure(
     environmentSettings.ConnectionString,
     environmentSettings.Jwt,
     environmentSettings.RabbitMq,
-    environmentSettings.PayPal);
+    environmentSettings.PayPal,
+    environmentSettings.Smtp);
 
 var app = builder.Build();
 

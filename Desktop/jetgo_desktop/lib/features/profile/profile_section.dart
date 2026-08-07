@@ -116,7 +116,11 @@ class _ProfileSectionState extends State<ProfileSection> {
     );
 
     if (changed == true && mounted) {
-      _showMessage('Lozinka je uspjesno promijenjena.');
+      _showMessage('Lozinka je uspjesno promijenjena. Prijavite se ponovo.');
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (mounted) {
+        widget.authController.logout();
+      }
     }
   }
 

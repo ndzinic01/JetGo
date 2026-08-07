@@ -517,8 +517,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Lozinka je uspjesno promijenjena.')),
+      const SnackBar(
+        content: Text('Lozinka je uspjesno promijenjena. Prijavite se ponovo.'),
+      ),
     );
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (mounted) {
+      widget.authController.logout();
+    }
   }
 
   Future<void> _openNewsPreview(NewsArticleSummary article) async {
