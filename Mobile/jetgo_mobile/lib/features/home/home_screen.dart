@@ -1036,11 +1036,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildRecommendedFlightCard(MobileRecommendedFlight flight) {
-    final imageUrl = _destinationImageFor(
-      cityName: flight.arrivalAirport.cityName,
-      airportCode: flight.arrivalAirport.iataCode,
-      routeCode: flight.routeCode,
-    );
+    final imageUrl = _imageUrlOrFallback(flight.destinationImageUrl);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -1050,6 +1046,7 @@ class _HomeScreenState extends State<HomeScreen> {
             id: flight.id,
             flightNumber: flight.flightNumber,
             routeCode: flight.routeCode,
+            destinationImageUrl: flight.destinationImageUrl,
             airline: flight.airline,
             departureAirport: flight.departureAirport,
             arrivalAirport: flight.arrivalAirport,
@@ -1884,11 +1881,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFlightCard(MobileFlight flight) {
-    final imageUrl = _destinationImageFor(
-      cityName: flight.arrivalAirport.cityName,
-      airportCode: flight.arrivalAirport.iataCode,
-      routeCode: flight.routeCode,
-    );
+    final imageUrl = _imageUrlOrFallback(flight.destinationImageUrl);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -2038,42 +2031,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _destinationImageFor({
-    required String cityName,
-    required String airportCode,
-    required String routeCode,
-  }) {
-    final key = '${cityName.toLowerCase()} ${airportCode.toLowerCase()} ${routeCode.toLowerCase()}';
-
-    if (key.contains('paris') || key.contains('cdg')) {
-      return 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=900&q=80';
-    }
-    if (key.contains('rome') || key.contains('rim') || key.contains('fco')) {
-      return 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=900&q=80';
-    }
-    if (key.contains('istanbul') || key.contains('ist')) {
-      return 'https://images.pexels.com/photos/28879119/pexels-photo-28879119.jpeg?cs=srgb&dl=pexels-reojuve-28879119.jpg&fm=jpg';
-    }
-    if (key.contains('berlin') || key.contains('ber')) {
-      return 'https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&w=900&q=80';
-    }
-    if (key.contains('vienna') || key.contains('vie') || key.contains('bec')) {
-      return 'https://images.pexels.com/photos/31725340/pexels-photo-31725340.jpeg?cs=srgb&dl=pexels-bidbtc-31725340.jpg&fm=jpg';
-    }
-    if (key.contains('zurich') || key.contains('cirih') || key.contains('zrh')) {
-      return 'https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=900&q=80';
-    }
-    if (key.contains('zagreb') || key.contains('zag')) {
-      return 'https://images.pexels.com/photos/27401067/pexels-photo-27401067.jpeg?cs=srgb&dl=pexels-damir-27401067.jpg&fm=jpg';
-    }
-    if (key.contains('frankfurt') || key.contains('fra')) {
-      return 'https://images.pexels.com/photos/19335682/pexels-photo-19335682.jpeg?cs=srgb&dl=pexels-masoodaslami-19335682.jpg&fm=jpg';
-    }
-    if (key.contains('belgrade') || key.contains('beograd') || key.contains('beg')) {
-      return 'https://images.pexels.com/photos/32237254/pexels-photo-32237254.jpeg?cs=srgb&dl=pexels-borishamer-32237254.jpg&fm=jpg';
-    }
-
-    return _heroImageUrl;
+  String _imageUrlOrFallback(String? imageUrl) {
+    final value = imageUrl?.trim();
+    return value == null || value.isEmpty ? _heroImageUrl : value;
   }
 
   String _formatShortDate(DateTime value) {

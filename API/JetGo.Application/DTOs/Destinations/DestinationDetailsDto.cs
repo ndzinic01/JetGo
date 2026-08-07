@@ -8,6 +8,8 @@ public sealed class DestinationDetailsDto
 
     public string RouteCode { get; init; } = string.Empty;
 
+    public string? ImageUrl { get; init; }
+
     public bool IsActive { get; init; }
 
     public AirportSummaryDto DepartureAirport { get; init; } = new();

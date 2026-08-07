@@ -11,6 +11,8 @@ public sealed class FlightListItemDto
 
     public string RouteCode { get; init; } = string.Empty;
 
+    public string? DestinationImageUrl { get; init; }
+
     public AirlineSummaryDto Airline { get; init; } = new();
 
     public AirportSummaryDto DepartureAirport { get; init; } = new();

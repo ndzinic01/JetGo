@@ -72,6 +72,7 @@ class MobileFlight {
     required this.id,
     required this.flightNumber,
     required this.routeCode,
+    this.destinationImageUrl,
     required this.airline,
     required this.departureAirport,
     required this.arrivalAirport,
@@ -88,6 +89,7 @@ class MobileFlight {
   final int id;
   final String flightNumber;
   final String routeCode;
+  final String? destinationImageUrl;
   final AirlineSummary airline;
   final AirportSummary departureAirport;
   final AirportSummary arrivalAirport;
@@ -105,6 +107,7 @@ class MobileFlight {
       id: json['id'] as int? ?? 0,
       flightNumber: json['flightNumber'] as String? ?? '',
       routeCode: json['routeCode'] as String? ?? '',
+      destinationImageUrl: json['destinationImageUrl'] as String?,
       airline: AirlineSummary.fromJson(
         json['airline'] as Map<String, dynamic>? ?? const <String, dynamic>{},
       ),
@@ -134,6 +137,7 @@ class MobileFlightDetails {
     required this.destinationId,
     required this.flightNumber,
     required this.routeCode,
+    this.destinationImageUrl,
     required this.airline,
     required this.departureAirport,
     required this.arrivalAirport,
@@ -155,6 +159,7 @@ class MobileFlightDetails {
   final int destinationId;
   final String flightNumber;
   final String routeCode;
+  final String? destinationImageUrl;
   final AirlineSummary airline;
   final AirportSummary departureAirport;
   final AirportSummary arrivalAirport;
@@ -177,6 +182,7 @@ class MobileFlightDetails {
       destinationId: json['destinationId'] as int? ?? 0,
       flightNumber: json['flightNumber'] as String? ?? '',
       routeCode: json['routeCode'] as String? ?? '',
+      destinationImageUrl: json['destinationImageUrl'] as String?,
       airline: AirlineSummary.fromJson(
         json['airline'] as Map<String, dynamic>? ?? const <String, dynamic>{},
       ),
@@ -542,6 +548,7 @@ class MobileRecommendedFlight {
     required this.id,
     required this.flightNumber,
     required this.routeCode,
+    this.destinationImageUrl,
     required this.airline,
     required this.departureAirport,
     required this.arrivalAirport,
@@ -565,6 +572,7 @@ class MobileRecommendedFlight {
   final int id;
   final String flightNumber;
   final String routeCode;
+  final String? destinationImageUrl;
   final AirlineSummary airline;
   final AirportSummary departureAirport;
   final AirportSummary arrivalAirport;
@@ -589,6 +597,7 @@ class MobileRecommendedFlight {
       id: json['id'] as int? ?? 0,
       flightNumber: json['flightNumber'] as String? ?? '',
       routeCode: json['routeCode'] as String? ?? '',
+      destinationImageUrl: json['destinationImageUrl'] as String?,
       airline: AirlineSummary.fromJson(
         json['airline'] as Map<String, dynamic>? ?? const <String, dynamic>{},
       ),

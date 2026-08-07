@@ -86,6 +86,7 @@ public sealed class RecommendationService : IRecommendationService
                 DestinationId = x.DestinationId,
                 FlightNumber = x.FlightNumber,
                 RouteCode = x.Destination.RouteCode,
+                DestinationImageUrl = x.Destination.ImageUrl,
                 Airline = new AirlineSummaryDto
                 {
                     Id = x.Airline.Id,
@@ -173,6 +174,7 @@ public sealed class RecommendationService : IRecommendationService
             Id = candidate.Id,
             FlightNumber = candidate.FlightNumber,
             RouteCode = candidate.RouteCode,
+            DestinationImageUrl = candidate.DestinationImageUrl,
             Airline = candidate.Airline,
             DepartureAirport = candidate.DepartureAirport,
             ArrivalAirport = candidate.ArrivalAirport,
@@ -338,6 +340,8 @@ public sealed class RecommendationService : IRecommendationService
         public string FlightNumber { get; init; } = string.Empty;
 
         public string RouteCode { get; init; } = string.Empty;
+
+        public string? DestinationImageUrl { get; init; }
 
         public AirlineSummaryDto Airline { get; init; } = new();
 

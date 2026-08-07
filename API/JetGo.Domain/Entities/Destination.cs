@@ -14,6 +14,8 @@ public sealed class Destination : AuditableEntity
 
     public string RouteCode { get; set; } = string.Empty;
 
+    public string? ImageUrl { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public ICollection<Flight> Flights { get; set; } = new List<Flight>();

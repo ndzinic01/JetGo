@@ -37,6 +37,7 @@ public sealed class FlightAdminService : IFlightAdminService
                 Id = x.Id,
                 FlightNumber = x.FlightNumber,
                 RouteCode = x.Destination.RouteCode,
+                DestinationImageUrl = x.Destination.ImageUrl,
                 Airline = new AirlineSummaryDto
                 {
                     Id = x.Airline.Id,
@@ -90,6 +91,7 @@ public sealed class FlightAdminService : IFlightAdminService
                 DestinationId = x.DestinationId,
                 FlightNumber = x.FlightNumber,
                 RouteCode = x.Destination.RouteCode,
+                DestinationImageUrl = x.Destination.ImageUrl,
                 Airline = new AirlineSummaryDto
                 {
                     Id = x.Airline.Id,

@@ -250,6 +250,7 @@ internal static class JetGoSeedData
             DepartureAirportId = 1,
             ArrivalAirportId = 4,
             RouteCode = "SJJ-ZAG",
+            ImageUrl = "https://images.pexels.com/photos/27401067/pexels-photo-27401067.jpeg?cs=srgb&dl=pexels-damir-27401067.jpg&fm=jpg",
             IsActive = true,
             CreatedAtUtc = SeedTimestampUtc
         },
@@ -259,6 +260,7 @@ internal static class JetGoSeedData
             DepartureAirportId = 1,
             ArrivalAirportId = 5,
             RouteCode = "SJJ-VIE",
+            ImageUrl = "https://images.pexels.com/photos/31725340/pexels-photo-31725340.jpeg?cs=srgb&dl=pexels-bidbtc-31725340.jpg&fm=jpg",
             IsActive = true,
             CreatedAtUtc = SeedTimestampUtc
         },
@@ -268,6 +270,7 @@ internal static class JetGoSeedData
             DepartureAirportId = 3,
             ArrivalAirportId = 6,
             RouteCode = "BNX-BEG",
+            ImageUrl = "https://images.pexels.com/photos/32237254/pexels-photo-32237254.jpeg?cs=srgb&dl=pexels-borishamer-32237254.jpg&fm=jpg",
             IsActive = true,
             CreatedAtUtc = SeedTimestampUtc
         },
@@ -277,6 +280,7 @@ internal static class JetGoSeedData
             DepartureAirportId = 2,
             ArrivalAirportId = 7,
             RouteCode = "OMO-IST",
+            ImageUrl = "https://images.pexels.com/photos/28879119/pexels-photo-28879119.jpeg?cs=srgb&dl=pexels-reojuve-28879119.jpg&fm=jpg",
             IsActive = true,
             CreatedAtUtc = SeedTimestampUtc
         },
@@ -286,6 +290,7 @@ internal static class JetGoSeedData
             DepartureAirportId = 1,
             ArrivalAirportId = 8,
             RouteCode = "SJJ-FRA",
+            ImageUrl = "https://images.pexels.com/photos/19335682/pexels-photo-19335682.jpeg?cs=srgb&dl=pexels-masoodaslami-19335682.jpg&fm=jpg",
             IsActive = true,
             CreatedAtUtc = SeedTimestampUtc
         },
@@ -295,6 +300,7 @@ internal static class JetGoSeedData
             DepartureAirportId = 3,
             ArrivalAirportId = 5,
             RouteCode = "BNX-VIE",
+            ImageUrl = "https://images.pexels.com/photos/31725340/pexels-photo-31725340.jpeg?cs=srgb&dl=pexels-bidbtc-31725340.jpg&fm=jpg",
             IsActive = true,
             CreatedAtUtc = SeedTimestampUtc
         }

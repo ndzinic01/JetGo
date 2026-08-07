@@ -36,6 +36,7 @@ public sealed class DestinationAdminService : IDestinationAdminService
             {
                 Id = x.Id,
                 RouteCode = x.RouteCode,
+                ImageUrl = x.ImageUrl,
                 IsActive = x.IsActive,
                 DepartureAirport = new AirportSummaryDto
                 {
@@ -79,6 +80,7 @@ public sealed class DestinationAdminService : IDestinationAdminService
             {
                 Id = x.Id,
                 RouteCode = x.RouteCode,
+                ImageUrl = x.ImageUrl,
                 IsActive = x.IsActive,
                 DepartureAirport = new AirportSummaryDto
                 {
@@ -122,6 +124,7 @@ public sealed class DestinationAdminService : IDestinationAdminService
             DepartureAirportId = request.DepartureAirportId,
             ArrivalAirportId = request.ArrivalAirportId,
             RouteCode = $"{airportData.DepartureIataCode}-{airportData.ArrivalIataCode}",
+            ImageUrl = NormalizeImageUrl(request.ImageUrl),
             IsActive = request.IsActive
         };
 
@@ -156,6 +159,7 @@ public sealed class DestinationAdminService : IDestinationAdminService
         destination.DepartureAirportId = request.DepartureAirportId;
         destination.ArrivalAirportId = request.ArrivalAirportId;
         destination.RouteCode = $"{airportData.DepartureIataCode}-{airportData.ArrivalIataCode}";
+        destination.ImageUrl = NormalizeImageUrl(request.ImageUrl);
         destination.IsActive = request.IsActive;
         destination.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -275,5 +279,10 @@ public sealed class DestinationAdminService : IDestinationAdminService
         {
             throw new ConflictException("Destinacija sa istom rutom vec postoji.");
         }
+    }
+
+    private static string? NormalizeImageUrl(string? imageUrl)
+    {
+        return string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl.Trim();
     }
 }

@@ -35,6 +35,7 @@ public sealed class DestinationService : IDestinationService
             {
                 Id = x.Id,
                 RouteCode = x.RouteCode,
+                ImageUrl = x.ImageUrl,
                 IsActive = x.IsActive,
                 DepartureAirport = new AirportSummaryDto
                 {
@@ -78,6 +79,7 @@ public sealed class DestinationService : IDestinationService
             {
                 Id = x.Id,
                 RouteCode = x.RouteCode,
+                ImageUrl = x.ImageUrl,
                 IsActive = x.IsActive,
                 DepartureAirport = new AirportSummaryDto
                 {

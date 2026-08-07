@@ -51,6 +51,7 @@ class FlightsRoutesService {
     required String token,
     required int departureAirportId,
     required int arrivalAirportId,
+    String? imageUrl,
     required bool isActive,
   }) async {
     final response = await _apiClient.postJson(
@@ -59,6 +60,7 @@ class FlightsRoutesService {
       body: <String, dynamic>{
         'departureAirportId': departureAirportId,
         'arrivalAirportId': arrivalAirportId,
+        'imageUrl': imageUrl?.trim(),
         'isActive': isActive,
       },
     );
@@ -71,6 +73,7 @@ class FlightsRoutesService {
     required int id,
     required int departureAirportId,
     required int arrivalAirportId,
+    String? imageUrl,
     required bool isActive,
   }) async {
     final response = await _apiClient.putJson(
@@ -79,6 +82,7 @@ class FlightsRoutesService {
       body: <String, dynamic>{
         'departureAirportId': departureAirportId,
         'arrivalAirportId': arrivalAirportId,
+        'imageUrl': imageUrl?.trim(),
         'isActive': isActive,
       },
     );

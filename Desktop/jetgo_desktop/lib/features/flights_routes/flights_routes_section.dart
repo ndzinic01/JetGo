@@ -301,6 +301,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
           token: widget.token,
           departureAirportId: value.departureAirportId,
           arrivalAirportId: value.arrivalAirportId,
+          imageUrl: value.imageUrl,
           isActive: value.isActive,
         );
       } else {
@@ -309,6 +310,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
           id: initial.id,
           departureAirportId: value.departureAirportId,
           arrivalAirportId: value.arrivalAirportId,
+          imageUrl: value.imageUrl,
           isActive: value.isActive,
         );
       }
@@ -808,6 +810,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
     return _TableScrollWrapper(
       child: DataTable(
         columns: const [
+          DataColumn(label: Text('Slika')),
           DataColumn(label: Text('Ruta')),
           DataColumn(label: Text('Polazni aerodrom')),
           DataColumn(label: Text('Dolazni aerodrom')),
@@ -818,6 +821,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
         rows: _destinations.map((item) {
           return DataRow(
             cells: [
+              DataCell(_DestinationImageThumb(imageUrl: item.imageUrl)),
               DataCell(Text(item.routeCode)),
               DataCell(_AirportCellText(airport: item.departureAirport)),
               DataCell(_AirportCellText(airport: item.arrivalAirport)),
@@ -955,6 +959,49 @@ class _AirportCellText extends StatelessWidget {
   }
 }
 
+class _DestinationImageThumb extends StatelessWidget {
+  const _DestinationImageThumb({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = imageUrl?.trim();
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 56,
+        height: 38,
+        child: value == null || value.isEmpty
+            ? ColoredBox(
+                color: colorScheme.surfaceContainerHighest,
+                child: Icon(
+                  Icons.image_outlined,
+                  size: 18,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              )
+            : Image.network(
+                value,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return ColoredBox(
+                    color: colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: 18,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}
+
 class _TableScrollWrapper extends StatelessWidget {
   const _TableScrollWrapper({required this.child});
 
@@ -1015,6 +1062,7 @@ class _DestinationDialog extends StatefulWidget {
 
 class _DestinationDialogState extends State<_DestinationDialog> {
   final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _imageUrlController;
   late int _departureAirportId;
   late int _arrivalAirportId;
   late bool _isActive;
@@ -1028,7 +1076,16 @@ class _DestinationDialogState extends State<_DestinationDialog> {
         (widget.airports.length > 1
             ? widget.airports[1].id
             : (widget.airports.isNotEmpty ? widget.airports.first.id : 0));
+    _imageUrlController = TextEditingController(
+      text: widget.initial?.imageUrl ?? '',
+    );
     _isActive = widget.initial?.isActive ?? true;
+  }
+
+  @override
+  void dispose() {
+    _imageUrlController.dispose();
+    super.dispose();
   }
 
   @override
@@ -1109,6 +1166,37 @@ class _DestinationDialogState extends State<_DestinationDialog> {
                 },
               ),
               const SizedBox(height: 12),
+              TextFormField(
+                controller: _imageUrlController,
+                keyboardType: TextInputType.url,
+                maxLength: 500,
+                decoration: const InputDecoration(
+                  labelText: 'URL slike',
+                  hintText: 'https://example.com/destinacija.jpg',
+                  counterText: '',
+                ),
+                validator: (value) {
+                  final imageUrl = value?.trim() ?? '';
+
+                  if (imageUrl.isEmpty) {
+                    return null;
+                  }
+
+                  final uri = Uri.tryParse(imageUrl);
+                  if (uri == null ||
+                      uri.host.isEmpty ||
+                      (uri.scheme != 'http' && uri.scheme != 'https')) {
+                    return 'Unesite validan URL slike, npr. https://example.com/slika.jpg.';
+                  }
+
+                  if (imageUrl.length > 500) {
+                    return 'URL slike moze sadrzavati maksimalno 500 karaktera.';
+                  }
+
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _isActive,
@@ -1141,6 +1229,7 @@ class _DestinationDialogState extends State<_DestinationDialog> {
               _DestinationFormValue(
                 departureAirportId: _departureAirportId,
                 arrivalAirportId: _arrivalAirportId,
+                imageUrl: _imageUrlController.text.trim(),
                 isActive: _isActive,
               ),
             );
@@ -1502,11 +1591,13 @@ class _DestinationFormValue {
   const _DestinationFormValue({
     required this.departureAirportId,
     required this.arrivalAirportId,
+    required this.imageUrl,
     required this.isActive,
   });
 
   final int departureAirportId;
   final int arrivalAirportId;
+  final String imageUrl;
   final bool isActive;
 }
 

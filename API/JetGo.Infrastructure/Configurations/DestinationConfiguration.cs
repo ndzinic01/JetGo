@@ -16,6 +16,7 @@ public sealed class DestinationConfiguration : AuditableEntityConfiguration<Dest
         });
 
         builder.Property(x => x.RouteCode).IsRequired().HasMaxLength(20);
+        builder.Property(x => x.ImageUrl).HasMaxLength(500);
 
         builder.HasIndex(x => x.RouteCode).IsUnique();
 

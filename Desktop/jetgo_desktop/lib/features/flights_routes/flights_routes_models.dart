@@ -51,6 +51,7 @@ class DestinationItem {
   DestinationItem({
     required this.id,
     required this.routeCode,
+    this.imageUrl,
     required this.isActive,
     required this.departureAirport,
     required this.arrivalAirport,
@@ -61,6 +62,7 @@ class DestinationItem {
 
   final int id;
   final String routeCode;
+  final String? imageUrl;
   final bool isActive;
   final AirportSummary departureAirport;
   final AirportSummary arrivalAirport;
@@ -72,6 +74,7 @@ class DestinationItem {
     return DestinationItem(
       id: json['id'] as int? ?? 0,
       routeCode: json['routeCode'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String?,
       isActive: json['isActive'] as bool? ?? false,
       departureAirport: AirportSummary.fromJson(
         json['departureAirport'] as Map<String, dynamic>? ?? const {},
@@ -92,6 +95,7 @@ class DestinationDetails {
   DestinationDetails({
     required this.id,
     required this.routeCode,
+    this.imageUrl,
     required this.isActive,
     required this.departureAirport,
     required this.arrivalAirport,
@@ -103,6 +107,7 @@ class DestinationDetails {
 
   final int id;
   final String routeCode;
+  final String? imageUrl;
   final bool isActive;
   final AirportSummary departureAirport;
   final AirportSummary arrivalAirport;
@@ -115,6 +120,7 @@ class DestinationDetails {
     return DestinationDetails(
       id: json['id'] as int? ?? 0,
       routeCode: json['routeCode'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String?,
       isActive: json['isActive'] as bool? ?? false,
       departureAirport: AirportSummary.fromJson(
         json['departureAirport'] as Map<String, dynamic>? ?? const {},
@@ -137,6 +143,7 @@ class FlightItem {
     required this.id,
     required this.flightNumber,
     required this.routeCode,
+    this.destinationImageUrl,
     required this.airline,
     required this.departureAirport,
     required this.arrivalAirport,
@@ -153,6 +160,7 @@ class FlightItem {
   final int id;
   final String flightNumber;
   final String routeCode;
+  final String? destinationImageUrl;
   final AirlineSummary airline;
   final AirportSummary departureAirport;
   final AirportSummary arrivalAirport;
@@ -170,6 +178,7 @@ class FlightItem {
       id: json['id'] as int? ?? 0,
       flightNumber: json['flightNumber'] as String? ?? '',
       routeCode: json['routeCode'] as String? ?? '',
+      destinationImageUrl: json['destinationImageUrl'] as String?,
       airline: AirlineSummary.fromJson(
         json['airline'] as Map<String, dynamic>? ?? const {},
       ),
@@ -197,6 +206,7 @@ class FlightDetails {
     required this.destinationId,
     required this.flightNumber,
     required this.routeCode,
+    this.destinationImageUrl,
     required this.airline,
     required this.departureAirport,
     required this.arrivalAirport,
@@ -216,6 +226,7 @@ class FlightDetails {
   final int destinationId;
   final String flightNumber;
   final String routeCode;
+  final String? destinationImageUrl;
   final AirlineSummary airline;
   final AirportSummary departureAirport;
   final AirportSummary arrivalAirport;
@@ -236,6 +247,7 @@ class FlightDetails {
       destinationId: json['destinationId'] as int? ?? 0,
       flightNumber: json['flightNumber'] as String? ?? '',
       routeCode: json['routeCode'] as String? ?? '',
+      destinationImageUrl: json['destinationImageUrl'] as String?,
       airline: AirlineSummary.fromJson(
         json['airline'] as Map<String, dynamic>? ?? const {},
       ),
