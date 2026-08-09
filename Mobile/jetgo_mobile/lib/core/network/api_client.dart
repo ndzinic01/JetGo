@@ -14,11 +14,23 @@ class ApiClient {
 
   final HttpClient _httpClient;
 
-  Uri get _baseUri => Uri.parse(
-        AppConfig.apiBaseUrl.endsWith('/')
-            ? AppConfig.apiBaseUrl
-            : '${AppConfig.apiBaseUrl}/',
+  Uri get _baseUri {
+    final configuredBaseUrl = AppConfig.apiBaseUrl.trim();
+
+    if (configuredBaseUrl.isEmpty) {
+      throw ApiException(
+        statusCode: 500,
+        message:
+            'API adresa nije podesena. Pokrenite aplikaciju sa --dart-define=API_BASE_URL=<adresa-api-ja>.',
       );
+    }
+
+    return Uri.parse(
+      configuredBaseUrl.endsWith('/')
+          ? configuredBaseUrl
+          : '$configuredBaseUrl/',
+    );
+  }
 
   Future<Map<String, dynamic>> getJson(
     String path, {

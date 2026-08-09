@@ -2,9 +2,9 @@ namespace JetGo.Application.Configuration;
 
 public sealed class SmtpSettings
 {
-    public string Host { get; init; } = "localhost";
+    public string Host { get; init; } = string.Empty;
 
-    public int Port { get; init; } = 1025;
+    public int Port { get; init; }
 
     public string? UserName { get; init; }
 
@@ -12,9 +12,9 @@ public sealed class SmtpSettings
 
     public bool UseSsl { get; init; }
 
-    public string FromEmail { get; init; } = "no-reply@jetgo.local";
+    public string FromEmail { get; init; } = string.Empty;
 
-    public string FromName { get; init; } = "JetGo";
+    public string FromName { get; init; } = string.Empty;
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Host) &&

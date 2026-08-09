@@ -2,7 +2,7 @@ namespace JetGo.Application.Configuration;
 
 public sealed class PayPalSettings
 {
-    public string BaseUrl { get; init; } = "https://api-m.sandbox.paypal.com";
+    public string BaseUrl { get; init; } = string.Empty;
 
     public string ClientId { get; init; } = string.Empty;
 
@@ -12,9 +12,9 @@ public sealed class PayPalSettings
 
     public string CancelUrl { get; init; } = string.Empty;
 
-    public string CurrencyCode { get; init; } = "EUR";
+    public string CurrencyCode { get; init; } = string.Empty;
 
-    public decimal BamToCurrencyRate { get; init; } = 1.95583m;
+    public decimal BamToCurrencyRate { get; init; }
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ClientId) &&

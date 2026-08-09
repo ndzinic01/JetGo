@@ -183,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'API: ${AppConfig.apiBaseUrl}',
+                          'API: ${AppConfig.apiBaseUrlLabel}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),

@@ -28,37 +28,9 @@ public static class EnvironmentVariableReader
         return parsedValue;
     }
 
-    public static int GetOptionalInt(string variableName, int defaultValue)
+    public static decimal GetRequiredDecimal(string variableName)
     {
-        var rawValue = GetOptional(variableName);
-
-        if (string.IsNullOrWhiteSpace(rawValue))
-        {
-            return defaultValue;
-        }
-
-        if (!int.TryParse(rawValue, out var parsedValue) || parsedValue <= 0)
-        {
-            throw new InvalidOperationException($"Environment variable '{variableName}' must be a positive integer.");
-        }
-
-        return parsedValue;
-    }
-
-    public static string? GetOptional(string variableName)
-    {
-        var value = Environment.GetEnvironmentVariable(variableName);
-        return string.IsNullOrWhiteSpace(value) ? null : value;
-    }
-
-    public static decimal GetOptionalDecimal(string variableName, decimal defaultValue)
-    {
-        var rawValue = GetOptional(variableName);
-
-        if (string.IsNullOrWhiteSpace(rawValue))
-        {
-            return defaultValue;
-        }
+        var rawValue = GetRequired(variableName);
 
         if (!decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedValue) || parsedValue <= 0)
         {
@@ -68,14 +40,9 @@ public static class EnvironmentVariableReader
         return parsedValue;
     }
 
-    public static bool GetOptionalBool(string variableName, bool defaultValue)
+    public static bool GetRequiredBool(string variableName)
     {
-        var rawValue = GetOptional(variableName);
-
-        if (string.IsNullOrWhiteSpace(rawValue))
-        {
-            return defaultValue;
-        }
+        var rawValue = GetRequired(variableName);
 
         if (!bool.TryParse(rawValue, out var parsedValue))
         {
@@ -83,5 +50,11 @@ public static class EnvironmentVariableReader
         }
 
         return parsedValue;
+    }
+
+    public static string? GetOptional(string variableName)
+    {
+        var value = Environment.GetEnvironmentVariable(variableName);
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }
