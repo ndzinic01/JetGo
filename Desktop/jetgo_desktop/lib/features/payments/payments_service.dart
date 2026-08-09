@@ -4,7 +4,7 @@ import 'payments_models.dart';
 
 class PaymentsService {
   PaymentsService({ApiClient? apiClient})
-      : _apiClient = apiClient ?? ApiClient();
+    : _apiClient = apiClient ?? ApiClient();
 
   final ApiClient _apiClient;
 
@@ -49,21 +49,19 @@ class PaymentsService {
     final response = await _apiClient.postJson(
       '/api/Payments/$id/refund',
       token: token,
-      body: <String, dynamic>{
-        'reason': reason.trim(),
-      },
+      body: <String, dynamic>{'reason': reason.trim()},
     );
 
     return PaymentDetails.fromJson(response);
   }
 
-  Future<PayPalDebugSnapshot> getPayPalDebugSnapshot({
+  Future<PayPalVerificationSnapshot> getPayPalVerification({
     required String token,
     required int id,
     String? callbackToken,
   }) async {
     final response = await _apiClient.getJson(
-      '/api/Payments/$id/debug-paypal',
+      '/api/Payments/$id/paypal-verification',
       token: token,
       queryParameters: <String, String>{
         if (callbackToken != null && callbackToken.trim().isNotEmpty)
@@ -71,7 +69,7 @@ class PaymentsService {
       },
     );
 
-    return PayPalDebugSnapshot.fromJson(response);
+    return PayPalVerificationSnapshot.fromJson(response);
   }
 
   PagedResult<T> _mapPagedResult<T>(

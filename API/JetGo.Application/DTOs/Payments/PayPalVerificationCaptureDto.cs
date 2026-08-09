@@ -1,6 +1,6 @@
 namespace JetGo.Application.DTOs.Payments;
 
-public sealed class PayPalDebugCaptureDto
+public sealed class PayPalVerificationCaptureDto
 {
     public string Id { get; init; } = string.Empty;
 

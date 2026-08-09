@@ -1,6 +1,6 @@
 namespace JetGo.Application.DTOs.Payments;
 
-public sealed class PayPalDebugLinkDto
+public sealed class PayPalVerificationLinkDto
 {
     public string Rel { get; init; } = string.Empty;
 

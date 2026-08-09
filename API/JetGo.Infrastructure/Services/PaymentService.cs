@@ -192,7 +192,7 @@ public sealed class PaymentService : IPaymentService
         return await GetByIdInternalAsync(id, null, cancellationToken);
     }
 
-    public async Task<PayPalPaymentDebugDto> GetPayPalDebugSnapshotAsync(int id, string? callbackToken, CancellationToken cancellationToken = default)
+    public async Task<PayPalPaymentVerificationDto> GetPayPalVerificationAsync(int id, string? callbackToken, CancellationToken cancellationToken = default)
     {
         EnsureCurrentUserIsAdmin();
         EnsurePayPalConfigured();
@@ -210,7 +210,7 @@ public sealed class PaymentService : IPaymentService
 
         if (string.IsNullOrWhiteSpace(payment.ProviderReference))
         {
-            throw new ConflictException("Placanje nema evidentiran provider reference za PayPal debug pregled.");
+            throw new ConflictException("Placanje nema evidentiranu PayPal referencu za provjeru.");
         }
 
         var normalizedCallbackToken = string.IsNullOrWhiteSpace(callbackToken)
@@ -225,7 +225,7 @@ public sealed class PaymentService : IPaymentService
                 payment.Reservation.Flight.ArrivalAtUtc,
                 DateTime.UtcNow);
 
-            return new PayPalPaymentDebugDto
+            return new PayPalPaymentVerificationDto
             {
                 PaymentId = payment.Id,
                 ReservationId = payment.ReservationId,
@@ -242,10 +242,10 @@ public sealed class PaymentService : IPaymentService
                 PayPalOrderId = capture.Id,
                 PayPalOrderStatus = capture.Status,
                 ApprovalUrl = null,
-                DebugNote =
+                VerificationNote =
                     "Placanje je vec finalizovano, pa sacuvani provider reference sada pokazuje na PayPal capture zapis umjesto na originalni order token.",
                 Links = capture.Links
-                    .Select(x => new PayPalDebugLinkDto
+                    .Select(x => new PayPalVerificationLinkDto
                     {
                         Rel = x.Rel,
                         Method = x.Method,
@@ -254,7 +254,7 @@ public sealed class PaymentService : IPaymentService
                     .ToArray(),
                 Captures =
                 [
-                    new PayPalDebugCaptureDto
+                    new PayPalVerificationCaptureDto
                     {
                         Id = capture.Id,
                         Status = capture.Status,
@@ -273,7 +273,7 @@ public sealed class PaymentService : IPaymentService
             payment.Reservation.Flight.ArrivalAtUtc,
             DateTime.UtcNow);
 
-        return new PayPalPaymentDebugDto
+        return new PayPalPaymentVerificationDto
         {
             PaymentId = payment.Id,
             ReservationId = payment.ReservationId,
@@ -290,9 +290,9 @@ public sealed class PaymentService : IPaymentService
             PayPalOrderId = order.Id,
             PayPalOrderStatus = order.Status,
             ApprovalUrl = approvalUrl,
-            DebugNote = null,
+            VerificationNote = null,
             Links = order.Links
-                .Select(x => new PayPalDebugLinkDto
+                .Select(x => new PayPalVerificationLinkDto
                 {
                     Rel = x.Rel,
                     Method = x.Method,
@@ -301,7 +301,7 @@ public sealed class PaymentService : IPaymentService
                 .ToArray(),
             Captures = order.PurchaseUnits
                 .SelectMany(x => x.Payments?.Captures ?? [])
-                .Select(x => new PayPalDebugCaptureDto
+                .Select(x => new PayPalVerificationCaptureDto
                 {
                     Id = x.Id,
                     Status = x.Status,

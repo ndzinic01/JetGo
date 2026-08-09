@@ -157,8 +157,8 @@ class PaymentCustomer {
   }
 }
 
-class PayPalDebugSnapshot {
-  PayPalDebugSnapshot({
+class PayPalVerificationSnapshot {
+  PayPalVerificationSnapshot({
     required this.paymentId,
     required this.reservationId,
     required this.reservationCode,
@@ -172,7 +172,7 @@ class PayPalDebugSnapshot {
     required this.payPalOrderId,
     required this.payPalOrderStatus,
     required this.approvalUrl,
-    required this.debugNote,
+    required this.verificationNote,
     required this.links,
     required this.captures,
   });
@@ -190,12 +190,12 @@ class PayPalDebugSnapshot {
   final String payPalOrderId;
   final String payPalOrderStatus;
   final String? approvalUrl;
-  final String? debugNote;
-  final List<PayPalDebugLink> links;
-  final List<PayPalDebugCapture> captures;
+  final String? verificationNote;
+  final List<PayPalVerificationLink> links;
+  final List<PayPalVerificationCapture> captures;
 
-  factory PayPalDebugSnapshot.fromJson(Map<String, dynamic> json) {
-    return PayPalDebugSnapshot(
+  factory PayPalVerificationSnapshot.fromJson(Map<String, dynamic> json) {
+    return PayPalVerificationSnapshot(
       paymentId: json['paymentId'] as int? ?? 0,
       reservationId: json['reservationId'] as int? ?? 0,
       reservationCode: json['reservationCode'] as String? ?? '',
@@ -214,21 +214,26 @@ class PayPalDebugSnapshot {
       payPalOrderId: json['payPalOrderId'] as String? ?? '',
       payPalOrderStatus: json['payPalOrderStatus'] as String? ?? '',
       approvalUrl: json['approvalUrl'] as String?,
-      debugNote: json['debugNote'] as String?,
+      verificationNote: json['verificationNote'] as String?,
       links: (json['links'] as List<dynamic>? ?? const [])
-          .map((item) => PayPalDebugLink.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) =>
+                PayPalVerificationLink.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
       captures: (json['captures'] as List<dynamic>? ?? const [])
           .map(
-            (item) => PayPalDebugCapture.fromJson(item as Map<String, dynamic>),
+            (item) => PayPalVerificationCapture.fromJson(
+              item as Map<String, dynamic>,
+            ),
           )
           .toList(),
     );
   }
 }
 
-class PayPalDebugLink {
-  PayPalDebugLink({
+class PayPalVerificationLink {
+  PayPalVerificationLink({
     required this.rel,
     required this.method,
     required this.href,
@@ -238,8 +243,8 @@ class PayPalDebugLink {
   final String method;
   final String href;
 
-  factory PayPalDebugLink.fromJson(Map<String, dynamic> json) {
-    return PayPalDebugLink(
+  factory PayPalVerificationLink.fromJson(Map<String, dynamic> json) {
+    return PayPalVerificationLink(
       rel: json['rel'] as String? ?? '',
       method: json['method'] as String? ?? '',
       href: json['href'] as String? ?? '',
@@ -247,8 +252,8 @@ class PayPalDebugLink {
   }
 }
 
-class PayPalDebugCapture {
-  PayPalDebugCapture({
+class PayPalVerificationCapture {
+  PayPalVerificationCapture({
     required this.id,
     required this.status,
     required this.amount,
@@ -262,8 +267,8 @@ class PayPalDebugCapture {
   final String currency;
   final DateTime? createTimeUtc;
 
-  factory PayPalDebugCapture.fromJson(Map<String, dynamic> json) {
-    return PayPalDebugCapture(
+  factory PayPalVerificationCapture.fromJson(Map<String, dynamic> json) {
+    return PayPalVerificationCapture(
       id: json['id'] as String? ?? '',
       status: json['status'] as String? ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? 0,

@@ -23,16 +23,16 @@ class _PaymentsSectionState extends State<PaymentsSection> {
 
   bool _isLoading = true;
   bool _isDetailsLoading = false;
-  bool _isDebugLoading = false;
+  bool _isVerificationLoading = false;
   String? _errorMessage;
   String? _detailsErrorMessage;
-  String? _debugErrorMessage;
+  String? _verificationErrorMessage;
 
   List<PaymentItem> _payments = const [];
   PaymentDetails? _selectedDetails;
   int? _selectedPaymentId;
   PaymentStatusValue? _statusFilter;
-  PayPalDebugSnapshot? _debugSnapshot;
+  PayPalVerificationSnapshot? _verificationSnapshot;
 
   @override
   void initState() {
@@ -84,12 +84,15 @@ class _PaymentsSectionState extends State<PaymentsSection> {
         _selectedPaymentId = null;
         _selectedDetails = null;
         _detailsErrorMessage = null;
-        _debugSnapshot = null;
-        _debugErrorMessage = null;
+        _verificationSnapshot = null;
+        _verificationErrorMessage = null;
       } else {
-        final selectedExists = _selectedPaymentId != null &&
+        final selectedExists =
+            _selectedPaymentId != null &&
             _payments.any((item) => item.id == _selectedPaymentId);
-        final nextId = selectedExists ? _selectedPaymentId! : _payments.first.id;
+        final nextId = selectedExists
+            ? _selectedPaymentId!
+            : _payments.first.id;
         await _loadPaymentDetails(nextId, showLoader: false);
       }
     } on ApiException catch (error) {
@@ -105,10 +108,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
     }
   }
 
-  Future<void> _loadPaymentDetails(
-    int id, {
-    bool showLoader = true,
-  }) async {
+  Future<void> _loadPaymentDetails(int id, {bool showLoader = true}) async {
     if (showLoader) {
       setState(() {
         _isDetailsLoading = true;
@@ -121,10 +121,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
     }
 
     try {
-      final details = await _service.getPayment(
-        token: widget.token,
-        id: id,
-      );
+      final details = await _service.getPayment(token: widget.token, id: id);
 
       if (!mounted) {
         return;
@@ -133,8 +130,8 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       setState(() {
         _selectedPaymentId = id;
         _selectedDetails = details;
-        _debugSnapshot = null;
-        _debugErrorMessage = null;
+        _verificationSnapshot = null;
+        _verificationErrorMessage = null;
       });
     } on ApiException catch (error) {
       if (!mounted) {
@@ -164,9 +161,9 @@ class _PaymentsSectionState extends State<PaymentsSection> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openRefundDialog() async {
@@ -179,8 +176,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       context: context,
       builder: (context) => _RefundDialog(
         reservationCode: details.reservationCode,
-        amountLabel:
-            '${details.amount.toStringAsFixed(2)} ${details.currency}',
+        amountLabel: '${details.amount.toStringAsFixed(2)} ${details.currency}',
       ),
     );
 
@@ -201,8 +197,8 @@ class _PaymentsSectionState extends State<PaymentsSection> {
 
       setState(() {
         _selectedDetails = updated;
-        _debugSnapshot = null;
-        _debugErrorMessage = null;
+        _verificationSnapshot = null;
+        _verificationErrorMessage = null;
       });
       await _loadPayments(showLoader: false);
       _showMessage('Placanje je uspjesno refundirano.');
@@ -213,19 +209,19 @@ class _PaymentsSectionState extends State<PaymentsSection> {
     }
   }
 
-  Future<void> _openDebugDialog() async {
+  Future<void> _openPayPalVerification() async {
     final details = _selectedDetails;
     if (details == null) {
       return;
     }
 
     setState(() {
-      _isDebugLoading = true;
-      _debugErrorMessage = null;
+      _isVerificationLoading = true;
+      _verificationErrorMessage = null;
     });
 
     try {
-      final snapshot = await _service.getPayPalDebugSnapshot(
+      final snapshot = await _service.getPayPalVerification(
         token: widget.token,
         id: details.id,
       );
@@ -235,26 +231,26 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       }
 
       setState(() {
-        _debugSnapshot = snapshot;
+        _verificationSnapshot = snapshot;
       });
     } on ApiException catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _debugErrorMessage = error.message;
+        _verificationErrorMessage = error.message;
       });
     } catch (_) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _debugErrorMessage = 'PayPal debug trenutno nije dostupan.';
+        _verificationErrorMessage = 'PayPal provjera trenutno nije dostupna.';
       });
     } finally {
       if (mounted) {
         setState(() {
-          _isDebugLoading = false;
+          _isVerificationLoading = false;
         });
       }
     }
@@ -421,7 +417,9 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                       DataCell(Text(item.routeCode)),
                       DataCell(Text(item.provider)),
                       DataCell(
-                        Text('${item.amount.toStringAsFixed(2)} ${item.currency}'),
+                        Text(
+                          '${item.amount.toStringAsFixed(2)} ${item.currency}',
+                        ),
                       ),
                       DataCell(Text(item.status.label)),
                       DataCell(Text(_formatDateTime(item.createdAtUtc))),
@@ -455,7 +453,8 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       return const _CenteredMessage(
         icon: Icons.touch_app_rounded,
         title: 'Odaberite placanje',
-        message: 'Kliknite red iz tabele da otvorite detalje i dostupne akcije.',
+        message:
+            'Kliknite red iz tabele da otvorite detalje i dostupne akcije.',
       );
     }
 
@@ -495,7 +494,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                 label: const Text('Refundiraj'),
               ),
             FilledButton.tonalIcon(
-              onPressed: _openDebugDialog,
+              onPressed: _openPayPalVerification,
               icon: const Icon(Icons.bug_report_rounded),
               label: const Text('PayPal provjera'),
             ),
@@ -520,8 +519,14 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                 title: 'Status i timeline',
                 rows: [
                   _DetailsRow('Status', details.status.label),
-                  _DetailsRow('Kreirano', _formatDateTime(details.createdAtUtc)),
-                  _DetailsRow('Azurirano', _formatDateTime(details.updatedAtUtc)),
+                  _DetailsRow(
+                    'Kreirano',
+                    _formatDateTime(details.createdAtUtc),
+                  ),
+                  _DetailsRow(
+                    'Azurirano',
+                    _formatDateTime(details.updatedAtUtc),
+                  ),
                   _DetailsRow('Placeno u', _formatDateTime(details.paidAtUtc)),
                   _DetailsRow(
                     'Refundirano u',
@@ -538,7 +543,10 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                 title: 'Kupac',
                 rows: [
                   _DetailsRow('Ime i prezime', details.customer.fullName),
-                  _DetailsRow('Korisnicko ime', '@${details.customer.username}'),
+                  _DetailsRow(
+                    'Korisnicko ime',
+                    '@${details.customer.username}',
+                  ),
                   _DetailsRow('Email', details.customer.email),
                 ],
               ),
@@ -555,7 +563,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
                 ],
               ),
               const SizedBox(height: 16),
-              _buildDebugBlock(),
+              _buildPayPalVerificationBlock(),
             ],
           ),
         ),
@@ -563,28 +571,26 @@ class _PaymentsSectionState extends State<PaymentsSection> {
     );
   }
 
-  Widget _buildDebugBlock() {
-    if (_isDebugLoading) {
+  Widget _buildPayPalVerificationBlock() {
+    if (_isVerificationLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_debugErrorMessage != null) {
+    if (_verificationErrorMessage != null) {
       return _DetailsBlock(
         title: 'PayPal provjera',
-        rows: [
-          _DetailsRow('Greska', _debugErrorMessage!),
-        ],
+        rows: [_DetailsRow('Greska', _verificationErrorMessage!)],
       );
     }
 
-    final debug = _debugSnapshot;
-    if (debug == null) {
+    final verification = _verificationSnapshot;
+    if (verification == null) {
       return const _DetailsBlock(
         title: 'PayPal provjera',
         rows: [
           _DetailsRow(
             'Stanje',
-            'Debug snapshot nije ucitan. Kliknite "PayPal provjera" za provjeru.',
+            'PayPal provjera nije ucitana. Kliknite "PayPal provjera" za provjeru.',
           ),
         ],
       );
@@ -593,61 +599,72 @@ class _PaymentsSectionState extends State<PaymentsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ..._buildDebugSummaryRows(debug),
+        ..._buildVerificationSummaryRows(verification),
         _DetailsBlock(
           title: 'PayPal provjera',
-          rows: _buildDebugPrimaryRows(debug),
+          rows: _buildVerificationPrimaryRows(verification),
         ),
         const SizedBox(height: 12),
         _DetailsBlock(
           title: 'Capture zapisi',
-          rows: debug.captures.isEmpty
+          rows: verification.captures.isEmpty
               ? const [_DetailsRow('Capture zapisi', 'Nema capture zapisa.')]
-              : debug.captures
-                  .map(
-                    (capture) => _DetailsRow(
-                      capture.id,
-                      '${_localizePayPalStatus(capture.status)} - ${capture.amount.toStringAsFixed(2)} ${capture.currency} - ${_formatDateTime(capture.createTimeUtc)}',
-                    ),
-                  )
-                  .toList(),
+              : verification.captures
+                    .map(
+                      (capture) => _DetailsRow(
+                        capture.id,
+                        '${_localizePayPalStatus(capture.status)} - ${capture.amount.toStringAsFixed(2)} ${capture.currency} - ${_formatDateTime(capture.createTimeUtc)}',
+                      ),
+                    )
+                    .toList(),
         ),
       ],
     );
   }
 
-  List<Widget> _buildDebugSummaryRows(PayPalDebugSnapshot debug) {
-    if (debug.debugNote == null || debug.debugNote!.trim().isEmpty) {
+  List<Widget> _buildVerificationSummaryRows(
+    PayPalVerificationSnapshot verification,
+  ) {
+    if (verification.verificationNote == null ||
+        verification.verificationNote!.trim().isEmpty) {
       return const [];
     }
 
     return [
       _DetailsBlock(
         title: 'Napomena',
-        rows: [
-          _DetailsRow('Info', debug.debugNote!),
-        ],
+        rows: [_DetailsRow('Info', verification.verificationNote!)],
       ),
       const SizedBox(height: 12),
     ];
   }
 
-  List<_DetailsRow> _buildDebugPrimaryRows(PayPalDebugSnapshot debug) {
-    final isCapture = debug.payPalResourceType.toLowerCase() == 'capture';
+  List<_DetailsRow> _buildVerificationPrimaryRows(
+    PayPalVerificationSnapshot verification,
+  ) {
+    final isCapture =
+        verification.payPalResourceType.toLowerCase() == 'capture';
     final resourceIdLabel = isCapture ? 'ID capture zapisa' : 'ID narudzbe';
-    final resourceStatusLabel =
-        isCapture ? 'Status capture zapisa' : 'Status narudzbe';
+    final resourceStatusLabel = isCapture
+        ? 'Status capture zapisa'
+        : 'Status narudzbe';
 
     return [
-      _DetailsRow('Tip resursa', _localizePayPalResourceType(debug.payPalResourceType)),
-      _DetailsRow(resourceIdLabel, debug.payPalOrderId),
-      _DetailsRow(resourceStatusLabel, _localizePayPalStatus(debug.payPalOrderStatus)),
-      _DetailsRow('Status placanja', debug.paymentStatus.label),
-      _DetailsRow('Status rezervacije', debug.reservationStatus.label),
+      _DetailsRow(
+        'Tip resursa',
+        _localizePayPalResourceType(verification.payPalResourceType),
+      ),
+      _DetailsRow(resourceIdLabel, verification.payPalOrderId),
+      _DetailsRow(
+        resourceStatusLabel,
+        _localizePayPalStatus(verification.payPalOrderStatus),
+      ),
+      _DetailsRow('Status placanja', verification.paymentStatus.label),
+      _DetailsRow('Status rezervacije', verification.reservationStatus.label),
       _DetailsRow(
         'URL odobrenja',
-        debug.approvalUrl ?? '-',
-        linkUrl: debug.approvalUrl,
+        verification.approvalUrl ?? '-',
+        linkUrl: verification.approvalUrl,
       ),
     ];
   }
@@ -750,19 +767,16 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
 }
 
 class _DetailsBlock extends StatelessWidget {
-  const _DetailsBlock({
-    required this.title,
-    required this.rows,
-  });
+  const _DetailsBlock({required this.title, required this.rows});
 
   final String title;
   final List<_DetailsRow> rows;
@@ -772,10 +786,7 @@ class _DetailsBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         ...rows.map(
           (row) => Padding(
@@ -788,9 +799,8 @@ class _DetailsBlock extends StatelessWidget {
                   child: Text(
                     row.label,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -840,7 +850,9 @@ class _OpenLinkButton extends StatelessWidget {
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Otvaranje linka trenutno nije dostupno.')),
+        const SnackBar(
+          content: Text('Otvaranje linka trenutno nije dostupno.'),
+        ),
       );
     }
   }

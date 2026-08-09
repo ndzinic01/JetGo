@@ -53,15 +53,15 @@ public sealed class PaymentsController : ControllerBase
         return Ok(response);
     }
 
-    [HttpGet("{id:int}/debug-paypal")]
+    [HttpGet("{id:int}/paypal-verification")]
     [Authorize(Roles = RoleNames.Admin)]
-    [ProducesResponseType(typeof(PayPalPaymentDebugDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<PayPalPaymentDebugDto>> DebugPayPal(
+    [ProducesResponseType(typeof(PayPalPaymentVerificationDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PayPalPaymentVerificationDto>> VerifyPayPal(
         int id,
         [FromQuery] string? callbackToken,
         CancellationToken cancellationToken)
     {
-        var response = await _paymentService.GetPayPalDebugSnapshotAsync(id, callbackToken, cancellationToken);
+        var response = await _paymentService.GetPayPalVerificationAsync(id, callbackToken, cancellationToken);
         return Ok(response);
     }
 

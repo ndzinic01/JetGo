@@ -2,7 +2,7 @@ using JetGo.Domain.Enums;
 
 namespace JetGo.Application.DTOs.Payments;
 
-public sealed class PayPalPaymentDebugDto
+public sealed class PayPalPaymentVerificationDto
 {
     public int PaymentId { get; init; }
 
@@ -30,9 +30,9 @@ public sealed class PayPalPaymentDebugDto
 
     public string? ApprovalUrl { get; init; }
 
-    public string? DebugNote { get; init; }
+    public string? VerificationNote { get; init; }
 
-    public IReadOnlyCollection<PayPalDebugLinkDto> Links { get; init; } = Array.Empty<PayPalDebugLinkDto>();
+    public IReadOnlyCollection<PayPalVerificationLinkDto> Links { get; init; } = Array.Empty<PayPalVerificationLinkDto>();
 
-    public IReadOnlyCollection<PayPalDebugCaptureDto> Captures { get; init; } = Array.Empty<PayPalDebugCaptureDto>();
+    public IReadOnlyCollection<PayPalVerificationCaptureDto> Captures { get; init; } = Array.Empty<PayPalVerificationCaptureDto>();
 }
