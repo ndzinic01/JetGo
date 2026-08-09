@@ -45,7 +45,36 @@ internal static class ApiEnvironmentSettingsLoader
                 UseSsl = EnvironmentVariableReader.GetRequiredBool("JETGO_SMTP_USE_SSL"),
                 FromEmail = EnvironmentVariableReader.GetRequired("JETGO_SMTP_FROM_EMAIL"),
                 FromName = EnvironmentVariableReader.GetRequired("JETGO_SMTP_FROM_NAME")
+            },
+            Cors = new CorsSettings
+            {
+                AllowedOrigins = ParseRequiredCsv("JETGO_CORS_ALLOWED_ORIGINS")
             }
         };
+    }
+
+    private static string[] ParseRequiredCsv(string variableName)
+    {
+        var values = EnvironmentVariableReader.GetRequired(variableName)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (values.Length == 0)
+        {
+            throw new InvalidOperationException($"Environment variable '{variableName}' must contain at least one value.");
+        }
+
+        foreach (var value in values)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new InvalidOperationException($"Environment variable '{variableName}' contains invalid origin '{value}'. Use values like http://localhost:5000.");
+            }
+        }
+
+        return values;
     }
 }

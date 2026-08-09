@@ -183,6 +183,7 @@ Najbitnije varijable:
 - `JETGO_SMTP_USE_SSL`
 - `JETGO_SMTP_FROM_EMAIL`
 - `JETGO_SMTP_FROM_NAME`
+- `JETGO_CORS_ALLOWED_ORIGINS`
 
 Napomena:
 

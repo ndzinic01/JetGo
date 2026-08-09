@@ -1,3 +1,5 @@
+import 'mobile_status_values.dart';
+
 class PagedResult<T> {
   PagedResult({
     required this.items,
@@ -126,7 +128,7 @@ class MobileFlight {
       currency: json['currency'] as String? ?? '',
       availableSeats: json['availableSeats'] as int? ?? 0,
       totalSeats: json['totalSeats'] as int? ?? 0,
-      status: json['status'] as int? ?? 0,
+      status: json['status'] as int? ?? MobileFlightStatus.unknown,
     );
   }
 }
@@ -204,7 +206,7 @@ class MobileFlightDetails {
       availableSeats: json['availableSeats'] as int? ?? 0,
       totalSeats: json['totalSeats'] as int? ?? 0,
       reservedSeats: json['reservedSeats'] as int? ?? 0,
-      status: json['status'] as int? ?? 0,
+      status: json['status'] as int? ?? MobileFlightStatus.unknown,
       seatNumbers: ((json['seatNumbers'] as List<dynamic>?) ?? const [])
           .map((item) => item.toString())
           .toList(),
@@ -272,7 +274,7 @@ class MobileReservation {
       arrivalAtUtc: json['arrivalAtUtc'] != null
           ? DateTime.parse(json['arrivalAtUtc'] as String)
           : null,
-      status: json['status'] as int? ?? 0,
+      status: json['status'] as int? ?? MobileReservationStatus.unknown,
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? '',
       paymentId: json['paymentId'] as int?,
@@ -407,7 +409,7 @@ class MobileReservationDetails {
       arrivalAirportCode: json['arrivalAirportCode'] as String? ?? '',
       departureAtUtc: DateTime.parse(json['departureAtUtc'] as String),
       arrivalAtUtc: DateTime.parse(json['arrivalAtUtc'] as String),
-      status: json['status'] as int? ?? 0,
+      status: json['status'] as int? ?? MobileReservationStatus.unknown,
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? '',
       seatsTotalAmount: (json['seatsTotalAmount'] as num?)?.toDouble() ?? 0,
@@ -496,7 +498,7 @@ class MobilePaymentDetails {
       approvalUrl: json['approvalUrl'] as String?,
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? 'BAM',
-      status: json['status'] as int? ?? 1,
+      status: json['status'] as int? ?? MobilePaymentStatus.pending,
       isPaid: json['isPaid'] as bool? ?? false,
       createdAtUtc: json['createdAtUtc'] == null
           ? null
@@ -616,7 +618,7 @@ class MobileRecommendedFlight {
       currency: json['currency'] as String? ?? 'BAM',
       availableSeats: json['availableSeats'] as int? ?? 0,
       totalSeats: json['totalSeats'] as int? ?? 0,
-      status: json['status'] as int? ?? 0,
+      status: json['status'] as int? ?? MobileFlightStatus.unknown,
       recommendationScore: json['recommendationScore'] as int? ?? 0,
       exactRouteSearchCount: json['exactRouteSearchCount'] as int? ?? 0,
       keywordSearchCount: json['keywordSearchCount'] as int? ?? 0,
@@ -689,14 +691,14 @@ class MobileNotification {
   final DateTime createdAtUtc;
   final DateTime? readAtUtc;
 
-  bool get isUnread => status == 1;
+  bool get isUnread => status == MobileNotificationStatus.unread;
 
   factory MobileNotification.fromJson(Map<String, dynamic> json) {
     return MobileNotification(
       id: json['id'] as int? ?? 0,
       title: json['title'] as String? ?? '',
       body: json['body'] as String? ?? '',
-      status: json['status'] as int? ?? 0,
+      status: json['status'] as int? ?? MobileNotificationStatus.unknown,
       createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
       readAtUtc: json['readAtUtc'] == null
           ? null

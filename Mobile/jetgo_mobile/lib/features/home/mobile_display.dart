@@ -1,3 +1,5 @@
+import 'mobile_status_values.dart';
+
 class MobileDisplay {
   static String flightNumberLabel(String value) {
     final normalized = value.trim();
@@ -22,13 +24,13 @@ class MobileDisplay {
 
   static String flightStatusLabel(int status) {
     switch (status) {
-      case 1:
+      case MobileFlightStatus.scheduled:
         return 'Zakazan';
-      case 2:
+      case MobileFlightStatus.delayed:
         return 'Kasni';
-      case 3:
+      case MobileFlightStatus.cancelled:
         return 'Otkazan';
-      case 4:
+      case MobileFlightStatus.completed:
         return 'Zavrsen';
       default:
         return 'Nepoznato';
@@ -37,13 +39,13 @@ class MobileDisplay {
 
   static String reservationStatusLabel(int status) {
     switch (status) {
-      case 1:
+      case MobileReservationStatus.pending:
         return 'Na cekanju';
-      case 2:
+      case MobileReservationStatus.confirmed:
         return 'Potvrdjena';
-      case 3:
+      case MobileReservationStatus.cancelled:
         return 'Otkazana';
-      case 4:
+      case MobileReservationStatus.completed:
         return 'Zavrsena';
       default:
         return 'Nepoznato';
@@ -52,9 +54,9 @@ class MobileDisplay {
 
   static String notificationStatusLabel(int status) {
     switch (status) {
-      case 1:
+      case MobileNotificationStatus.unread:
         return 'Neprocitana';
-      case 2:
+      case MobileNotificationStatus.read:
         return 'Procitana';
       default:
         return 'Nepoznato';
@@ -63,13 +65,13 @@ class MobileDisplay {
 
   static String paymentStatusLabel(int? status) {
     switch (status) {
-      case 1:
+      case MobilePaymentStatus.pending:
         return 'Na cekanju';
-      case 2:
+      case MobilePaymentStatus.paid:
         return 'Placeno';
-      case 3:
+      case MobilePaymentStatus.failed:
         return 'Neuspjelo';
-      case 4:
+      case MobilePaymentStatus.refunded:
         return 'Refundirano';
       default:
         return 'Nepoznato';

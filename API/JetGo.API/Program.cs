@@ -5,6 +5,8 @@ using JetGo.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 
+const string CorsPolicyName = "JetGoCorsPolicy";
+
 var builder = WebApplication.CreateBuilder(args);
 DotEnvLoader.LoadNearest(builder.Environment.ContentRootPath);
 var environmentSettings = ApiEnvironmentSettingsLoader.Load();
@@ -32,6 +34,16 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(CorsPolicyName, policy =>
+    {
+        policy
+            .WithOrigins(environmentSettings.Cors.AllowedOrigins.ToArray())
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -91,6 +103,7 @@ if (!isRunningInContainer)
     app.UseHttpsRedirection();
 }
 
+app.UseCors(CorsPolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 

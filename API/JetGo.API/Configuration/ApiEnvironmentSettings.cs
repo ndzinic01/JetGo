@@ -13,4 +13,6 @@ internal sealed class ApiEnvironmentSettings
     public PayPalSettings PayPal { get; init; } = new();
 
     public SmtpSettings Smtp { get; init; } = new();
+
+    public CorsSettings Cors { get; init; } = new();
 }

@@ -7,6 +7,7 @@ import 'create_support_message_screen.dart';
 import 'mobile_data_service.dart';
 import 'mobile_display.dart';
 import 'mobile_models.dart';
+import 'mobile_status_values.dart';
 
 enum PayPalReturnStatus {
   approved,
@@ -327,7 +328,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     final canInitializePayment =
         !details.isPaid && (details.canInitiatePayment || _hasPendingPayment(details));
     final canConfirmPayment =
-        !details.isPaid && effectivePaymentId != null && effectivePaymentStatus == 1;
+        !details.isPaid &&
+            effectivePaymentId != null &&
+            effectivePaymentStatus == MobilePaymentStatus.pending;
 
     return Card(
       child: Padding(
@@ -544,7 +547,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
   bool _hasPendingPayment(MobileReservationDetails details) {
     final paymentStatus = _paymentDetails?.status ?? details.paymentStatus;
-    return details.paymentId != null && !details.isPaid && paymentStatus == 1;
+    return details.paymentId != null &&
+        !details.isPaid &&
+        paymentStatus == MobilePaymentStatus.pending;
   }
 
   Future<void> _initializePayment(MobileReservationDetails details) async {
@@ -575,7 +580,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              payment.status == 1
+              payment.status == MobilePaymentStatus.pending
                   ? 'PayPal link za odobrenje trenutno nije dostupan. Ako ste placanje vec odobrili ranije, kliknite "2. Zavrsi placanje".'
                   : 'Placanje je inicirano, ali PayPal link za odobrenje trenutno nije dostupan.',
             ),

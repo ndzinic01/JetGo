@@ -182,7 +182,7 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> _send(
+  Future<Object?> _send(
     String method,
     String path, {
     String? token,
