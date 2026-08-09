@@ -13,10 +13,11 @@ public sealed class UpdateAdminUserRequest
     public string LastName { get; init; } = string.Empty;
 
     [Required(ErrorMessage = "Email adresa je obavezna.")]
-    [EmailAddress(ErrorMessage = "Unesite validnu email adresu.")]
+    [EmailAddress(ErrorMessage = "Email adresa mora biti u formatu korisnik@domena.com.")]
     [MaxLength(256, ErrorMessage = "Email adresa moze sadrzavati maksimalno 256 karaktera.")]
     public string Email { get; init; } = string.Empty;
 
+    [RegularExpression(@"^\+?[0-9][0-9\s\-\/]{6,19}$", ErrorMessage = "Broj telefona mora biti u formatu +38761123456 ili 061123456.")]
     [MaxLength(50, ErrorMessage = "Broj telefona moze sadrzavati maksimalno 50 karaktera.")]
     public string? PhoneNumber { get; init; }
 

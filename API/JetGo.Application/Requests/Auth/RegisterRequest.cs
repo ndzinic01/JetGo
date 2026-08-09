@@ -17,11 +17,11 @@ public sealed class RegisterRequest
     public string LastName { get; init; } = string.Empty;
 
     [Required(ErrorMessage = "Email adresa je obavezna.")]
-    [EmailAddress(ErrorMessage = "Unesite validnu email adresu u formatu korisnik@domena.com.")]
+    [EmailAddress(ErrorMessage = "Email adresa mora biti u formatu korisnik@domena.com.")]
     [MaxLength(200, ErrorMessage = "Email adresa moze sadrzavati maksimalno 200 karaktera.")]
     public string Email { get; init; } = string.Empty;
 
-    [Phone(ErrorMessage = "Unesite validan broj telefona.")]
+    [RegularExpression(@"^\+?[0-9][0-9\s\-\/]{6,19}$", ErrorMessage = "Broj telefona mora biti u formatu +38761123456 ili 061123456.")]
     [MaxLength(30, ErrorMessage = "Broj telefona moze sadrzavati maksimalno 30 karaktera.")]
     public string? PhoneNumber { get; init; }
 

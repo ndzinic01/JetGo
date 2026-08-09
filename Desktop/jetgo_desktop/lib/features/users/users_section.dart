@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
+import '../../core/validation/input_validators.dart';
 import 'users_models.dart';
 import 'users_service.dart';
 
@@ -91,10 +92,12 @@ class _UsersSectionState extends State<UsersSection> {
         _selectedDetails = null;
         _detailsErrorMessage = null;
       } else {
-        final selectedExists = _selectedUserId != null &&
+        final selectedExists =
+            _selectedUserId != null &&
             _users.any((item) => item.userId == _selectedUserId);
-        final nextUserId =
-            selectedExists ? _selectedUserId! : _users.first.userId;
+        final nextUserId = selectedExists
+            ? _selectedUserId!
+            : _users.first.userId;
         await _loadUserDetails(nextUserId, showLoader: false);
       }
     } on ApiException catch (error) {
@@ -110,10 +113,7 @@ class _UsersSectionState extends State<UsersSection> {
     }
   }
 
-  Future<void> _loadUserDetails(
-    String userId, {
-    bool showLoader = true,
-  }) async {
+  Future<void> _loadUserDetails(String userId, {bool showLoader = true}) async {
     if (showLoader) {
       setState(() {
         _isDetailsLoading = true;
@@ -167,9 +167,9 @@ class _UsersSectionState extends State<UsersSection> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openEditDialog() async {
@@ -178,45 +178,30 @@ class _UsersSectionState extends State<UsersSection> {
       return;
     }
 
-    final value = await showDialog<_EditUserFormValue>(
+    final updated = await showDialog<AdminUserDetails>(
       context: context,
       builder: (context) => _EditUserDialog(
         initial: details,
         supportedRoles: _supportedRoles,
         isCurrentUser: details.userId == widget.currentUserId,
+        token: widget.token,
+        service: _service,
       ),
     );
 
-    if (value == null) {
+    if (updated == null) {
       return;
     }
 
-    try {
-      final updated = await _service.updateUser(
-        token: widget.token,
-        userId: details.userId,
-        firstName: value.firstName,
-        lastName: value.lastName,
-        email: value.email,
-        phoneNumber: value.phoneNumber,
-        imageUrl: value.imageUrl,
-        roles: value.roles,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _selectedDetails = updated;
-      });
-      await _loadUsers(showLoader: false);
-      _showMessage('Korisnik je uspjesno azuriran.');
-    } on ApiException catch (error) {
-      _showMessage(error.message);
-    } catch (_) {
-      _showMessage('Azuriranje korisnika trenutno nije dostupno.');
+    if (!mounted) {
+      return;
     }
+
+    setState(() {
+      _selectedDetails = updated;
+    });
+    await _loadUsers(showLoader: false);
+    _showMessage('Korisnik je uspjesno azuriran.');
   }
 
   Future<void> _toggleActivation() async {
@@ -230,7 +215,9 @@ class _UsersSectionState extends State<UsersSection> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(nextActive ? 'Aktiviraj korisnika' : 'Deaktiviraj korisnika'),
+          title: Text(
+            nextActive ? 'Aktiviraj korisnika' : 'Deaktiviraj korisnika',
+          ),
           content: Text(
             nextActive
                 ? 'Da li ste sigurni da zelite aktivirati korisnika @${details.username}?'
@@ -499,9 +486,7 @@ class _UsersSectionState extends State<UsersSection> {
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 180),
                           child: Text(
-                            item.fullName.trim().isEmpty
-                                ? '-'
-                                : item.fullName,
+                            item.fullName.trim().isEmpty ? '-' : item.fullName,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -515,9 +500,13 @@ class _UsersSectionState extends State<UsersSection> {
                           ),
                         ),
                       ),
-                      DataCell(Text(item.phoneNumber?.trim().isNotEmpty == true
-                          ? item.phoneNumber!
-                          : '-')),
+                      DataCell(
+                        Text(
+                          item.phoneNumber?.trim().isNotEmpty == true
+                              ? item.phoneNumber!
+                              : '-',
+                        ),
+                      ),
                       DataCell(Text(item.roles.join(', '))),
                       DataCell(Text(item.isActive ? 'Aktivan' : 'Neaktivan')),
                       DataCell(Text(item.reservationsCount.toString())),
@@ -616,8 +605,7 @@ class _UsersSectionState extends State<UsersSection> {
                   ? 'Resetuj lozinku odabranom korisniku'
                   : 'Vlastitu lozinku promijenite kroz Moj profil, uz unos trenutne lozinke.',
               child: FilledButton.tonalIcon(
-                onPressed:
-                    canResetPassword ? _openResetPasswordDialog : null,
+                onPressed: canResetPassword ? _openResetPasswordDialog : null,
                 icon: const Icon(Icons.lock_reset_rounded),
                 label: const Text('Resetuj lozinku'),
               ),
@@ -766,19 +754,16 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
 }
 
 class _DetailsBlock extends StatelessWidget {
-  const _DetailsBlock({
-    required this.title,
-    required this.rows,
-  });
+  const _DetailsBlock({required this.title, required this.rows});
 
   final String title;
   final List<_DetailsRow> rows;
@@ -788,10 +773,7 @@ class _DetailsBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         ...rows.map(
           (row) => Padding(
@@ -804,9 +786,8 @@ class _DetailsBlock extends StatelessWidget {
                   child: Text(
                     row.label,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -832,11 +813,15 @@ class _EditUserDialog extends StatefulWidget {
     required this.initial,
     required this.supportedRoles,
     required this.isCurrentUser,
+    required this.token,
+    required this.service,
   });
 
   final AdminUserDetails initial;
   final List<String> supportedRoles;
   final bool isCurrentUser;
+  final String token;
+  final UsersService service;
 
   @override
   State<_EditUserDialog> createState() => _EditUserDialogState();
@@ -850,17 +835,24 @@ class _EditUserDialogState extends State<_EditUserDialog> {
   late final TextEditingController _phoneNumberController;
   late final TextEditingController _imageUrlController;
   late List<String> _selectedRoles;
+  bool _isSubmitting = false;
+  String? _errorMessage;
+  ApiException? _serverError;
 
   @override
   void initState() {
     super.initState();
-    _firstNameController =
-        TextEditingController(text: widget.initial.firstName);
+    _firstNameController = TextEditingController(
+      text: widget.initial.firstName,
+    );
     _lastNameController = TextEditingController(text: widget.initial.lastName);
     _emailController = TextEditingController(text: widget.initial.email);
-    _phoneNumberController =
-        TextEditingController(text: widget.initial.phoneNumber ?? '');
-    _imageUrlController = TextEditingController(text: widget.initial.imageUrl ?? '');
+    _phoneNumberController = TextEditingController(
+      text: widget.initial.phoneNumber ?? '',
+    );
+    _imageUrlController = TextEditingController(
+      text: widget.initial.imageUrl ?? '',
+    );
     _selectedRoles = List<String>.from(widget.initial.roles);
   }
 
@@ -886,17 +878,24 @@ class _EditUserDialogState extends State<_EditUserDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_errorMessage != null) ...[
+                  _DialogError(message: _errorMessage!),
+                  const SizedBox(height: 12),
+                ],
                 Row(
                   children: [
                     Expanded(
                       child: TextFormField(
                         controller: _firstNameController,
                         decoration: const InputDecoration(labelText: 'Ime'),
+                        onChanged: (_) => _clearServerErrors(),
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Ime je obavezno.';
-                          }
-                          return null;
+                          return InputValidators.requiredText(
+                                value,
+                                fieldName: 'Ime',
+                                maxLength: 100,
+                              ) ??
+                              _serverError?.fieldError('FirstName');
                         },
                       ),
                     ),
@@ -905,11 +904,14 @@ class _EditUserDialogState extends State<_EditUserDialog> {
                       child: TextFormField(
                         controller: _lastNameController,
                         decoration: const InputDecoration(labelText: 'Prezime'),
+                        onChanged: (_) => _clearServerErrors(),
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Prezime je obavezno.';
-                          }
-                          return null;
+                          return InputValidators.requiredText(
+                                value,
+                                fieldName: 'Prezime',
+                                maxLength: 100,
+                              ) ??
+                              _serverError?.fieldError('LastName');
                         },
                       ),
                     ),
@@ -919,23 +921,31 @@ class _EditUserDialogState extends State<_EditUserDialog> {
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(labelText: 'Email'),
+                  keyboardType: TextInputType.emailAddress,
+                  onChanged: (_) => _clearServerErrors(),
                   validator: (value) {
-                    final email = value?.trim() ?? '';
-                    if (email.isEmpty || !email.contains('@')) {
-                      return 'Unesite validan email.';
-                    }
-                    return null;
+                    return InputValidators.email(value) ??
+                        _serverError?.fieldError('Email');
                   },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _phoneNumberController,
                   decoration: const InputDecoration(labelText: 'Telefon'),
+                  keyboardType: TextInputType.phone,
+                  onChanged: (_) => _clearServerErrors(),
+                  validator: (value) {
+                    return InputValidators.phone(value) ??
+                        _serverError?.fieldError('PhoneNumber');
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _imageUrlController,
                   decoration: const InputDecoration(labelText: 'URL slike'),
+                  keyboardType: TextInputType.url,
+                  onChanged: (_) => _clearServerErrors(),
+                  validator: (_) => _serverError?.fieldError('ImageUrl'),
                 ),
                 const SizedBox(height: 16),
                 Align(
@@ -951,9 +961,8 @@ class _EditUserDialogState extends State<_EditUserDialog> {
                   runSpacing: 8,
                   children: widget.supportedRoles.map((role) {
                     final isSelected = _selectedRoles.contains(role);
-                    final isLockedAdminRole = widget.isCurrentUser &&
-                        role == 'Admin' &&
-                        isSelected;
+                    final isLockedAdminRole =
+                        widget.isCurrentUser && role == 'Admin' && isSelected;
 
                     return FilterChip(
                       label: Text(role),
@@ -967,9 +976,12 @@ class _EditUserDialogState extends State<_EditUserDialog> {
                                     _selectedRoles = [..._selectedRoles, role];
                                   }
                                 } else {
-                                  _selectedRoles =
-                                      _selectedRoles.where((item) => item != role).toList();
+                                  _selectedRoles = _selectedRoles
+                                      .where((item) => item != role)
+                                      .toList();
                                 }
+                                _serverError = null;
+                                _errorMessage = null;
                               });
                             },
                     );
@@ -986,6 +998,16 @@ class _EditUserDialogState extends State<_EditUserDialog> {
                       ),
                     ),
                   ),
+                if (_serverError?.fieldError('Roles') != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _serverError!.fieldError('Roles')!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -993,33 +1015,131 @@ class _EditUserDialogState extends State<_EditUserDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
           child: const Text('Odustani'),
         ),
         FilledButton(
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) {
-              return;
-            }
-            if (_selectedRoles.isEmpty) {
-              setState(() {});
-              return;
-            }
-
-            Navigator.of(context).pop(
-              _EditUserFormValue(
-                firstName: _firstNameController.text.trim(),
-                lastName: _lastNameController.text.trim(),
-                email: _emailController.text.trim(),
-                phoneNumber: _phoneNumberController.text.trim(),
-                imageUrl: _imageUrlController.text.trim(),
-                roles: _selectedRoles,
-              ),
-            );
-          },
-          child: const Text('Sacuvaj'),
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Sacuvaj'),
         ),
       ],
+    );
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _errorMessage = null;
+      _serverError = null;
+    });
+
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    if (_selectedRoles.isEmpty) {
+      setState(() {});
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final updated = await widget.service.updateUser(
+        token: widget.token,
+        userId: widget.initial.userId,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phoneNumber: _phoneNumberController.text.trim(),
+        imageUrl: _imageUrlController.text.trim(),
+        roles: _selectedRoles,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop(updated);
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final hasFieldErrors = _hasUserFieldErrors(error);
+      setState(() {
+        _serverError = error;
+        _errorMessage = hasFieldErrors ? null : error.message;
+      });
+      _formKey.currentState?.validate();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _errorMessage = 'Azuriranje korisnika trenutno nije dostupno.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  bool _hasUserFieldErrors(ApiException error) {
+    return const [
+      'FirstName',
+      'LastName',
+      'Email',
+      'PhoneNumber',
+      'ImageUrl',
+      'Roles',
+    ].any((fieldName) => error.fieldError(fieldName) != null);
+  }
+
+  void _clearServerErrors() {
+    if (_serverError == null && _errorMessage == null) {
+      return;
+    }
+
+    setState(() {
+      _serverError = null;
+      _errorMessage = null;
+    });
+  }
+}
+
+class _DialogError extends StatelessWidget {
+  const _DialogError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        message,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onErrorContainer,
+        ),
+      ),
     );
   }
 }
@@ -1134,24 +1254,6 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
       ],
     );
   }
-}
-
-class _EditUserFormValue {
-  const _EditUserFormValue({
-    required this.firstName,
-    required this.lastName,
-    required this.email,
-    required this.phoneNumber,
-    required this.imageUrl,
-    required this.roles,
-  });
-
-  final String firstName;
-  final String lastName;
-  final String email;
-  final String phoneNumber;
-  final String imageUrl;
-  final List<String> roles;
 }
 
 class _ResetPasswordFormValue {

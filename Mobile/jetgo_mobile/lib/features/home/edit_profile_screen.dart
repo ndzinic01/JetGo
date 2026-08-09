@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
+import '../../core/validation/input_validators.dart';
 import 'mobile_data_service.dart';
 import 'mobile_models.dart';
 
@@ -29,15 +30,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _imageUrlController;
 
   bool _isSubmitting = false;
+  String? _formErrorMessage;
+  ApiException? _serverError;
 
   @override
   void initState() {
     super.initState();
-    _firstNameController = TextEditingController(text: widget.profile.firstName);
+    _firstNameController = TextEditingController(
+      text: widget.profile.firstName,
+    );
     _lastNameController = TextEditingController(text: widget.profile.lastName);
     _emailController = TextEditingController(text: widget.profile.email);
-    _phoneController = TextEditingController(text: widget.profile.phoneNumber ?? '');
-    _imageUrlController = TextEditingController(text: widget.profile.imageUrl ?? '');
+    _phoneController = TextEditingController(
+      text: widget.profile.phoneNumber ?? '',
+    );
+    _imageUrlController = TextEditingController(
+      text: widget.profile.imageUrl ?? '',
+    );
   }
 
   @override
@@ -51,8 +60,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    setState(() {
+      _formErrorMessage = null;
+      _serverError = null;
+    });
+
     final form = _formKey.currentState;
-    if (form == null || !form.validate() || _isSubmitting) {
+    if (form == null || !form.validate()) {
       return;
     }
 
@@ -76,9 +94,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       Navigator.of(context).pop(updated);
     } on ApiException catch (error) {
-      _showMessage(error.message);
+      final hasFieldErrors = _hasProfileFieldErrors(error);
+      setState(() {
+        _serverError = error;
+        _formErrorMessage = hasFieldErrors ? null : error.message;
+      });
+      _formKey.currentState?.validate();
     } catch (_) {
-      _showMessage('Izmjena profila trenutno nije dostupna. Pokusajte ponovo.');
+      setState(() {
+        _formErrorMessage =
+            'Izmjena profila trenutno nije dostupna. Pokusajte ponovo.';
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -88,10 +114,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+  bool _hasProfileFieldErrors(ApiException error) {
+    return const [
+      'FirstName',
+      'LastName',
+      'Email',
+      'PhoneNumber',
+      'ImageUrl',
+    ].any((fieldName) => error.fieldError(fieldName) != null);
+  }
+
+  void _clearServerErrors() {
+    if (_serverError == null && _formErrorMessage == null) {
+      return;
+    }
+
+    setState(() {
+      _serverError = null;
+      _formErrorMessage = null;
+    });
   }
 
   @override
@@ -104,15 +145,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (_formErrorMessage != null) ...[
+                _InlineFormError(message: _formErrorMessage!),
+                const SizedBox(height: 12),
+              ],
               TextFormField(
                 controller: _firstNameController,
                 maxLength: 100,
                 decoration: const InputDecoration(labelText: 'Ime'),
+                onChanged: (_) => _clearServerErrors(),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Ime je obavezno.';
-                  }
-                  return null;
+                  return InputValidators.requiredText(
+                        value,
+                        fieldName: 'Ime',
+                        maxLength: 100,
+                      ) ??
+                      _serverError?.fieldError('FirstName');
                 },
               ),
               const SizedBox(height: 12),
@@ -120,11 +168,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 controller: _lastNameController,
                 maxLength: 100,
                 decoration: const InputDecoration(labelText: 'Prezime'),
+                onChanged: (_) => _clearServerErrors(),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Prezime je obavezno.';
-                  }
-                  return null;
+                  return InputValidators.requiredText(
+                        value,
+                        fieldName: 'Prezime',
+                        maxLength: 100,
+                      ) ??
+                      _serverError?.fieldError('LastName');
                 },
               ),
               const SizedBox(height: 12),
@@ -133,15 +184,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 keyboardType: TextInputType.emailAddress,
                 maxLength: 200,
                 decoration: const InputDecoration(labelText: 'Email'),
+                onChanged: (_) => _clearServerErrors(),
                 validator: (value) {
-                  final trimmed = value?.trim() ?? '';
-                  if (trimmed.isEmpty) {
-                    return 'Email je obavezan.';
-                  }
-                  if (!trimmed.contains('@') || !trimmed.contains('.')) {
-                    return 'Unesite validan email.';
-                  }
-                  return null;
+                  return InputValidators.email(value) ??
+                      _serverError?.fieldError('Email');
                 },
               ),
               const SizedBox(height: 12),
@@ -150,6 +196,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 keyboardType: TextInputType.phone,
                 maxLength: 30,
                 decoration: const InputDecoration(labelText: 'Telefon'),
+                onChanged: (_) => _clearServerErrors(),
+                validator: (value) {
+                  return InputValidators.phone(value) ??
+                      _serverError?.fieldError('PhoneNumber');
+                },
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -160,6 +211,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   labelText: 'URL slike',
                   hintText: 'Opcionalno',
                 ),
+                onChanged: (_) => _clearServerErrors(),
+                validator: (_) => _serverError?.fieldError('ImageUrl'),
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
@@ -175,6 +228,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineFormError extends StatelessWidget {
+  const _InlineFormError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        message,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onErrorContainer,
         ),
       ),
     );

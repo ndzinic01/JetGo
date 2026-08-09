@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_controller.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/validation/input_validators.dart';
 import 'profile_models.dart';
 import 'profile_service.dart';
 
@@ -109,10 +110,8 @@ class _ProfileSectionState extends State<ProfileSection> {
   Future<void> _openChangePasswordDialog() async {
     final changed = await showDialog<bool>(
       context: context,
-      builder: (context) => _ChangePasswordDialog(
-        token: widget.token,
-        service: _service,
-      ),
+      builder: (context) =>
+          _ChangePasswordDialog(token: widget.token, service: _service),
     );
 
     if (changed == true && mounted) {
@@ -125,9 +124,9 @@ class _ProfileSectionState extends State<ProfileSection> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -293,10 +292,7 @@ class _ProfileAvatar extends StatelessWidget {
           : null,
       child: imageUrl != null && imageUrl.isNotEmpty
           ? null
-          : Text(
-              initials,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+          : Text(initials, style: Theme.of(context).textTheme.titleMedium),
     );
   }
 
@@ -344,18 +340,22 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   late final TextEditingController _imageUrlController;
   bool _isSubmitting = false;
   String? _errorMessage;
+  ApiException? _serverError;
 
   @override
   void initState() {
     super.initState();
-    _firstNameController =
-        TextEditingController(text: widget.profile.firstName);
+    _firstNameController = TextEditingController(
+      text: widget.profile.firstName,
+    );
     _lastNameController = TextEditingController(text: widget.profile.lastName);
     _emailController = TextEditingController(text: widget.profile.email);
-    _phoneController =
-        TextEditingController(text: widget.profile.phoneNumber ?? '');
-    _imageUrlController =
-        TextEditingController(text: widget.profile.imageUrl ?? '');
+    _phoneController = TextEditingController(
+      text: widget.profile.phoneNumber ?? '',
+    );
+    _imageUrlController = TextEditingController(
+      text: widget.profile.imageUrl ?? '',
+    );
   }
 
   @override
@@ -369,13 +369,21 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _isSubmitting) {
+    if (_isSubmitting) {
+      return;
+    }
+
+    setState(() {
+      _errorMessage = null;
+      _serverError = null;
+    });
+
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
     setState(() {
       _isSubmitting = true;
-      _errorMessage = null;
     });
 
     try {
@@ -398,9 +406,12 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
         return;
       }
 
+      final hasFieldErrors = _hasProfileFieldErrors(error);
       setState(() {
-        _errorMessage = error.message;
+        _serverError = error;
+        _errorMessage = hasFieldErrors ? null : error.message;
       });
+      _formKey.currentState?.validate();
     } catch (_) {
       if (!mounted) {
         return;
@@ -416,6 +427,27 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
         });
       }
     }
+  }
+
+  bool _hasProfileFieldErrors(ApiException error) {
+    return const [
+      'FirstName',
+      'LastName',
+      'Email',
+      'PhoneNumber',
+      'ImageUrl',
+    ].any((fieldName) => error.fieldError(fieldName) != null);
+  }
+
+  void _clearServerErrors() {
+    if (_serverError == null && _errorMessage == null) {
+      return;
+    }
+
+    setState(() {
+      _serverError = null;
+      _errorMessage = null;
+    });
   }
 
   @override
@@ -441,11 +473,14 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                         controller: _firstNameController,
                         maxLength: 100,
                         decoration: const InputDecoration(labelText: 'Ime'),
+                        onChanged: (_) => _clearServerErrors(),
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Ime je obavezno.';
-                          }
-                          return null;
+                          return InputValidators.requiredText(
+                                value,
+                                fieldName: 'Ime',
+                                maxLength: 100,
+                              ) ??
+                              _serverError?.fieldError('FirstName');
                         },
                       ),
                     ),
@@ -455,11 +490,14 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                         controller: _lastNameController,
                         maxLength: 100,
                         decoration: const InputDecoration(labelText: 'Prezime'),
+                        onChanged: (_) => _clearServerErrors(),
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Prezime je obavezno.';
-                          }
-                          return null;
+                          return InputValidators.requiredText(
+                                value,
+                                fieldName: 'Prezime',
+                                maxLength: 100,
+                              ) ??
+                              _serverError?.fieldError('LastName');
                         },
                       ),
                     ),
@@ -471,15 +509,10 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                   keyboardType: TextInputType.emailAddress,
                   maxLength: 200,
                   decoration: const InputDecoration(labelText: 'Email'),
+                  onChanged: (_) => _clearServerErrors(),
                   validator: (value) {
-                    final trimmed = value?.trim() ?? '';
-                    if (trimmed.isEmpty) {
-                      return 'Email je obavezan.';
-                    }
-                    if (!trimmed.contains('@') || !trimmed.contains('.')) {
-                      return 'Unesite validan email.';
-                    }
-                    return null;
+                    return InputValidators.email(value) ??
+                        _serverError?.fieldError('Email');
                   },
                 ),
                 const SizedBox(height: 12),
@@ -488,6 +521,11 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                   keyboardType: TextInputType.phone,
                   maxLength: 30,
                   decoration: const InputDecoration(labelText: 'Telefon'),
+                  onChanged: (_) => _clearServerErrors(),
+                  validator: (value) {
+                    return InputValidators.phone(value) ??
+                        _serverError?.fieldError('PhoneNumber');
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -498,6 +536,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                     labelText: 'URL slike',
                     hintText: 'Opcionalno',
                   ),
+                  onChanged: (_) => _clearServerErrors(),
+                  validator: (_) => _serverError?.fieldError('ImageUrl'),
                 ),
               ],
             ),
@@ -526,10 +566,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 }
 
 class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog({
-    required this.token,
-    required this.service,
-  });
+  const _ChangePasswordDialog({required this.token, required this.service});
 
   final String token;
   final ProfileService service;
@@ -751,8 +788,8 @@ class _InlineError extends StatelessWidget {
       child: Text(
         message,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
+          color: Theme.of(context).colorScheme.onErrorContainer,
+        ),
       ),
     );
   }
@@ -790,10 +827,7 @@ class _CenteredMessage extends StatelessWidget {
 }
 
 class _DetailsBlock extends StatelessWidget {
-  const _DetailsBlock({
-    required this.title,
-    required this.rows,
-  });
+  const _DetailsBlock({required this.title, required this.rows});
 
   final String title;
   final List<_DetailsRow> rows;
@@ -803,10 +837,7 @@ class _DetailsBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         ...rows.map(
           (row) => Padding(
@@ -819,9 +850,8 @@ class _DetailsBlock extends StatelessWidget {
                   child: Text(
                     row.label,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
