@@ -81,10 +81,12 @@ class _NewsSectionState extends State<NewsSection> {
         _selectedDetails = null;
         _detailsErrorMessage = null;
       } else {
-        final selectedExists = _selectedArticleId != null &&
+        final selectedExists =
+            _selectedArticleId != null &&
             _articles.any((item) => item.id == _selectedArticleId);
-        final nextId =
-            selectedExists ? _selectedArticleId! : _articles.first.id;
+        final nextId = selectedExists
+            ? _selectedArticleId!
+            : _articles.first.id;
         await _loadArticleDetails(nextId, showLoader: false);
       }
     } on ApiException catch (error) {
@@ -100,10 +102,7 @@ class _NewsSectionState extends State<NewsSection> {
     }
   }
 
-  Future<void> _loadArticleDetails(
-    int id, {
-    bool showLoader = true,
-  }) async {
+  Future<void> _loadArticleDetails(int id, {bool showLoader = true}) async {
     if (showLoader) {
       setState(() {
         _isDetailsLoading = true;
@@ -116,10 +115,7 @@ class _NewsSectionState extends State<NewsSection> {
     }
 
     try {
-      final details = await _service.getArticle(
-        token: widget.token,
-        id: id,
-      );
+      final details = await _service.getArticle(token: widget.token, id: id);
 
       if (!mounted) {
         return;
@@ -157,9 +153,9 @@ class _NewsSectionState extends State<NewsSection> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openArticleDialog({NewsArticleDetails? initial}) async {
@@ -301,14 +297,8 @@ class _NewsSectionState extends State<NewsSection> {
                   value: null,
                   child: Text('Sve vijesti'),
                 ),
-                DropdownMenuItem<bool?>(
-                  value: true,
-                  child: Text('Objavljeno'),
-                ),
-                DropdownMenuItem<bool?>(
-                  value: false,
-                  child: Text('Skica'),
-                ),
+                DropdownMenuItem<bool?>(value: true, child: Text('Objavljeno')),
+                DropdownMenuItem<bool?>(value: false, child: Text('Skica')),
               ],
               onChanged: (value) {
                 setState(() {
@@ -358,10 +348,10 @@ class _NewsSectionState extends State<NewsSection> {
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 columns: const [
+                  DataColumn(label: Text('Slika')),
                   DataColumn(label: Text('Naslov')),
                   DataColumn(label: Text('Status')),
                   DataColumn(label: Text('Objavljeno')),
-                  DataColumn(label: Text('URL slike')),
                 ],
                 rows: _articles.map((item) {
                   final isSelected = item.id == _selectedArticleId;
@@ -369,6 +359,7 @@ class _NewsSectionState extends State<NewsSection> {
                     selected: isSelected,
                     onSelectChanged: (_) => _loadArticleDetails(item.id),
                     cells: [
+                      DataCell(_NewsImageThumb(imageUrl: item.imageUrl)),
                       DataCell(
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 260),
@@ -378,19 +369,8 @@ class _NewsSectionState extends State<NewsSection> {
                           ),
                         ),
                       ),
-                      DataCell(
-                        Text(item.isPublished ? 'Objavljeno' : 'Skica'),
-                      ),
+                      DataCell(Text(item.isPublished ? 'Objavljeno' : 'Skica')),
                       DataCell(Text(_formatDateTime(item.publishedAtUtc))),
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 260),
-                          child: Text(
-                            item.imageUrl.trim().isEmpty ? '-' : item.imageUrl,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
                     ],
                   );
                 }).toList(),
@@ -493,7 +473,9 @@ class _NewsSectionState extends State<NewsSection> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(details.content),
@@ -517,6 +499,46 @@ class _NewsSectionState extends State<NewsSection> {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day.$month.${local.year} $hour:$minute';
+  }
+}
+
+class _NewsImageThumb extends StatelessWidget {
+  const _NewsImageThumb({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = imageUrl.trim();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 64,
+        height: 42,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        alignment: Alignment.center,
+        child: value.isEmpty
+            ? Icon(
+                Icons.image_not_supported_outlined,
+                size: 18,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              )
+            : Image.network(
+                value,
+                width: 64,
+                height: 42,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    Icons.broken_image_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  );
+                },
+              ),
+      ),
+    );
   }
 }
 
@@ -602,20 +624,16 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
 }
 
 class _DetailsBlock extends StatelessWidget {
-  const _DetailsBlock({
-    required this.title,
-    this.rows,
-    this.child,
-  });
+  const _DetailsBlock({required this.title, this.rows, this.child});
 
   final String title;
   final List<_DetailsRow>? rows;
@@ -626,10 +644,7 @@ class _DetailsBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         if (rows != null)
           ...rows!.map(
@@ -643,10 +658,8 @@ class _DetailsBlock extends StatelessWidget {
                     child: Text(
                       row.label,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

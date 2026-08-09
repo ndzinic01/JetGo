@@ -6,12 +6,7 @@ import '../../core/network/api_exception.dart';
 import 'reference_data_models.dart';
 import 'reference_data_service.dart';
 
-enum ReferenceDataTab {
-  countries,
-  cities,
-  airports,
-  airlines,
-}
+enum ReferenceDataTab { countries, cities, airports, airlines }
 
 class ReferenceDataSection extends StatefulWidget {
   const ReferenceDataSection({required this.token, super.key});
@@ -198,9 +193,7 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
     }
   }
 
-  Future<void> _reloadAfterMutation({
-    required bool refreshLookups,
-  }) async {
+  Future<void> _reloadAfterMutation({required bool refreshLookups}) async {
     if (refreshLookups) {
       await _refreshLookups();
     }
@@ -234,17 +227,13 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _dropdownItemLabel(String value) {
-    return Text(
-      value,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
+    return Text(value, maxLines: 1, overflow: TextOverflow.ellipsis);
   }
 
   Future<void> _deleteEntity({
@@ -334,7 +323,10 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
 
   Future<void> _editCountry(CountryItem item) async {
     try {
-      final details = await _service.getCountry(token: widget.token, id: item.id);
+      final details = await _service.getCountry(
+        token: widget.token,
+        id: item.id,
+      );
       if (!mounted) {
         return;
       }
@@ -349,10 +341,8 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
   Future<void> _openCityDialog({CityDetails? initial}) async {
     final value = await showDialog<_CityFormValue>(
       context: context,
-      builder: (context) => _CityDialog(
-        countries: _allCountries,
-        initial: initial,
-      ),
+      builder: (context) =>
+          _CityDialog(countries: _allCountries, initial: initial),
     );
 
     if (value == null) {
@@ -381,7 +371,9 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
 
       await _reloadAfterMutation(refreshLookups: true);
       _showMessage(
-        initial == null ? 'Grad je uspjesno dodan.' : 'Grad je uspjesno azuriran.',
+        initial == null
+            ? 'Grad je uspjesno dodan.'
+            : 'Grad je uspjesno azuriran.',
       );
     } on ApiException catch (error) {
       _showMessage(error.message);
@@ -407,10 +399,8 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
   Future<void> _openAirportDialog({AirportDetails? initial}) async {
     final value = await showDialog<_AirportFormValue>(
       context: context,
-      builder: (context) => _AirportDialog(
-        cities: _allCities,
-        initial: initial,
-      ),
+      builder: (context) =>
+          _AirportDialog(cities: _allCities, initial: initial),
     );
 
     if (value == null) {
@@ -454,8 +444,10 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
 
   Future<void> _editAirport(AirportItem item) async {
     try {
-      final details =
-          await _service.getAirport(token: widget.token, id: item.id);
+      final details = await _service.getAirport(
+        token: widget.token,
+        id: item.id,
+      );
       if (!mounted) {
         return;
       }
@@ -516,8 +508,10 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
 
   Future<void> _editAirline(AirlineItem item) async {
     try {
-      final details =
-          await _service.getAirline(token: widget.token, id: item.id);
+      final details = await _service.getAirline(
+        token: widget.token,
+        id: item.id,
+      );
       if (!mounted) {
         return;
       }
@@ -675,8 +669,8 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
         final filteredCities = _airportCountryFilter == null
             ? _allCities
             : _allCities
-                .where((city) => city.countryId == _airportCountryFilter)
-                .toList();
+                  .where((city) => city.countryId == _airportCountryFilter)
+                  .toList();
 
         return Row(
           children: [
@@ -786,14 +780,8 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
                 initialValue: _airlineStatusFilter,
                 decoration: const InputDecoration(labelText: 'Status'),
                 items: const [
-                  DropdownMenuItem<bool?>(
-                    value: null,
-                    child: Text('Sve'),
-                  ),
-                  DropdownMenuItem<bool?>(
-                    value: true,
-                    child: Text('Aktivne'),
-                  ),
+                  DropdownMenuItem<bool?>(value: null, child: Text('Sve')),
+                  DropdownMenuItem<bool?>(value: true, child: Text('Aktivne')),
                   DropdownMenuItem<bool?>(
                     value: false,
                     child: Text('Neaktivne'),
@@ -838,10 +826,7 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
             children: [
               const Icon(Icons.cloud_off_rounded, size: 36),
               const SizedBox(height: 12),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-              ),
+              Text(_errorMessage!, textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -1046,7 +1031,6 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
           DataColumn(label: Text('Kod')),
           DataColumn(label: Text('Status')),
           DataColumn(label: Text('Letovi')),
-          DataColumn(label: Text('Logo adresa')),
           DataColumn(label: Text('Akcije')),
         ],
         rows: _airlines.map((item) {
@@ -1056,15 +1040,6 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
               DataCell(Text(item.code)),
               DataCell(Text(item.isActive ? 'Aktivna' : 'Neaktivna')),
               DataCell(Text(item.flightsCount.toString())),
-              DataCell(
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 220),
-                  child: Text(
-                    item.logoUrl?.trim().isNotEmpty == true ? item.logoUrl! : '-',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
               DataCell(
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1097,7 +1072,6 @@ class _ReferenceDataSectionState extends State<ReferenceDataSection> {
       ),
     );
   }
-
 }
 
 class _TableScrollWrapper extends StatelessWidget {
@@ -1117,10 +1091,7 @@ class _TableScrollWrapper extends StatelessWidget {
 }
 
 class _EmptyTableState extends StatelessWidget {
-  const _EmptyTableState({
-    required this.title,
-    required this.message,
-  });
+  const _EmptyTableState({required this.title, required this.message});
 
   final String title;
   final String message;
@@ -1162,10 +1133,10 @@ class _CountryDialogState extends State<_CountryDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.initial?.name ?? '');
-    _isoCodeController =
-        TextEditingController(text: widget.initial?.isoCode ?? '');
+    _nameController = TextEditingController(text: widget.initial?.name ?? '');
+    _isoCodeController = TextEditingController(
+      text: widget.initial?.isoCode ?? '',
+    );
   }
 
   @override
@@ -1239,10 +1210,7 @@ class _CountryDialogState extends State<_CountryDialog> {
 }
 
 class _CityDialog extends StatefulWidget {
-  const _CityDialog({
-    required this.countries,
-    this.initial,
-  });
+  const _CityDialog({required this.countries, this.initial});
 
   final List<CountryItem> countries;
   final CityDetails? initial;
@@ -1260,7 +1228,8 @@ class _CityDialogState extends State<_CityDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initial?.name ?? '');
-    _countryId = widget.initial?.countryId ??
+    _countryId =
+        widget.initial?.countryId ??
         (widget.countries.isNotEmpty ? widget.countries.first.id : null);
   }
 
@@ -1326,7 +1295,8 @@ class _CityDialogState extends State<_CityDialog> {
         ),
         FilledButton(
           onPressed: () {
-            if (_formKey.currentState?.validate() != true || _countryId == null) {
+            if (_formKey.currentState?.validate() != true ||
+                _countryId == null) {
               return;
             }
 
@@ -1345,10 +1315,7 @@ class _CityDialogState extends State<_CityDialog> {
 }
 
 class _AirportDialog extends StatefulWidget {
-  const _AirportDialog({
-    required this.cities,
-    this.initial,
-  });
+  const _AirportDialog({required this.cities, this.initial});
 
   final List<CityItem> cities;
   final AirportDetails? initial;
@@ -1367,9 +1334,11 @@ class _AirportDialogState extends State<_AirportDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initial?.name ?? '');
-    _iataController =
-        TextEditingController(text: widget.initial?.iataCode ?? '');
-    _cityId = widget.initial?.cityId ??
+    _iataController = TextEditingController(
+      text: widget.initial?.iataCode ?? '',
+    );
+    _cityId =
+        widget.initial?.cityId ??
         (widget.cities.isNotEmpty ? widget.cities.first.id : null);
   }
 
@@ -1486,12 +1455,11 @@ class _AirlineDialogState extends State<_AirlineDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.initial?.name ?? '');
-    _codeController =
-        TextEditingController(text: widget.initial?.code ?? '');
-    _logoUrlController =
-        TextEditingController(text: widget.initial?.logoUrl ?? '');
+    _nameController = TextEditingController(text: widget.initial?.name ?? '');
+    _codeController = TextEditingController(text: widget.initial?.code ?? '');
+    _logoUrlController = TextEditingController(
+      text: widget.initial?.logoUrl ?? '',
+    );
     _isActive = widget.initial?.isActive ?? true;
   }
 
@@ -1585,20 +1553,14 @@ class _AirlineDialogState extends State<_AirlineDialog> {
 }
 
 class _CountryFormValue {
-  _CountryFormValue({
-    required this.name,
-    required this.isoCode,
-  });
+  _CountryFormValue({required this.name, required this.isoCode});
 
   final String name;
   final String isoCode;
 }
 
 class _CityFormValue {
-  _CityFormValue({
-    required this.countryId,
-    required this.name,
-  });
+  _CityFormValue({required this.countryId, required this.name});
 
   final int countryId;
   final String name;
