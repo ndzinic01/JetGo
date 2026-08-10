@@ -162,6 +162,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<ISupportMessageService, SupportMessageService>();
         services.AddScoped<ReservationStateMachine>();
+        services.AddScoped<ReservationStatusSyncService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IdentityDataSeeder>();
 

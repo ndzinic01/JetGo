@@ -13,10 +13,14 @@ namespace JetGo.Infrastructure.Services;
 public sealed class ReportService : IReportService
 {
     private readonly JetGoDbContext _dbContext;
+    private readonly ReservationStatusSyncService _reservationStatusSyncService;
 
-    public ReportService(JetGoDbContext dbContext)
+    public ReportService(
+        JetGoDbContext dbContext,
+        ReservationStatusSyncService reservationStatusSyncService)
     {
         _dbContext = dbContext;
+        _reservationStatusSyncService = reservationStatusSyncService;
     }
 
     public async Task<ReportFileDto> GenerateReservationsReportAsync(
@@ -24,6 +28,7 @@ public sealed class ReportService : IReportService
         CancellationToken cancellationToken = default)
     {
         ValidateReservationRequest(request);
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(DateTime.UtcNow, cancellationToken);
 
         var reservations = await _dbContext.Reservations
             .AsNoTracking()
@@ -80,6 +85,7 @@ public sealed class ReportService : IReportService
         CancellationToken cancellationToken = default)
     {
         ValidatePaymentRequest(request);
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(DateTime.UtcNow, cancellationToken);
 
         var payments = await _dbContext.Payments
             .AsNoTracking()

@@ -6,6 +6,8 @@ namespace JetGo.Infrastructure.Services;
 
 public sealed class ReservationStateMachine
 {
+    private const string AutoCompletedReason = "Rezervacija je automatski oznacena kao zavrsena jer je proslo planirano vrijeme dolaska leta.";
+
     public void MarkCreated(Reservation reservation, string actorUserId, DateTime nowUtc)
     {
         reservation.Status = ReservationStatus.Confirmed;
@@ -82,6 +84,28 @@ public sealed class ReservationStateMachine
             : reason.Trim();
     }
 
+    public bool TryAutoCompleteAfterArrival(Reservation reservation, string actorUserId, DateTime nowUtc)
+    {
+        if (reservation.Status is ReservationStatus.Cancelled or ReservationStatus.Completed)
+        {
+            return false;
+        }
+
+        if (reservation.Flight.ArrivalAtUtc > nowUtc)
+        {
+            return false;
+        }
+
+        if (reservation.Status == ReservationStatus.Pending)
+        {
+            MarkCreated(reservation, actorUserId, nowUtc);
+        }
+
+        Complete(reservation, actorUserId, AutoCompletedReason, nowUtc);
+        reservation.UpdatedAtUtc = nowUtc;
+        return true;
+    }
+
     public bool CanCancel(ReservationStatus status)
     {
         return status is ReservationStatus.Pending or ReservationStatus.Confirmed;
@@ -90,5 +114,17 @@ public sealed class ReservationStateMachine
     public bool CanComplete(ReservationStatus status)
     {
         return status == ReservationStatus.Confirmed;
+    }
+
+    public ReservationStatus GetEffectiveStatus(ReservationStatus status, DateTime arrivalAtUtc, DateTime nowUtc)
+    {
+        if (status is ReservationStatus.Cancelled or ReservationStatus.Completed)
+        {
+            return status;
+        }
+
+        return arrivalAtUtc <= nowUtc
+            ? ReservationStatus.Completed
+            : status;
     }
 }

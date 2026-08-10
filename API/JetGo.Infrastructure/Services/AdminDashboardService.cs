@@ -9,16 +9,21 @@ namespace JetGo.Infrastructure.Services;
 public sealed class AdminDashboardService : IAdminDashboardService
 {
     private readonly JetGoDbContext _dbContext;
+    private readonly ReservationStatusSyncService _reservationStatusSyncService;
 
-    public AdminDashboardService(JetGoDbContext dbContext)
+    public AdminDashboardService(
+        JetGoDbContext dbContext,
+        ReservationStatusSyncService reservationStatusSyncService)
     {
         _dbContext = dbContext;
+        _reservationStatusSyncService = reservationStatusSyncService;
     }
 
     public async Task<AdminDashboardSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default)
     {
         var nowUtc = DateTime.UtcNow;
         var nowOffset = DateTimeOffset.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var totalUsersCount = await _dbContext.Users
             .AsNoTracking()

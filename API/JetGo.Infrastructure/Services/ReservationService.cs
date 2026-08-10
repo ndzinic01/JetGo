@@ -19,9 +19,12 @@ namespace JetGo.Infrastructure.Services;
 
 public sealed class ReservationService : IReservationService
 {
+    private const int RefundLeadTimeHours = 48;
+
     private readonly JetGoDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ReservationStateMachine _stateMachine;
+    private readonly ReservationStatusSyncService _reservationStatusSyncService;
     private readonly INotificationEventPublisher _notificationEventPublisher;
     private readonly ILogger<ReservationService> _logger;
 
@@ -29,12 +32,14 @@ public sealed class ReservationService : IReservationService
         JetGoDbContext dbContext,
         IHttpContextAccessor httpContextAccessor,
         ReservationStateMachine stateMachine,
+        ReservationStatusSyncService reservationStatusSyncService,
         INotificationEventPublisher notificationEventPublisher,
         ILogger<ReservationService> logger)
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
         _stateMachine = stateMachine;
+        _reservationStatusSyncService = reservationStatusSyncService;
         _notificationEventPublisher = notificationEventPublisher;
         _logger = logger;
     }
@@ -174,6 +179,7 @@ public sealed class ReservationService : IReservationService
     {
         var isAdmin = CurrentUserIsAdmin();
         var currentUserId = GetRequiredCurrentUserId();
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(DateTime.UtcNow, cancellationToken);
 
         var reservation = await BuildDetailsQuery()
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -196,6 +202,7 @@ public sealed class ReservationService : IReservationService
         var actorUserId = GetRequiredCurrentUserId();
         var isAdmin = CurrentUserIsAdmin();
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var reservation = await _dbContext.Reservations
             .Include(x => x.Payment)
@@ -213,7 +220,7 @@ public sealed class ReservationService : IReservationService
             throw new ForbiddenException("Mozete mijenjati dodatni prtljag samo na vlastitoj rezervaciji.");
         }
 
-        var effectiveStatus = GetEffectiveReservationStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc);
+        var effectiveStatus = _reservationStatusSyncService.GetEffectiveStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc);
 
         if (effectiveStatus is ReservationStatus.Cancelled or ReservationStatus.Completed)
         {
@@ -272,6 +279,7 @@ public sealed class ReservationService : IReservationService
         var actorUserId = GetRequiredCurrentUserId();
         var isAdmin = CurrentUserIsAdmin();
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var reservation = await _dbContext.Reservations
             .Include(x => x.Payment)
@@ -290,7 +298,7 @@ public sealed class ReservationService : IReservationService
             throw new ForbiddenException("Mozete otkazati samo vlastitu rezervaciju.");
         }
 
-        var effectiveStatus = GetEffectiveReservationStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc);
+        var effectiveStatus = _reservationStatusSyncService.GetEffectiveStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc);
 
         if (effectiveStatus == ReservationStatus.Completed)
         {
@@ -344,6 +352,7 @@ public sealed class ReservationService : IReservationService
         CancellationToken cancellationToken)
     {
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
         var query = BuildListQuery(request, userIdFilter, includeAllUsers);
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -588,7 +597,7 @@ public sealed class ReservationService : IReservationService
     private ReservationDetailsDto BuildVisibleReservationDetails(ReservationDetailsDto reservation, bool isAdmin)
     {
         var nowUtc = DateTime.UtcNow;
-        var actualStatus = GetEffectiveReservationStatus(reservation.Status, reservation.ArrivalAtUtc, nowUtc);
+        var actualStatus = _reservationStatusSyncService.GetEffectiveStatus(reservation.Status, reservation.ArrivalAtUtc, nowUtc);
 
         return new ReservationDetailsDto
         {
@@ -626,7 +635,7 @@ public sealed class ReservationService : IReservationService
             CanBeRefunded =
                 reservation.PaymentStatus == PaymentStatus.Paid &&
                 actualStatus != ReservationStatus.Completed &&
-                reservation.DepartureAtUtc > nowUtc.AddHours(48),
+                reservation.DepartureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours),
             CanUpdateBaggage = CanUpdateBaggage(actualStatus, reservation.PaymentStatus, reservation.IsPaid)
         };
     }
@@ -635,21 +644,6 @@ public sealed class ReservationService : IReservationService
     {
         return reservationStatus == ReservationStatus.Pending
             ? ReservationStatus.Confirmed
-            : reservationStatus;
-    }
-
-    private static ReservationStatus GetEffectiveReservationStatus(
-        ReservationStatus reservationStatus,
-        DateTime arrivalAtUtc,
-        DateTime nowUtc)
-    {
-        if (reservationStatus is ReservationStatus.Cancelled or ReservationStatus.Completed)
-        {
-            return reservationStatus;
-        }
-
-        return arrivalAtUtc <= nowUtc
-            ? ReservationStatus.Completed
             : reservationStatus;
     }
 

@@ -28,6 +28,8 @@ public sealed class PaymentService : IPaymentService
     private readonly JetGoDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly INotificationEventPublisher _notificationEventPublisher;
+    private readonly ReservationStateMachine _stateMachine;
+    private readonly ReservationStatusSyncService _reservationStatusSyncService;
     private readonly PayPalCheckoutClient _payPalCheckoutClient;
     private readonly PayPalSettings _payPalSettings;
     private readonly ILogger<PaymentService> _logger;
@@ -36,6 +38,8 @@ public sealed class PaymentService : IPaymentService
         JetGoDbContext dbContext,
         IHttpContextAccessor httpContextAccessor,
         INotificationEventPublisher notificationEventPublisher,
+        ReservationStateMachine stateMachine,
+        ReservationStatusSyncService reservationStatusSyncService,
         PayPalCheckoutClient payPalCheckoutClient,
         PayPalSettings payPalSettings,
         ILogger<PaymentService> logger)
@@ -43,6 +47,8 @@ public sealed class PaymentService : IPaymentService
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
         _notificationEventPublisher = notificationEventPublisher;
+        _stateMachine = stateMachine;
+        _reservationStatusSyncService = reservationStatusSyncService;
         _payPalCheckoutClient = payPalCheckoutClient;
         _payPalSettings = payPalSettings;
         _logger = logger;
@@ -55,6 +61,7 @@ public sealed class PaymentService : IPaymentService
         var currentUserId = GetRequiredCurrentUserId();
         var isAdmin = CurrentUserIsAdmin();
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var reservation = await _dbContext.Reservations
             .Include(x => x.Payment)
@@ -169,6 +176,7 @@ public sealed class PaymentService : IPaymentService
     {
         var currentUserId = GetRequiredCurrentUserId();
         var isAdmin = CurrentUserIsAdmin();
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(DateTime.UtcNow, cancellationToken);
 
         var ownership = await _dbContext.Payments
             .AsNoTracking()
@@ -196,6 +204,8 @@ public sealed class PaymentService : IPaymentService
     {
         EnsureCurrentUserIsAdmin();
         EnsurePayPalConfigured();
+        var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var payment = await _dbContext.Payments
             .AsNoTracking()
@@ -220,10 +230,10 @@ public sealed class PaymentService : IPaymentService
         if (payment.Status is PaymentStatus.Paid or PaymentStatus.Refunded)
         {
             var capture = await _payPalCheckoutClient.GetCaptureAsync(payment.ProviderReference, cancellationToken);
-            var effectiveReservationStatus = GetEffectiveReservationStatus(
+            var effectiveReservationStatus = _reservationStatusSyncService.GetEffectiveStatus(
                 payment.Reservation.Status,
                 payment.Reservation.Flight.ArrivalAtUtc,
-                DateTime.UtcNow);
+                nowUtc);
 
             return new PayPalPaymentVerificationDto
             {
@@ -268,10 +278,10 @@ public sealed class PaymentService : IPaymentService
 
         var order = await _payPalCheckoutClient.GetOrderAsync(payment.ProviderReference, cancellationToken);
         var approvalUrl = GetApprovalUrl(order);
-        var effectiveStatus = GetEffectiveReservationStatus(
+        var effectiveStatus = _reservationStatusSyncService.GetEffectiveStatus(
             payment.Reservation.Status,
             payment.Reservation.Flight.ArrivalAtUtc,
-            DateTime.UtcNow);
+            nowUtc);
 
         return new PayPalPaymentVerificationDto
         {
@@ -319,6 +329,8 @@ public sealed class PaymentService : IPaymentService
 
         var currentUserId = GetRequiredCurrentUserId();
         var isAdmin = CurrentUserIsAdmin();
+        var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var payment = await _dbContext.Payments
             .Include(x => x.Reservation)
@@ -335,9 +347,8 @@ public sealed class PaymentService : IPaymentService
             throw new ForbiddenException("Mozete potvrditi placanje samo za vlastitu rezervaciju.");
         }
 
-        var nowUtc = DateTime.UtcNow;
         var wasAutoConfirmed = AutoConfirmReservationIfNeeded(payment.Reservation, currentUserId, nowUtc);
-        var effectiveReservationStatus = GetEffectiveReservationStatus(
+        var effectiveReservationStatus = _reservationStatusSyncService.GetEffectiveStatus(
             payment.Reservation.Status,
             payment.Reservation.Flight.ArrivalAtUtc,
             nowUtc);
@@ -435,6 +446,7 @@ public sealed class PaymentService : IPaymentService
         EnsureCurrentUserIsAdmin();
         EnsurePayPalConfigured();
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var payment = await _dbContext.Payments
             .Include(x => x.Reservation)
@@ -461,7 +473,7 @@ public sealed class PaymentService : IPaymentService
                 });
         }
 
-        var effectiveReservationStatus = GetEffectiveReservationStatus(
+        var effectiveReservationStatus = _reservationStatusSyncService.GetEffectiveStatus(
             payment.Reservation.Status,
             payment.Reservation.Flight.ArrivalAtUtc,
             nowUtc);
@@ -523,6 +535,7 @@ public sealed class PaymentService : IPaymentService
         bool includeAllUsers,
         CancellationToken cancellationToken)
     {
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(DateTime.UtcNow, cancellationToken);
         var query = BuildListQuery(request, userIdFilter, includeAllUsers);
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -633,7 +646,7 @@ public sealed class PaymentService : IPaymentService
                     x.Reservation.Flight.ArrivalAtUtc > nowUtc,
                 CanBeRefunded = x.Status == PaymentStatus.Paid &&
                     x.Reservation.Status != ReservationStatus.Completed &&
-                    x.Reservation.Flight.DepartureAtUtc > nowUtc.AddHours(RefundLeadTimeHours),
+                    x.Reservation.Flight.DepartureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours),
                 Customer = new PaymentCustomerDto
                 {
                     UserId = x.Reservation.UserId,
@@ -685,9 +698,9 @@ public sealed class PaymentService : IPaymentService
             });
     }
 
-    private static void EnsureReservationCanReceivePayment(Reservation reservation)
+    private void EnsureReservationCanReceivePayment(Reservation reservation)
     {
-        var effectiveStatus = GetEffectiveReservationStatus(
+        var effectiveStatus = _reservationStatusSyncService.GetEffectiveStatus(
             reservation.Status,
             reservation.Flight.ArrivalAtUtc,
             DateTime.UtcNow);
@@ -703,9 +716,9 @@ public sealed class PaymentService : IPaymentService
         }
     }
 
-    private static bool AutoConfirmReservationIfNeeded(Reservation reservation, string actorUserId, DateTime nowUtc)
+    private bool AutoConfirmReservationIfNeeded(Reservation reservation, string actorUserId, DateTime nowUtc)
     {
-        if (GetEffectiveReservationStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc) == ReservationStatus.Completed)
+        if (_reservationStatusSyncService.GetEffectiveStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc) == ReservationStatus.Completed)
         {
             return false;
         }
@@ -715,10 +728,7 @@ public sealed class PaymentService : IPaymentService
             return false;
         }
 
-        reservation.Status = ReservationStatus.Confirmed;
-        reservation.StatusChangedByUserId = actorUserId;
-        reservation.StatusChangedAtUtc = nowUtc;
-        reservation.StatusReason = "Rezervacija je automatski potvrdjena i spremna za placanje.";
+        _stateMachine.MarkCreated(reservation, actorUserId, nowUtc);
         return true;
     }
 
@@ -730,22 +740,7 @@ public sealed class PaymentService : IPaymentService
     {
         return paymentStatus == PaymentStatus.Paid &&
             reservationStatus != ReservationStatus.Completed &&
-            departureAtUtc > nowUtc.AddHours(RefundLeadTimeHours);
-    }
-
-    private static ReservationStatus GetEffectiveReservationStatus(
-        ReservationStatus reservationStatus,
-        DateTime arrivalAtUtc,
-        DateTime nowUtc)
-    {
-        if (reservationStatus is ReservationStatus.Cancelled or ReservationStatus.Completed)
-        {
-            return reservationStatus;
-        }
-
-        return arrivalAtUtc <= nowUtc
-            ? ReservationStatus.Completed
-            : reservationStatus;
+            departureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours);
     }
 
     private static string BuildPayPalCallbackUrl(string baseUrl, int reservationId)
