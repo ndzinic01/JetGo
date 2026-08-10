@@ -1,3 +1,5 @@
+using JetGo.Application.Contracts.Messaging;
+using JetGo.Application.Messaging.Notifications;
 using JetGo.Domain.Enums;
 using JetGo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,15 +13,18 @@ public sealed class ReservationStatusSyncService
 
     private readonly JetGoDbContext _dbContext;
     private readonly ReservationStateMachine _stateMachine;
+    private readonly INotificationEventPublisher _notificationEventPublisher;
     private readonly ILogger<ReservationStatusSyncService> _logger;
 
     public ReservationStatusSyncService(
         JetGoDbContext dbContext,
         ReservationStateMachine stateMachine,
+        INotificationEventPublisher notificationEventPublisher,
         ILogger<ReservationStatusSyncService> logger)
     {
         _dbContext = dbContext;
         _stateMachine = stateMachine;
+        _notificationEventPublisher = notificationEventPublisher;
         _logger = logger;
     }
 
@@ -32,27 +37,65 @@ public sealed class ReservationStatusSyncService
                 x.Flight.ArrivalAtUtc <= nowUtc)
             .ToListAsync(cancellationToken);
 
-        var completedCount = 0;
+        var completedReservations = new List<(string UserId, string ReservationCode, string FlightNumber)>();
 
         foreach (var reservation in reservations)
         {
             if (_stateMachine.TryAutoCompleteAfterArrival(reservation, SystemActorUserId, nowUtc))
             {
-                completedCount++;
+                completedReservations.Add((reservation.UserId, reservation.ReservationCode, reservation.Flight.FlightNumber));
             }
         }
 
-        if (completedCount == 0)
+        if (completedReservations.Count == 0)
         {
             return;
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("{ReservationCount} reservations automatically marked as completed.", completedCount);
+        _logger.LogInformation("{ReservationCount} reservations automatically marked as completed.", completedReservations.Count);
+
+        foreach (var reservation in completedReservations)
+        {
+            await PublishCompletionNotificationSafelyAsync(
+                reservation.UserId,
+                reservation.ReservationCode,
+                reservation.FlightNumber,
+                nowUtc,
+                cancellationToken);
+        }
     }
 
     public ReservationStatus GetEffectiveStatus(ReservationStatus status, DateTime arrivalAtUtc, DateTime nowUtc)
     {
         return _stateMachine.GetEffectiveStatus(status, arrivalAtUtc, nowUtc);
+    }
+
+    private async Task PublishCompletionNotificationSafelyAsync(
+        string userId,
+        string reservationCode,
+        string flightNumber,
+        DateTime occurredAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var message = new NotificationRequestedMessage
+        {
+            UserId = userId,
+            Title = "Putovanje zavrseno",
+            Body = $"Rezervacija {reservationCode} za let {flightNumber} je automatski oznacena kao zavrsena jer je let stigao.",
+            OccurredAtUtc = occurredAtUtc
+        };
+
+        try
+        {
+            await _notificationEventPublisher.PublishAsync(message, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to publish reservation completion notification for reservation {ReservationCode}.",
+                reservationCode);
+        }
     }
 }
