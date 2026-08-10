@@ -68,13 +68,4 @@ public sealed class ReservationsController : ControllerBase
         var response = await _reservationService.CancelAsync(id, request, cancellationToken);
         return Ok(response);
     }
-
-    [HttpPost("{id:int}/complete")]
-    [Authorize(Roles = RoleNames.Admin)]
-    [ProducesResponseType(typeof(ReservationDetailsDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<ReservationDetailsDto>> Complete(int id, [FromBody] UpdateReservationStatusRequest request, CancellationToken cancellationToken)
-    {
-        var response = await _reservationService.CompleteAsync(id, request, cancellationToken);
-        return Ok(response);
-    }
 }

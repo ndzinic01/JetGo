@@ -333,18 +333,6 @@ public sealed class ReservationService : IReservationService
         return await GetByIdAsync(id, cancellationToken);
     }
 
-    public Task<ReservationDetailsDto> CompleteAsync(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken = default)
-    {
-        EnsureCurrentUserIsAdmin();
-        return Task.FromException<ReservationDetailsDto>(
-            new ValidationException(
-                "Rezervacija se vise ne zavrsava rucno.",
-                new Dictionary<string, string[]>
-                {
-                    ["reservation"] = ["Rezervacija automatski prelazi u status Completed nakon planiranog vremena dolaska leta."]
-                }));
-    }
-
     private async Task<PagedResponseDto<ReservationListItemDto>> GetPagedInternalAsync(
         ReservationSearchRequest request,
         string? userIdFilter,

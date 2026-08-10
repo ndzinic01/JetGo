@@ -59,22 +59,6 @@ class ReservationsService {
     return ReservationDetails.fromJson(response);
   }
 
-  Future<ReservationDetails> completeReservation({
-    required String token,
-    required int id,
-    String? reason,
-  }) async {
-    final response = await _apiClient.postJson(
-      '/api/Reservations/$id/complete',
-      token: token,
-      body: <String, dynamic>{
-        'reason': _normalizeReason(reason),
-      },
-    );
-
-    return ReservationDetails.fromJson(response);
-  }
-
   String? _normalizeReason(String? value) {
     final trimmed = value?.trim();
     if (trimmed == null || trimmed.isEmpty) {
