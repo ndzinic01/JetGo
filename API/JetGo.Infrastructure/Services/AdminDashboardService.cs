@@ -25,56 +25,70 @@ public sealed class AdminDashboardService : IAdminDashboardService
         var nowOffset = DateTimeOffset.UtcNow;
         await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
-        var totalUsersCount = await _dbContext.Users
+        var userStats = await _dbContext.Users
             .AsNoTracking()
-            .CountAsync(cancellationToken);
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                TotalCount = x.Count(),
+                ActiveCount = x.Count(y => !y.LockoutEnd.HasValue || y.LockoutEnd <= nowOffset)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        var activeUsersCount = await _dbContext.Users
+        var flightStats = await _dbContext.Flights
             .AsNoTracking()
-            .CountAsync(
-                x => !x.LockoutEnd.HasValue || x.LockoutEnd <= nowOffset,
-                cancellationToken);
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                UpcomingCount = x.Count(y =>
+                    y.DepartureAtUtc >= nowUtc &&
+                    (y.Status == FlightStatus.Scheduled || y.Status == FlightStatus.Delayed)),
+                DelayedCount = x.Count(y => y.Status == FlightStatus.Delayed)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        var upcomingFlightsCount = await _dbContext.Flights
+        var reservationStats = await _dbContext.Reservations
             .AsNoTracking()
-            .CountAsync(
-                x => x.DepartureAtUtc >= nowUtc &&
-                     (x.Status == FlightStatus.Scheduled || x.Status == FlightStatus.Delayed),
-                cancellationToken);
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                TotalCount = x.Count(),
+                PendingCount = x.Count(y => y.Status == ReservationStatus.Pending)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        var delayedFlightsCount = await _dbContext.Flights
+        var supportMessageStats = await _dbContext.SupportMessages
             .AsNoTracking()
-            .CountAsync(x => x.Status == FlightStatus.Delayed, cancellationToken);
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                TotalCount = x.Count(),
+                OpenCount = x.Count(y => y.AdminReply == null || y.AdminReply == string.Empty)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        var totalReservationsCount = await _dbContext.Reservations
+        var paymentStats = await _dbContext.Payments
             .AsNoTracking()
-            .CountAsync(cancellationToken);
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                PendingCount = x.Count(y => y.Status == PaymentStatus.Pending),
+                PaidCount = x.Count(y => y.Status == PaymentStatus.Paid),
+                RefundedCount = x.Count(y => y.Status == PaymentStatus.Refunded)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        var pendingReservationsCount = await _dbContext.Reservations
-            .AsNoTracking()
-            .CountAsync(x => x.Status == ReservationStatus.Pending, cancellationToken);
-
-        var openSupportMessagesCount = await _dbContext.SupportMessages
-            .AsNoTracking()
-            .CountAsync(
-                x => x.AdminReply == null || x.AdminReply == string.Empty,
-                cancellationToken);
-
-        var totalSupportMessagesCount = await _dbContext.SupportMessages
-            .AsNoTracking()
-            .CountAsync(cancellationToken);
-
-        var pendingPaymentsCount = await _dbContext.Payments
-            .AsNoTracking()
-            .CountAsync(x => x.Status == PaymentStatus.Pending, cancellationToken);
-
-        var paidPaymentsCount = await _dbContext.Payments
-            .AsNoTracking()
-            .CountAsync(x => x.Status == PaymentStatus.Paid, cancellationToken);
-
-        var refundedPaymentsCount = await _dbContext.Payments
-            .AsNoTracking()
-            .CountAsync(x => x.Status == PaymentStatus.Refunded, cancellationToken);
+        var totalUsersCount = userStats?.TotalCount ?? 0;
+        var activeUsersCount = userStats?.ActiveCount ?? 0;
+        var upcomingFlightsCount = flightStats?.UpcomingCount ?? 0;
+        var delayedFlightsCount = flightStats?.DelayedCount ?? 0;
+        var totalReservationsCount = reservationStats?.TotalCount ?? 0;
+        var pendingReservationsCount = reservationStats?.PendingCount ?? 0;
+        var totalSupportMessagesCount = supportMessageStats?.TotalCount ?? 0;
+        var openSupportMessagesCount = supportMessageStats?.OpenCount ?? 0;
+        var pendingPaymentsCount = paymentStats?.PendingCount ?? 0;
+        var paidPaymentsCount = paymentStats?.PaidCount ?? 0;
+        var refundedPaymentsCount = paymentStats?.RefundedCount ?? 0;
 
         var paidAmountsByCurrency = await _dbContext.Payments
             .AsNoTracking()

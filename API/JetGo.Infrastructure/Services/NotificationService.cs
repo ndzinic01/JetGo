@@ -71,16 +71,23 @@ public sealed class NotificationService : INotificationService
     public async Task<NotificationSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default)
     {
         var currentUserId = GetRequiredCurrentUserId();
+        var summary = await _dbContext.Notifications
+            .AsNoTracking()
+            .Where(x => x.UserId == currentUserId)
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                TotalCount = x.Count(),
+                UnreadCount = x.Count(y => y.Status == NotificationStatus.Unread),
+                LatestCreatedAtUtc = x.Max(y => (DateTime?)y.CreatedAtUtc)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
 
         return new NotificationSummaryDto
         {
-            TotalCount = await _dbContext.Notifications.CountAsync(x => x.UserId == currentUserId, cancellationToken),
-            UnreadCount = await _dbContext.Notifications.CountAsync(x => x.UserId == currentUserId && x.Status == NotificationStatus.Unread, cancellationToken),
-            LatestCreatedAtUtc = await _dbContext.Notifications
-                .Where(x => x.UserId == currentUserId)
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .Select(x => (DateTime?)x.CreatedAtUtc)
-                .FirstOrDefaultAsync(cancellationToken)
+            TotalCount = summary?.TotalCount ?? 0,
+            UnreadCount = summary?.UnreadCount ?? 0,
+            LatestCreatedAtUtc = summary?.LatestCreatedAtUtc
         };
     }
 
