@@ -159,6 +159,10 @@ Pravi `.env` fajl nije pracen kroz Git. Za lokalno pokretanje koristi se sablon:
 
 - [`.env.example`](.env.example)
 
+Za predaju se raw `.env` ne postavlja u GitHub Release build arhivu. Ako je potreban
+konfiguracijski fajl sa stvarnim tajnama, koristi se password-protected ZIP arhiva prema
+uputama predmeta.
+
 Najbitnije varijable:
 
 - `JETGO_CONNECTION_STRING`
@@ -349,7 +353,7 @@ Generisani Windows build:
 
 - `Desktop/jetgo_desktop/build/windows/x64/runner/Release/`
 
-## Korisni endpointi za testiranje
+## Pregled vaznih API ruta
 
 ### Autentifikacija i profil
 
@@ -466,17 +470,3 @@ Najbitnija pravila trenutno implementirana u sistemu:
 - Ako testiras samo backend, dovoljno je otvoriti Swagger
 - Ako testiras notifikacije i worker tok, RabbitMQ i worker moraju biti aktivni
 - Za placanja je potrebno popuniti validne PayPal sandbox podatke u `.env`
-
-## Trenutni status README-a
-
-Ovaj README opisuje trenutno implementirano stanje projekta i pokriva:
-
-- strukturu sistema
-- glavne funkcionalnosti
-- test korisnike
-- Docker pokretanje
-- lokalno pokretanje
-- build korake
-- lokaciju recommender dokumentacije
-
-To ga cini pogodnim kao glavni ulazni dokument za pregled i testiranje seminarskog rada.
