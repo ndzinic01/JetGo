@@ -100,6 +100,15 @@ Seed podaci trenutno kreiraju sljedece naloge:
   - username: `mobile2`
   - password: `test`
 
+### PayPal sandbox testiranje
+
+Za testiranje PayPal placanja koriste se sandbox buyer kredencijali iz
+sifrirane konfiguracijske arhive `.env-tajne.zip`. Arhiva sadrzi `.env` fajl,
+a vrijednosti koje tester rucno unosi na PayPal sandbox stranici su:
+
+- `JETGO_PAYPAL_SANDBOX_BUYER_EMAIL`
+- `JETGO_PAYPAL_SANDBOX_BUYER_PASSWORD`
+
 Role nazivi koji se koriste u sistemu:
 
 - `Admin`
