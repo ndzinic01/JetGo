@@ -44,6 +44,44 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<bool> register({
+    required String username,
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    required String confirmPassword,
+    String? phoneNumber,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final phone = phoneNumber?.trim();
+      _session = await _authService.register(
+        username: username.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phoneNumber: phone == null || phone.isEmpty ? null : phone,
+        password: password,
+        confirmPassword: confirmPassword,
+      );
+      return true;
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } catch (_) {
+      _errorMessage =
+          'Registracija trenutno nije dostupna. Pokusajte ponovo.';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<PasswordResetRequestResult?> requestPasswordReset({
     required String email,
   }) async {

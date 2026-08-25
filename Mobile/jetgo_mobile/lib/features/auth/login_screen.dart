@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
 import 'auth_controller.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({required this.authController, super.key});
@@ -20,8 +21,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _usernameController = TextEditingController(text: 'mobile');
-    _passwordController = TextEditingController(text: 'test');
+    _usernameController = TextEditingController();
+    _passwordController = TextEditingController();
   }
 
   @override
@@ -77,6 +78,16 @@ class _LoginScreenState extends State<LoginScreen> {
       const SnackBar(
         content: Text(
           'Lozinka je uspjesno promijenjena. Nova lozinka je upisana u polje za prijavu.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openRegisterScreen() async {
+    await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => RegisterScreen(
+          authController: widget.authController,
         ),
       ),
     );
@@ -180,6 +191,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             );
                           },
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: _openRegisterScreen,
+                          icon: const Icon(Icons.person_add_alt_1_rounded),
+                          label: const Text('Registrujte se'),
                         ),
                         const SizedBox(height: 12),
                         Text(

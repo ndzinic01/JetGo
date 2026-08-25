@@ -21,6 +21,31 @@ class AuthService {
     return AuthSession.fromJson(response);
   }
 
+  Future<AuthSession> register({
+    required String username,
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    required String confirmPassword,
+    String? phoneNumber,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/api/Auth/register',
+      body: <String, dynamic>{
+        'username': username,
+        'firstName': firstName,
+        'lastName': lastName,
+        'email': email,
+        'phoneNumber': phoneNumber,
+        'password': password,
+        'confirmPassword': confirmPassword,
+      },
+    );
+
+    return AuthSession.fromJson(response);
+  }
+
   Future<PasswordResetRequestResult> requestPasswordReset({
     required String email,
   }) async {
