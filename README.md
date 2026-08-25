@@ -180,6 +180,8 @@ Najbitnije varijable:
 - `JETGO_PAYPAL_CANCEL_URL`
 - `JETGO_PAYPAL_CURRENCY_CODE`
 - `JETGO_PAYPAL_BAM_TO_CURRENCY_RATE`
+- `JETGO_PAYPAL_SANDBOX_BUYER_EMAIL`
+- `JETGO_PAYPAL_SANDBOX_BUYER_PASSWORD`
 - `JETGO_SMTP_HOST`
 - `JETGO_SMTP_PORT`
 - `JETGO_SMTP_USERNAME`
@@ -451,6 +453,8 @@ Bitne napomene:
 - `confirm` vrsi server-side capture
 - `refund` koristi stvarno evidentiran naplaceni iznos
 - mobile aplikacija prikazuje korake za otvaranje PayPal approval toka i zavrsetak placanja
+- sandbox buyer email i lozinka iz `.env` sluze samo za rucno logovanje u PayPal sandbox tokom pregleda rada
+- aplikacija ne popunjava PayPal login automatski; tester ove podatke rucno unosi na PayPal sandbox stranici
 
 ## Status poslovne logike
 
