@@ -1025,7 +1025,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            mainAxisExtent: 292,
+            mainAxisExtent: 296,
           ),
           itemBuilder: (context, index) {
             return _buildRecommendedFlightCard(topRecommendations[index]);
@@ -1081,14 +1081,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                   ),
-                  const Positioned(
-                    left: 8,
-                    top: 8,
-                    child: _FlightOverlayBadge(
-                      label: 'Preporuka',
-                      icon: Icons.auto_awesome_rounded,
-                    ),
-                  ),
                   Positioned(
                     right: 8,
                     top: 8,
@@ -1142,7 +1134,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+              padding: const EdgeInsets.fromLTRB(10, 9, 10, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1152,29 +1144,39 @@ class _HomeScreenState extends State<HomeScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 7),
                   _FlightTimeSummary(
                     departureTime: _formatTimeLabel(flight.departureAtUtc),
                     arrivalTime: _formatTimeLabel(flight.arrivalAtUtc),
                     middleLabel: '${flight.durationMinutes} min',
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _formatShortDate(flight.departureAtUtc),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _formatShortDate(flight.departureAtUtc),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    flight.recommendationReason,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _showRecommendationReason(flight),
+                        icon: const Icon(Icons.info_outline_rounded, size: 15),
+                        label: const Text('Zasto?'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: const Size(0, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1183,6 +1185,146 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showRecommendationReason(
+    MobileRecommendedFlight flight,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final signals = flight.appliedSignals
+            .map(_formatRecommendationSignal)
+            .where((signal) => signal.isNotEmpty)
+            .toList();
+
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Zasto je ovaj let preporucen?',
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${flight.departureAirport.cityName} - ${flight.arrivalAirport.cityName}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    flight.recommendationReason.isEmpty
+                        ? 'Ovaj let je preporucen na osnovu dostupnosti i prethodne aktivnosti u aplikaciji.'
+                        : flight.recommendationReason,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _InfoRow(
+                  label: 'Rezultat preporuke',
+                  value: flight.recommendationScore.toString(),
+                ),
+                _InfoRow(
+                  label: 'Let',
+                  value:
+                      '${MobileDisplay.flightNumberLabel(flight.flightNumber)} | ${flight.routeCode}',
+                ),
+                _InfoRow(
+                  label: 'Polazak',
+                  value:
+                      '${_formatShortDate(flight.departureAtUtc)} u ${_formatTimeLabel(flight.departureAtUtc)}',
+                ),
+                if (signals.isNotEmpty) ...[
+                  Text(
+                    'Korisni signali',
+                    style: theme.textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: signals
+                        .map(
+                          (signal) => Chip(
+                            avatar: const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 16,
+                            ),
+                            label: Text(signal),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _openFlightDetails(
+                        MobileFlight(
+                          id: flight.id,
+                          flightNumber: flight.flightNumber,
+                          routeCode: flight.routeCode,
+                          destinationImageUrl: flight.destinationImageUrl,
+                          airline: flight.airline,
+                          departureAirport: flight.departureAirport,
+                          arrivalAirport: flight.arrivalAirport,
+                          departureAtUtc: flight.departureAtUtc,
+                          arrivalAtUtc: flight.arrivalAtUtc,
+                          durationMinutes: flight.durationMinutes,
+                          basePrice: flight.basePrice,
+                          currency: flight.currency,
+                          availableSeats: flight.availableSeats,
+                          totalSeats: flight.totalSeats,
+                          status: flight.status,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.flight_takeoff_rounded),
+                    label: const Text('Otvori detalje leta'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatRecommendationSignal(String signal) {
+    switch (signal) {
+      case 'ExactRouteSearch':
+        return 'Pretrage iste rute';
+      case 'KeywordSearch':
+        return 'Pretrage slicnih pojmova';
+      case 'ReservationHistory':
+        return 'Historija rezervacija';
+      case 'Popularity':
+        return 'Popularnost leta';
+      case 'FallbackUpcomingAvailability':
+        return 'Naredna dostupna opcija';
+      default:
+        return signal.trim();
+    }
   }
 
   Widget _buildReservationsTab(BuildContext context) {
