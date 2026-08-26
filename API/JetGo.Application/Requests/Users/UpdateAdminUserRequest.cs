@@ -6,10 +6,12 @@ public sealed class UpdateAdminUserRequest
 {
     [Required(ErrorMessage = "Ime je obavezno.")]
     [MaxLength(100, ErrorMessage = "Ime moze sadrzavati maksimalno 100 karaktera.")]
+    [RegularExpression(@"^[\p{L}]+(?: [\p{L}]+)*$", ErrorMessage = "Ime smije sadrzavati samo slova i razmake.")]
     public string FirstName { get; init; } = string.Empty;
 
     [Required(ErrorMessage = "Prezime je obavezno.")]
     [MaxLength(100, ErrorMessage = "Prezime moze sadrzavati maksimalno 100 karaktera.")]
+    [RegularExpression(@"^[\p{L}]+(?: [\p{L}]+)*$", ErrorMessage = "Prezime smije sadrzavati samo slova i razmake.")]
     public string LastName { get; init; } = string.Empty;
 
     [Required(ErrorMessage = "Email adresa je obavezna.")]
@@ -17,7 +19,7 @@ public sealed class UpdateAdminUserRequest
     [MaxLength(256, ErrorMessage = "Email adresa moze sadrzavati maksimalno 256 karaktera.")]
     public string Email { get; init; } = string.Empty;
 
-    [RegularExpression(@"^\+?[0-9][0-9\s\-\/]{6,19}$", ErrorMessage = "Broj telefona mora biti u formatu +38761123456 ili 061123456.")]
+    [RegularExpression(@"^\+?[0-9]{8,15}$", ErrorMessage = "Broj telefona mora imati 8 do 15 cifara i smije imati samo + na pocetku, npr. +38761123456.")]
     [MaxLength(50, ErrorMessage = "Broj telefona moze sadrzavati maksimalno 50 karaktera.")]
     public string? PhoneNumber { get; init; }
 

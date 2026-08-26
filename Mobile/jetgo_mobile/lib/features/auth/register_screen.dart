@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/validation/input_validators.dart';
 import 'auth_controller.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -33,10 +35,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phoneController = TextEditingController();
     _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
+    _emailController.addListener(_refreshEmailValidationState);
   }
 
   @override
   void dispose() {
+    _emailController.removeListener(_refreshEmailValidationState);
     _firstNameController.dispose();
     _lastNameController.dispose();
     _usernameController.dispose();
@@ -45,6 +49,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  void _refreshEmailValidationState() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Widget? _emailStatusIcon(ThemeData theme) {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      return null;
+    }
+
+    final isValid = InputValidators.email(email) == null;
+    return Icon(
+      isValid ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+      color: isValid ? Colors.green.shade600 : theme.colorScheme.error,
+    );
+  }
+
+  void _normalizePhoneInput(String value) {
+    if (!value.startsWith('0')) {
+      return;
+    }
+
+    final normalized = value.replaceFirst(RegExp(r'^0+'), '');
+    _phoneController.value = TextEditingValue(
+      text: normalized,
+      selection: TextSelection.collapsed(offset: normalized.length),
+    );
   }
 
   Future<void> _submit() async {
@@ -56,11 +91,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     FocusScope.of(context).unfocus();
 
     final success = await widget.authController.register(
-      username: _usernameController.text,
-      firstName: _firstNameController.text,
-      lastName: _lastNameController.text,
-      email: _emailController.text,
-      phoneNumber: _phoneController.text,
+      username: _usernameController.text.trim(),
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      email: _emailController.text.trim(),
+      phoneNumber: '+387${_phoneController.text.trim()}',
       password: _passwordController.text,
       confirmPassword: _confirmPasswordController.text,
     );
@@ -84,61 +119,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     Navigator.of(context).pop(_usernameController.text.trim());
   }
 
-  String? _requiredText(
-    String? value,
-    String label, {
-    int maxLength = 100,
-  }) {
-    final text = value?.trim() ?? '';
-    if (text.isEmpty) {
-      return '$label je obavezno polje.';
-    }
-    if (text.length > maxLength) {
-      return '$label moze imati maksimalno $maxLength karaktera.';
-    }
-    return null;
-  }
-
-  String? _validateEmail(String? value) {
-    final email = value?.trim() ?? '';
-    if (email.isEmpty) {
-      return 'Email adresa je obavezna.';
-    }
-    final isValid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
-    if (!isValid) {
-      return 'Email adresa mora biti u formatu korisnik@domena.com.';
-    }
-    if (email.length > 200) {
-      return 'Email adresa moze imati maksimalno 200 karaktera.';
-    }
-    return null;
-  }
-
-  String? _validatePhone(String? value) {
-    final phone = value?.trim() ?? '';
-    if (phone.isEmpty) {
-      return null;
-    }
-    final isValid = RegExp(r'^\+?[0-9][0-9\s\-\/]{6,19}$').hasMatch(phone);
-    if (!isValid) {
-      return 'Broj telefona mora biti u formatu +38761123456 ili 061123456.';
-    }
-    if (phone.length > 30) {
-      return 'Broj telefona moze imati maksimalno 30 karaktera.';
-    }
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Lozinka je obavezna.';
-    }
-    if (value.length < 4) {
-      return 'Lozinka mora imati najmanje 4 karaktera.';
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -159,6 +139,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: AutofillGroup(
                     child: Form(
                       key: _formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
@@ -184,53 +165,82 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           TextFormField(
                             controller: _firstNameController,
                             autofillHints: const [AutofillHints.givenName],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[A-Za-zČĆŽŠĐčćžšđ ]'),
+                              ),
+                              LengthLimitingTextInputFormatter(100),
+                            ],
                             textCapitalization: TextCapitalization.words,
                             textInputAction: TextInputAction.next,
                             decoration: const InputDecoration(
                               labelText: 'Ime',
+                              helperText: 'Obavezno polje',
                               prefixIcon: Icon(Icons.badge_outlined),
                             ),
-                            validator: (value) => _requiredText(value, 'Ime'),
+                            validator: (value) => InputValidators.personName(
+                              value,
+                              fieldName: 'Ime',
+                            ),
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _lastNameController,
                             autofillHints: const [AutofillHints.familyName],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[A-Za-zČĆŽŠĐčćžšđ ]'),
+                              ),
+                              LengthLimitingTextInputFormatter(100),
+                            ],
                             textCapitalization: TextCapitalization.words,
                             textInputAction: TextInputAction.next,
                             decoration: const InputDecoration(
                               labelText: 'Prezime',
+                              helperText: 'Obavezno polje',
                               prefixIcon: Icon(Icons.badge_outlined),
                             ),
-                            validator: (value) =>
-                                _requiredText(value, 'Prezime'),
+                            validator: (value) => InputValidators.personName(
+                              value,
+                              fieldName: 'Prezime',
+                            ),
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _usernameController,
                             autofillHints: const [AutofillHints.username],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[A-Za-z0-9._-]'),
+                              ),
+                              LengthLimitingTextInputFormatter(50),
+                            ],
                             textInputAction: TextInputAction.next,
                             decoration: const InputDecoration(
                               labelText: 'Korisnicko ime',
+                              helperText: 'Obavezno polje',
                               prefixIcon: Icon(Icons.person_outline_rounded),
                             ),
-                            validator: (value) => _requiredText(
-                              value,
-                              'Korisnicko ime',
-                              maxLength: 50,
-                            ),
+                            validator: InputValidators.username,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: _emailController,
                             autofillHints: const [AutofillHints.email],
+                            inputFormatters: [
+                              LengthLimitingTextInputFormatter(200),
+                            ],
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Email adresa',
-                              prefixIcon: Icon(Icons.mail_outline_rounded),
+                              helperText: 'Obavezno polje',
+                              hintText: 'korisnik@domena.com',
+                              prefixIcon:
+                                  const Icon(Icons.mail_outline_rounded),
+                              suffixIcon: _emailStatusIcon(theme),
                             ),
-                            validator: _validateEmail,
+                            validator: InputValidators.email,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
@@ -238,14 +248,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             autofillHints: const [
                               AutofillHints.telephoneNumber,
                             ],
-                            keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(9),
+                            ],
+                            keyboardType: TextInputType.number,
                             textInputAction: TextInputAction.next,
+                            onChanged: _normalizePhoneInput,
                             decoration: const InputDecoration(
                               labelText: 'Telefon',
-                              hintText: '+38761123456',
+                              helperText: 'Obavezno polje',
+                              hintText: '61805861',
+                              prefixText: '+387 ',
                               prefixIcon: Icon(Icons.phone_outlined),
                             ),
-                            validator: _validatePhone,
+                            validator: InputValidators.bosniaLocalPhone,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
@@ -257,7 +274,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               labelText: 'Lozinka',
                               prefixIcon: Icon(Icons.lock_outline_rounded),
                             ),
-                            validator: _validatePassword,
+                            validator: InputValidators.password,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
@@ -271,7 +288,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               prefixIcon: Icon(Icons.lock_reset_rounded),
                             ),
                             validator: (value) {
-                              final error = _validatePassword(value);
+                              final error = InputValidators.password(
+                                value,
+                                fieldName: 'Potvrda lozinke',
+                              );
                               if (error != null) {
                                 return error;
                               }

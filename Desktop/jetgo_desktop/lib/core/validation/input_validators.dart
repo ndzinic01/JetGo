@@ -1,6 +1,6 @@
 abstract final class InputValidators {
   static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-  static final RegExp _phonePattern = RegExp(r'^\+?[0-9][0-9\s\-\/]{6,19}$');
+  static final RegExp _phonePattern = RegExp(r'^\+?[0-9]{8,15}$');
 
   static String? requiredText(
     String? value, {
@@ -34,7 +34,7 @@ abstract final class InputValidators {
       return required ? 'Broj telefona je obavezan.' : null;
     }
     if (!_phonePattern.hasMatch(trimmed)) {
-      return 'Broj telefona mora biti u formatu +38761123456 ili 061123456.';
+      return 'Broj telefona mora imati 8 do 15 cifara i smije imati samo + na pocetku, npr. +38761123456.';
     }
     return null;
   }

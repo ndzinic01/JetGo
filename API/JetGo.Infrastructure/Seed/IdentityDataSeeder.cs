@@ -39,7 +39,7 @@ public sealed class IdentityDataSeeder
             firstName: "Desktop",
             lastName: "Admin",
             email: "desktop@jetgo.local",
-            phoneNumber: "+38761000001",
+            phoneNumber: "+387611000001",
             cancellationToken);
 
         await EnsureUserAsync(
@@ -48,7 +48,7 @@ public sealed class IdentityDataSeeder
             firstName: "Mobile",
             lastName: "User",
             email: "mobile@jetgo.local",
-            phoneNumber: "+38761000002",
+            phoneNumber: "+387611000002",
             cancellationToken);
 
         await EnsureUserAsync(
@@ -57,7 +57,7 @@ public sealed class IdentityDataSeeder
             firstName: "Mobile",
             lastName: "Test",
             email: "mobile2@jetgo.local",
-            phoneNumber: "+38761000003",
+            phoneNumber: "+387611000003",
             cancellationToken);
     }
 
