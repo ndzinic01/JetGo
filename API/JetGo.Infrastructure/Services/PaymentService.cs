@@ -79,7 +79,6 @@ public sealed class PaymentService : IPaymentService
             throw new ForbiddenException("Mozete inicirati placanje samo za vlastitu rezervaciju.");
         }
 
-        var wasAutoConfirmed = AutoConfirmReservationIfNeeded(reservation, currentUserId, nowUtc);
         EnsureReservationCanReceivePayment(reservation);
 
         if (reservation.Payment is not null)
@@ -90,11 +89,6 @@ public sealed class PaymentService : IPaymentService
                     throw new ConflictException("Placanje za odabranu rezervaciju je vec uspjesno zavrseno.");
                 case PaymentStatus.Pending:
                 {
-                    if (wasAutoConfirmed)
-                    {
-                        await _dbContext.SaveChangesAsync(cancellationToken);
-                    }
-
                     var approvalUrl = await TryResolveApprovalUrlAsync(reservation.Payment.ProviderReference, cancellationToken);
                     return await GetByIdInternalAsync(reservation.Payment.Id, approvalUrl, cancellationToken);
                 }
@@ -232,6 +226,7 @@ public sealed class PaymentService : IPaymentService
             var capture = await _payPalCheckoutClient.GetCaptureAsync(payment.ProviderReference, cancellationToken);
             var effectiveReservationStatus = _reservationStatusSyncService.GetEffectiveStatus(
                 payment.Reservation.Status,
+                payment.Status,
                 payment.Reservation.Flight.ArrivalAtUtc,
                 nowUtc);
 
@@ -280,6 +275,7 @@ public sealed class PaymentService : IPaymentService
         var approvalUrl = GetApprovalUrl(order);
         var effectiveStatus = _reservationStatusSyncService.GetEffectiveStatus(
             payment.Reservation.Status,
+            payment.Status,
             payment.Reservation.Flight.ArrivalAtUtc,
             nowUtc);
 
@@ -347,19 +343,8 @@ public sealed class PaymentService : IPaymentService
             throw new ForbiddenException("Mozete potvrditi placanje samo za vlastitu rezervaciju.");
         }
 
-        var wasAutoConfirmed = AutoConfirmReservationIfNeeded(payment.Reservation, currentUserId, nowUtc);
-        var effectiveReservationStatus = _reservationStatusSyncService.GetEffectiveStatus(
-            payment.Reservation.Status,
-            payment.Reservation.Flight.ArrivalAtUtc,
-            nowUtc);
-
         if (payment.Status == PaymentStatus.Paid)
         {
-            if (wasAutoConfirmed)
-            {
-                await _dbContext.SaveChangesAsync(cancellationToken);
-            }
-
             return await GetByIdInternalAsync(id, null, cancellationToken);
         }
 
@@ -368,13 +353,23 @@ public sealed class PaymentService : IPaymentService
             throw new ConflictException("Refundirano placanje se ne moze ponovo potvrditi.");
         }
 
-        if (effectiveReservationStatus != ReservationStatus.Confirmed)
+        if (payment.Reservation.Flight.DepartureAtUtc <= nowUtc)
         {
             throw new ValidationException(
-                "Placanje je moguce potvrditi samo za rezervaciju u statusu Confirmed.",
+                "Placanje vise nije moguce jer je vrijeme polaska proslo.",
                 new Dictionary<string, string[]>
                 {
-                    ["reservation"] = ["Prije potvrde placanja rezervacija mora biti potvrdjena."]
+                    ["flight"] = ["Placanje mora biti zavrseno prije polaska leta."]
+                });
+        }
+
+        if (payment.Reservation.Status != ReservationStatus.Pending)
+        {
+            throw new ValidationException(
+                "Placanje je moguce potvrditi samo za rezervaciju koja ceka placanje.",
+                new Dictionary<string, string[]>
+                {
+                    ["reservation"] = ["Rezervacija mora biti u statusu Pending prije PayPal potvrde."]
                 });
         }
 
@@ -419,6 +414,8 @@ public sealed class PaymentService : IPaymentService
 
         payment.ProviderReference = capturedPayment.Id;
         payment.Status = PaymentStatus.Paid;
+        _stateMachine.MarkPaymentConfirmed(payment.Reservation, currentUserId, nowUtc);
+        payment.Reservation.UpdatedAtUtc = nowUtc;
         payment.Amount = ParseAmount(capturedPayment.Amount.Value);
         payment.Currency = capturedPayment.Amount.CurrencyCode;
         payment.PaidAtUtc = paidAtUtc;
@@ -444,19 +441,35 @@ public sealed class PaymentService : IPaymentService
     public async Task<PaymentDetailsDto> RefundAsync(int id, RefundPaymentRequest request, CancellationToken cancellationToken = default)
     {
         EnsureCurrentUserIsAdmin();
+        var currentUserId = GetRequiredCurrentUserId();
         EnsurePayPalConfigured();
         var nowUtc = DateTime.UtcNow;
         await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var payment = await _dbContext.Payments
             .Include(x => x.Reservation)
-            .ThenInclude(x => x.Flight)
+                .ThenInclude(x => x.Flight)
+            .Include(x => x.Reservation)
+                .ThenInclude(x => x.Items)
+                    .ThenInclude(x => x.FlightSeat)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (payment is null)
         {
             throw new NotFoundException($"Placanje sa ID vrijednoscu {id} nije pronadjeno.");
         }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            throw new ValidationException(
+                "Razlog refundiranja je obavezan.",
+                new Dictionary<string, string[]>
+                {
+                    ["reason"] = ["Unesite razlog refundiranja placanja."]
+                });
+        }
+
+        var refundReason = request.Reason.Trim();
 
         if (payment.Status == PaymentStatus.Refunded)
         {
@@ -475,6 +488,7 @@ public sealed class PaymentService : IPaymentService
 
         var effectiveReservationStatus = _reservationStatusSyncService.GetEffectiveStatus(
             payment.Reservation.Status,
+            payment.Status,
             payment.Reservation.Flight.ArrivalAtUtc,
             nowUtc);
 
@@ -485,6 +499,16 @@ public sealed class PaymentService : IPaymentService
                 new Dictionary<string, string[]>
                 {
                     ["reservation"] = ["Refund nije dozvoljen za rezervacije u statusu Completed."]
+                });
+        }
+
+        if (payment.Reservation.Status != ReservationStatus.Confirmed)
+        {
+            throw new ValidationException(
+                "Refund je moguc samo za placenu i potvrdjenu rezervaciju.",
+                new Dictionary<string, string[]>
+                {
+                    ["reservation"] = ["Rezervacija mora biti u statusu Confirmed prije refundacije placanja."]
                 });
         }
 
@@ -513,18 +537,25 @@ public sealed class PaymentService : IPaymentService
         var refundedAtUtc = refundResponse.CreateTime?.ToUniversalTime() ?? nowUtc;
         payment.Status = PaymentStatus.Refunded;
         payment.RefundedAtUtc = refundedAtUtc;
-        payment.StatusReason = request.Reason.Trim();
+        payment.StatusReason = refundReason;
         payment.UpdatedAtUtc = nowUtc;
+
+        _stateMachine.CancelAfterRefund(payment.Reservation, currentUserId, refundReason, nowUtc);
+        var releasedSeats = ReleaseReservedSeats(payment.Reservation);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishNotificationSafelyAsync(
             payment.Reservation.UserId,
             "Placanje refundirano",
-            $"Placanje za rezervaciju {payment.Reservation.ReservationCode} je refundirano kroz PayPal sandbox. Razlog: {request.Reason.Trim()}",
+            $"Placanje za rezervaciju {payment.Reservation.ReservationCode} je refundirano kroz PayPal sandbox i rezervacija je otkazana. Razlog: {refundReason}",
             refundedAtUtc,
             cancellationToken);
 
-        _logger.LogInformation("Payment {PaymentId} refunded through PayPal for reservation {ReservationId}.", payment.Id, payment.ReservationId);
+        _logger.LogInformation(
+            "Payment {PaymentId} refunded through PayPal for reservation {ReservationId}; {ReleasedSeatCount} seats released.",
+            payment.Id,
+            payment.ReservationId,
+            releasedSeats);
 
         return await GetByIdInternalAsync(id, null, cancellationToken);
     }
@@ -641,11 +672,10 @@ public sealed class PaymentService : IPaymentService
                 RefundedAtUtc = x.RefundedAtUtc,
                 StatusReason = x.StatusReason,
                 CanBeConfirmed = x.Status == PaymentStatus.Pending &&
-                    x.Reservation.Status != ReservationStatus.Cancelled &&
-                    x.Reservation.Status != ReservationStatus.Completed &&
-                    x.Reservation.Flight.ArrivalAtUtc > nowUtc,
+                    x.Reservation.Status == ReservationStatus.Pending &&
+                    x.Reservation.Flight.DepartureAtUtc > nowUtc,
                 CanBeRefunded = x.Status == PaymentStatus.Paid &&
-                    x.Reservation.Status != ReservationStatus.Completed &&
+                    x.Reservation.Status == ReservationStatus.Confirmed &&
                     x.Reservation.Flight.DepartureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours),
                 Customer = new PaymentCustomerDto
                 {
@@ -700,36 +730,49 @@ public sealed class PaymentService : IPaymentService
 
     private void EnsureReservationCanReceivePayment(Reservation reservation)
     {
-        var effectiveStatus = _reservationStatusSyncService.GetEffectiveStatus(
-            reservation.Status,
-            reservation.Flight.ArrivalAtUtc,
-            DateTime.UtcNow);
+        var nowUtc = DateTime.UtcNow;
 
-        if (effectiveStatus != ReservationStatus.Confirmed)
+        if (reservation.Status != ReservationStatus.Pending)
         {
             throw new ValidationException(
-                "Placanje je moguce inicirati samo za aktivnu rezervaciju.",
+                "Placanje je moguce pokrenuti samo za rezervaciju koja ceka placanje.",
                 new Dictionary<string, string[]>
                 {
-                    ["reservation"] = ["Placanje mozete pokrenuti samo za rezervaciju koja nije otkazana niti zavrsena."]
+                    ["reservation"] = ["Placanje mozete pokrenuti samo za rezervaciju u statusu Pending."]
+                });
+        }
+
+        if (reservation.Flight.DepartureAtUtc <= nowUtc)
+        {
+            throw new ValidationException(
+                "Placanje vise nije moguce jer je vrijeme polaska proslo.",
+                new Dictionary<string, string[]>
+                {
+                    ["flight"] = ["Placanje mora biti zavrseno prije polaska leta."]
                 });
         }
     }
 
-    private bool AutoConfirmReservationIfNeeded(Reservation reservation, string actorUserId, DateTime nowUtc)
+    private static int ReleaseReservedSeats(Reservation reservation)
     {
-        if (_reservationStatusSyncService.GetEffectiveStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc) == ReservationStatus.Completed)
+        var releasedSeats = 0;
+
+        foreach (var item in reservation.Items)
         {
-            return false;
+            if (!item.FlightSeat.IsReserved)
+            {
+                continue;
+            }
+
+            item.FlightSeat.IsReserved = false;
+            releasedSeats++;
         }
 
-        if (reservation.Status != ReservationStatus.Pending)
-        {
-            return false;
-        }
+        reservation.Flight.AvailableSeats = Math.Min(
+            reservation.Flight.TotalSeats,
+            reservation.Flight.AvailableSeats + releasedSeats);
 
-        _stateMachine.MarkCreated(reservation, actorUserId, nowUtc);
-        return true;
+        return releasedSeats;
     }
 
     private static bool CanBeRefunded(
@@ -739,7 +782,7 @@ public sealed class PaymentService : IPaymentService
         DateTime nowUtc)
     {
         return paymentStatus == PaymentStatus.Paid &&
-            reservationStatus != ReservationStatus.Completed &&
+            reservationStatus == ReservationStatus.Confirmed &&
             departureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours);
     }
 

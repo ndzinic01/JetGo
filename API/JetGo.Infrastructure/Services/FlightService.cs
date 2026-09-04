@@ -17,11 +17,16 @@ public sealed class FlightService : IFlightService
 {
     private readonly JetGoDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ReservationStatusSyncService _reservationStatusSyncService;
 
-    public FlightService(JetGoDbContext dbContext, IHttpContextAccessor httpContextAccessor)
+    public FlightService(
+        JetGoDbContext dbContext,
+        IHttpContextAccessor httpContextAccessor,
+        ReservationStatusSyncService reservationStatusSyncService)
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
+        _reservationStatusSyncService = reservationStatusSyncService;
     }
 
     public async Task<PagedResponseDto<FlightListItemDto>> GetPagedAsync(FlightSearchRequest request, CancellationToken cancellationToken = default)
@@ -29,6 +34,7 @@ public sealed class FlightService : IFlightService
         ValidateRequest(request);
 
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
         var query = BuildQuery(request);
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -88,6 +94,7 @@ public sealed class FlightService : IFlightService
     public async Task<FlightDetailsDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var flight = await _dbContext.Flights
             .AsNoTracking()

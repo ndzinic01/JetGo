@@ -16,11 +16,16 @@ public sealed class RecommendationService : IRecommendationService
 {
     private readonly JetGoDbContext _dbContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ReservationStatusSyncService _reservationStatusSyncService;
 
-    public RecommendationService(JetGoDbContext dbContext, IHttpContextAccessor httpContextAccessor)
+    public RecommendationService(
+        JetGoDbContext dbContext,
+        IHttpContextAccessor httpContextAccessor,
+        ReservationStatusSyncService reservationStatusSyncService)
     {
         _dbContext = dbContext;
         _httpContextAccessor = httpContextAccessor;
+        _reservationStatusSyncService = reservationStatusSyncService;
     }
 
     public async Task<PagedResponseDto<RecommendedFlightDto>> GetRecommendedFlightsAsync(
@@ -28,6 +33,8 @@ public sealed class RecommendationService : IRecommendationService
         CancellationToken cancellationToken = default)
     {
         var currentUserId = GetRequiredCurrentUserId();
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(DateTime.UtcNow, cancellationToken);
+
         var recentSearches = await _dbContext.SearchHistories
             .AsNoTracking()
             .Where(x => x.UserId == currentUserId)

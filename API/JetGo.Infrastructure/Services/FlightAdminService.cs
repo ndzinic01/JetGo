@@ -13,19 +13,24 @@ namespace JetGo.Infrastructure.Services;
 public sealed class FlightAdminService : IFlightAdminService
 {
     private readonly JetGoDbContext _dbContext;
+    private readonly ReservationStatusSyncService _reservationStatusSyncService;
 
-    public FlightAdminService(JetGoDbContext dbContext)
+    public FlightAdminService(
+        JetGoDbContext dbContext,
+        ReservationStatusSyncService reservationStatusSyncService)
     {
         _dbContext = dbContext;
+        _reservationStatusSyncService = reservationStatusSyncService;
     }
 
     public async Task<PagedResponseDto<FlightListItemDto>> GetPagedAsync(FlightSearchRequest request, CancellationToken cancellationToken = default)
     {
         ValidateRequest(request);
 
+        var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
         var query = BuildQuery(request);
         var totalCount = await query.CountAsync(cancellationToken);
-        var nowUtc = DateTime.UtcNow;
 
         var items = await query
             .OrderBy(x => x.DepartureAtUtc)
@@ -81,6 +86,7 @@ public sealed class FlightAdminService : IFlightAdminService
     public async Task<FlightDetailsDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var flight = await _dbContext.Flights
             .AsNoTracking()

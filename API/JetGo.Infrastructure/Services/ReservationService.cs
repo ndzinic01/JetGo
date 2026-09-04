@@ -48,6 +48,7 @@ public sealed class ReservationService : IReservationService
     {
         var currentUserId = GetRequiredCurrentUserId();
         var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
         var normalizedSeatNumbers = NormalizeSeatNumbers(request.SeatNumbers);
 
         var flight = await _dbContext.Flights
@@ -152,7 +153,7 @@ public sealed class ReservationService : IReservationService
         await PublishNotificationSafelyAsync(
             currentUserId,
             "Rezervacija kreirana",
-            $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je uspjesno kreirana i odmah spremna za placanje.",
+            $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je uspjesno kreirana i ceka zavrsetak placanja.",
             nowUtc,
             cancellationToken);
 
@@ -220,7 +221,11 @@ public sealed class ReservationService : IReservationService
             throw new ForbiddenException("Mozete mijenjati dodatni prtljag samo na vlastitoj rezervaciji.");
         }
 
-        var effectiveStatus = _reservationStatusSyncService.GetEffectiveStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc);
+        var effectiveStatus = GetEffectiveReservationStatus(
+            reservation.Status,
+            reservation.Payment?.Status,
+            reservation.Flight.ArrivalAtUtc,
+            nowUtc);
 
         if (effectiveStatus is ReservationStatus.Cancelled or ReservationStatus.Completed)
         {
@@ -298,7 +303,11 @@ public sealed class ReservationService : IReservationService
             throw new ForbiddenException("Mozete otkazati samo vlastitu rezervaciju.");
         }
 
-        var effectiveStatus = _reservationStatusSyncService.GetEffectiveStatus(reservation.Status, reservation.Flight.ArrivalAtUtc, nowUtc);
+        var effectiveStatus = GetEffectiveReservationStatus(
+            reservation.Status,
+            reservation.Payment?.Status,
+            reservation.Flight.ArrivalAtUtc,
+            nowUtc);
 
         if (effectiveStatus == ReservationStatus.Completed)
         {
@@ -360,12 +369,11 @@ public sealed class ReservationService : IReservationService
                 ArrivalAirportCode = x.Flight.Destination.ArrivalAirport.IataCode,
                 DepartureAtUtc = x.Flight.DepartureAtUtc,
                 ArrivalAtUtc = x.Flight.ArrivalAtUtc,
-                Status = x.Status == ReservationStatus.Cancelled
-                    ? ReservationStatus.Cancelled
-                    : x.Status == ReservationStatus.Completed || x.Flight.ArrivalAtUtc <= nowUtc
-                        ? ReservationStatus.Completed
-                        : x.Status == ReservationStatus.Pending
-                    ? ReservationStatus.Confirmed
+                Status = x.Status == ReservationStatus.Confirmed &&
+                    x.Payment != null &&
+                    x.Payment.Status == PaymentStatus.Paid &&
+                    x.Flight.ArrivalAtUtc <= nowUtc
+                    ? ReservationStatus.Completed
                     : x.Status,
                 TotalAmount = x.TotalAmount,
                 Currency = x.Currency,
@@ -401,11 +409,13 @@ public sealed class ReservationService : IReservationService
             {
                 ReservationStatus.Completed => query.Where(x =>
                     x.Status == ReservationStatus.Completed ||
-                    (x.Status != ReservationStatus.Cancelled && x.Flight.ArrivalAtUtc <= nowUtc)),
+                    (x.Status == ReservationStatus.Confirmed &&
+                        x.Payment != null &&
+                        x.Payment.Status == PaymentStatus.Paid &&
+                        x.Flight.ArrivalAtUtc <= nowUtc)),
                 ReservationStatus.Cancelled => query.Where(x => x.Status == ReservationStatus.Cancelled),
                 ReservationStatus.Confirmed => query.Where(x =>
-                    x.Status != ReservationStatus.Cancelled &&
-                    x.Status != ReservationStatus.Completed &&
+                    x.Status == ReservationStatus.Confirmed &&
                     x.Flight.ArrivalAtUtc > nowUtc),
                 ReservationStatus.Pending => query.Where(x =>
                     x.Status == ReservationStatus.Pending &&
@@ -585,7 +595,7 @@ public sealed class ReservationService : IReservationService
     private ReservationDetailsDto BuildVisibleReservationDetails(ReservationDetailsDto reservation, bool isAdmin)
     {
         var nowUtc = DateTime.UtcNow;
-        var actualStatus = _reservationStatusSyncService.GetEffectiveStatus(reservation.Status, reservation.ArrivalAtUtc, nowUtc);
+        var actualStatus = GetEffectiveReservationStatus(reservation.Status, reservation.PaymentStatus, reservation.ArrivalAtUtc, nowUtc);
 
         return new ReservationDetailsDto
         {
@@ -598,7 +608,7 @@ public sealed class ReservationService : IReservationService
             ArrivalAirportCode = reservation.ArrivalAirportCode,
             DepartureAtUtc = reservation.DepartureAtUtc,
             ArrivalAtUtc = reservation.ArrivalAtUtc,
-            Status = GetDisplayReservationStatus(actualStatus),
+            Status = actualStatus,
             TotalAmount = reservation.TotalAmount,
             Currency = reservation.Currency,
             SeatsTotalAmount = reservation.SeatsTotalAmount,
@@ -614,24 +624,30 @@ public sealed class ReservationService : IReservationService
             StatusReason = GetDisplayStatusReason(reservation.Status, actualStatus, reservation.StatusReason),
             Customer = reservation.Customer,
             Seats = reservation.Seats,
-            CanBeCancelled = _stateMachine.CanCancel(actualStatus),
+            CanBeCancelled = _stateMachine.CanCancel(actualStatus) &&
+                reservation.PaymentStatus is not PaymentStatus.Paid and not PaymentStatus.Refunded,
             CanBeConfirmed = false,
             CanBeCompleted = false,
             CanInitiatePayment =
-                (actualStatus is ReservationStatus.Pending or ReservationStatus.Confirmed) &&
-                !reservation.IsPaid,
+                actualStatus == ReservationStatus.Pending && !reservation.IsPaid,
             CanBeRefunded =
                 reservation.PaymentStatus == PaymentStatus.Paid &&
-                actualStatus != ReservationStatus.Completed &&
+                actualStatus == ReservationStatus.Confirmed &&
                 reservation.DepartureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours),
             CanUpdateBaggage = CanUpdateBaggage(actualStatus, reservation.PaymentStatus, reservation.IsPaid)
         };
     }
 
-    private static ReservationStatus GetDisplayReservationStatus(ReservationStatus reservationStatus)
+    private static ReservationStatus GetEffectiveReservationStatus(
+        ReservationStatus reservationStatus,
+        PaymentStatus? paymentStatus,
+        DateTime arrivalAtUtc,
+        DateTime nowUtc)
     {
-        return reservationStatus == ReservationStatus.Pending
-            ? ReservationStatus.Confirmed
+        return reservationStatus == ReservationStatus.Confirmed &&
+            paymentStatus == PaymentStatus.Paid &&
+            arrivalAtUtc <= nowUtc
+            ? ReservationStatus.Completed
             : reservationStatus;
     }
 
@@ -646,9 +662,7 @@ public sealed class ReservationService : IReservationService
             return "Putovanje je zavrseno jer je proslo planirano vrijeme dolaska leta.";
         }
 
-        return storedReservationStatus == ReservationStatus.Pending
-            ? "Rezervacija je automatski potvrdjena i spremna za placanje."
-            : statusReason;
+        return statusReason;
     }
 
     private string GetRequiredCurrentUserId()

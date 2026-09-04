@@ -10,10 +10,58 @@ public sealed class ReservationStateMachine
 
     public void MarkCreated(Reservation reservation, string actorUserId, DateTime nowUtc)
     {
+        reservation.Status = ReservationStatus.Pending;
+        reservation.StatusChangedByUserId = actorUserId;
+        reservation.StatusChangedAtUtc = nowUtc;
+        reservation.StatusReason = "Rezervacija je kreirana i ceka zavrsetak placanja.";
+    }
+
+    public void MarkPaymentConfirmed(Reservation reservation, string actorUserId, DateTime nowUtc)
+    {
+        if (reservation.Status == ReservationStatus.Confirmed)
+        {
+            return;
+        }
+
+        if (reservation.Status != ReservationStatus.Pending)
+        {
+            throw new ValidationException(
+                "Samo rezervacija koja ceka placanje moze biti potvrdjena.",
+                new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Potvrda je dozvoljena samo za rezervacije u statusu Pending."]
+                });
+        }
+
         reservation.Status = ReservationStatus.Confirmed;
         reservation.StatusChangedByUserId = actorUserId;
         reservation.StatusChangedAtUtc = nowUtc;
-        reservation.StatusReason = "Rezervacija je automatski potvrdjena i spremna za placanje.";
+        reservation.StatusReason = "Rezervacija je potvrdjena nakon uspjesnog placanja.";
+    }
+
+    public bool TryExpirePendingPayment(
+        Reservation reservation,
+        string actorUserId,
+        DateTime nowUtc,
+        TimeSpan paymentHoldDuration)
+    {
+        if (reservation.Status != ReservationStatus.Pending)
+        {
+            return false;
+        }
+
+        if (reservation.CreatedAtUtc.Add(paymentHoldDuration) > nowUtc)
+        {
+            return false;
+        }
+
+        reservation.Status = ReservationStatus.Cancelled;
+        reservation.StatusChangedByUserId = actorUserId;
+        reservation.StatusChangedAtUtc = nowUtc;
+        reservation.StatusReason = "Rezervacija je istekla jer placanje nije zavrseno u predvidjenom roku.";
+        reservation.UpdatedAtUtc = nowUtc;
+
+        return true;
     }
 
     public void Cancel(Reservation reservation, string actorUserId, string reason, DateTime nowUtc, bool hasCompletedPayment)
@@ -44,7 +92,7 @@ public sealed class ReservationStateMachine
                 "Placena rezervacija se trenutno ne moze otkazati bez refund toka.",
                 new Dictionary<string, string[]>
                 {
-                    ["payment"] = ["Prije otkazivanja placene rezervacije potrebno je implementirati refund logiku."]
+                    ["payment"] = ["Prije otkazivanja placene rezervacije potrebno je koristiti refund tok."]
                 });
         }
 
@@ -52,6 +100,46 @@ public sealed class ReservationStateMachine
         reservation.StatusChangedByUserId = actorUserId;
         reservation.StatusChangedAtUtc = nowUtc;
         reservation.StatusReason = reason.Trim();
+        reservation.UpdatedAtUtc = nowUtc;
+    }
+
+    public void CancelAfterRefund(Reservation reservation, string actorUserId, string reason, DateTime nowUtc)
+    {
+        if (reservation.Status == ReservationStatus.Cancelled)
+        {
+            throw new ValidationException(
+                "Rezervacija je vec otkazana.",
+                new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Refundirano placanje ne moze ponovo otkazati istu rezervaciju."]
+                });
+        }
+
+        if (reservation.Status == ReservationStatus.Completed)
+        {
+            throw new ValidationException(
+                "Zavrsena rezervacija se ne moze otkazati nakon refundacije.",
+                new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Refund nije dozvoljen za rezervacije u statusu Completed."]
+                });
+        }
+
+        if (reservation.Status != ReservationStatus.Confirmed)
+        {
+            throw new ValidationException(
+                "Refund moze otkazati samo potvrdjenu rezervaciju.",
+                new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Rezervacija mora biti u statusu Confirmed prije refundacije placanja."]
+                });
+        }
+
+        reservation.Status = ReservationStatus.Cancelled;
+        reservation.StatusChangedByUserId = actorUserId;
+        reservation.StatusChangedAtUtc = nowUtc;
+        reservation.StatusReason = $"Rezervacija je otkazana nakon refundacije placanja. Razlog: {reason.Trim()}";
+        reservation.UpdatedAtUtc = nowUtc;
     }
 
     public void Complete(Reservation reservation, string actorUserId, string? reason, DateTime nowUtc)
@@ -76,6 +164,16 @@ public sealed class ReservationStateMachine
                 });
         }
 
+        if (reservation.Payment?.Status != PaymentStatus.Paid)
+        {
+            throw new ValidationException(
+                "Rezervacija se ne moze oznaciti zavrsenom bez evidentiranog placanja.",
+                new Dictionary<string, string[]>
+                {
+                    ["payment"] = ["Prije statusa Completed placanje mora biti u statusu Paid."]
+                });
+        }
+
         reservation.Status = ReservationStatus.Completed;
         reservation.StatusChangedByUserId = actorUserId;
         reservation.StatusChangedAtUtc = nowUtc;
@@ -96,9 +194,14 @@ public sealed class ReservationStateMachine
             return false;
         }
 
-        if (reservation.Status == ReservationStatus.Pending)
+        if (reservation.Status != ReservationStatus.Confirmed)
         {
-            MarkCreated(reservation, actorUserId, nowUtc);
+            return false;
+        }
+
+        if (reservation.Payment?.Status != PaymentStatus.Paid)
+        {
+            return false;
         }
 
         Complete(reservation, actorUserId, AutoCompletedReason, nowUtc);
@@ -116,14 +219,20 @@ public sealed class ReservationStateMachine
         return status == ReservationStatus.Confirmed;
     }
 
-    public ReservationStatus GetEffectiveStatus(ReservationStatus status, DateTime arrivalAtUtc, DateTime nowUtc)
+    public ReservationStatus GetEffectiveStatus(
+        ReservationStatus status,
+        PaymentStatus? paymentStatus,
+        DateTime arrivalAtUtc,
+        DateTime nowUtc)
     {
         if (status is ReservationStatus.Cancelled or ReservationStatus.Completed)
         {
             return status;
         }
 
-        return arrivalAtUtc <= nowUtc
+        return status == ReservationStatus.Confirmed &&
+            paymentStatus == PaymentStatus.Paid &&
+            arrivalAtUtc <= nowUtc
             ? ReservationStatus.Completed
             : status;
     }
