@@ -80,7 +80,7 @@ public sealed class FlightService : IFlightService
                 TotalSeats = x.TotalSeats,
                 Status = x.Status == Domain.Enums.FlightStatus.Cancelled
                     ? x.Status
-                    : x.ArrivalAtUtc < nowUtc
+                    : x.ArrivalAtUtc <= nowUtc
                         ? Domain.Enums.FlightStatus.Completed
                         : x.Status
             })
@@ -139,7 +139,7 @@ public sealed class FlightService : IFlightService
                 ReservedSeats = x.Seats.Count(s => s.IsReserved),
                 Status = x.Status == Domain.Enums.FlightStatus.Cancelled
                     ? x.Status
-                    : x.ArrivalAtUtc < nowUtc
+                    : x.ArrivalAtUtc <= nowUtc
                         ? Domain.Enums.FlightStatus.Completed
                         : x.Status,
                 SeatNumbers = x.Seats
@@ -161,6 +161,14 @@ public sealed class FlightService : IFlightService
     {
         var nowUtc = DateTime.UtcNow;
         var query = _dbContext.Flights.AsNoTracking().AsQueryable();
+
+        if (!request.Status.HasValue)
+        {
+            query = query.Where(x =>
+                (x.Status == Domain.Enums.FlightStatus.Scheduled || x.Status == Domain.Enums.FlightStatus.Delayed) &&
+                x.DepartureAtUtc > nowUtc &&
+                x.ArrivalAtUtc > nowUtc);
+        }
 
         if (request.DepartureAirportId.HasValue)
         {
@@ -203,12 +211,12 @@ public sealed class FlightService : IFlightService
             {
                 Domain.Enums.FlightStatus.Completed => query.Where(x =>
                     x.Status == Domain.Enums.FlightStatus.Completed ||
-                    (x.Status != Domain.Enums.FlightStatus.Cancelled && x.ArrivalAtUtc < nowUtc)),
+                    (x.Status != Domain.Enums.FlightStatus.Cancelled && x.ArrivalAtUtc <= nowUtc)),
                 Domain.Enums.FlightStatus.Cancelled => query.Where(x => x.Status == Domain.Enums.FlightStatus.Cancelled),
                 Domain.Enums.FlightStatus.Delayed => query.Where(x =>
-                    x.Status == Domain.Enums.FlightStatus.Delayed && x.ArrivalAtUtc >= nowUtc),
+                    x.Status == Domain.Enums.FlightStatus.Delayed && x.DepartureAtUtc > nowUtc && x.ArrivalAtUtc > nowUtc),
                 _ => query.Where(x =>
-                    x.Status == Domain.Enums.FlightStatus.Scheduled && x.ArrivalAtUtc >= nowUtc)
+                    x.Status == Domain.Enums.FlightStatus.Scheduled && x.DepartureAtUtc > nowUtc && x.ArrivalAtUtc > nowUtc)
             };
         }
 

@@ -41,9 +41,13 @@ public sealed class AdminDashboardService : IAdminDashboardService
             .Select(x => new
             {
                 UpcomingCount = x.Count(y =>
-                    y.DepartureAtUtc >= nowUtc &&
+                    y.DepartureAtUtc > nowUtc &&
+                    y.ArrivalAtUtc > nowUtc &&
                     (y.Status == FlightStatus.Scheduled || y.Status == FlightStatus.Delayed)),
-                DelayedCount = x.Count(y => y.Status == FlightStatus.Delayed)
+                DelayedCount = x.Count(y =>
+                    y.Status == FlightStatus.Delayed &&
+                    y.DepartureAtUtc > nowUtc &&
+                    y.ArrivalAtUtc > nowUtc)
             })
             .SingleOrDefaultAsync(cancellationToken);
 

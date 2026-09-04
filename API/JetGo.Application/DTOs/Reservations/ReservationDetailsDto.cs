@@ -22,6 +22,8 @@ public sealed class ReservationDetailsDto
 
     public DateTime ArrivalAtUtc { get; init; }
 
+    public FlightStatus FlightStatus { get; init; }
+
     public ReservationStatus Status { get; init; }
 
     public decimal TotalAmount { get; init; }

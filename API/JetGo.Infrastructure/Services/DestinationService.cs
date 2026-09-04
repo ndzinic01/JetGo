@@ -53,13 +53,13 @@ public sealed class DestinationService : IDestinationService
                     CityName = x.ArrivalAirport.City.Name,
                     CountryName = x.ArrivalAirport.City.Country.Name
                 },
-                UpcomingFlightsCount = x.Flights.Count(f => f.DepartureAtUtc >= nowUtc && f.Status == FlightStatus.Scheduled),
+                UpcomingFlightsCount = x.Flights.Count(f => f.DepartureAtUtc > nowUtc && f.ArrivalAtUtc > nowUtc && (f.Status == FlightStatus.Scheduled || f.Status == FlightStatus.Delayed)),
                 LowestBasePrice = x.Flights
-                    .Where(f => f.DepartureAtUtc >= nowUtc && f.Status == FlightStatus.Scheduled)
+                    .Where(f => f.DepartureAtUtc > nowUtc && f.ArrivalAtUtc > nowUtc && (f.Status == FlightStatus.Scheduled || f.Status == FlightStatus.Delayed))
                     .Select(f => (decimal?)f.BasePrice)
                     .Min(),
                 NextDepartureAtUtc = x.Flights
-                    .Where(f => f.DepartureAtUtc >= nowUtc && f.Status == FlightStatus.Scheduled)
+                    .Where(f => f.DepartureAtUtc > nowUtc && f.ArrivalAtUtc > nowUtc && (f.Status == FlightStatus.Scheduled || f.Status == FlightStatus.Delayed))
                     .Select(f => (DateTime?)f.DepartureAtUtc)
                     .Min()
             })
@@ -98,13 +98,13 @@ public sealed class DestinationService : IDestinationService
                     CountryName = x.ArrivalAirport.City.Country.Name
                 },
                 TotalFlightsCount = x.Flights.Count(),
-                UpcomingFlightsCount = x.Flights.Count(f => f.DepartureAtUtc >= nowUtc && f.Status == FlightStatus.Scheduled),
+                UpcomingFlightsCount = x.Flights.Count(f => f.DepartureAtUtc > nowUtc && f.ArrivalAtUtc > nowUtc && (f.Status == FlightStatus.Scheduled || f.Status == FlightStatus.Delayed)),
                 LowestBasePrice = x.Flights
-                    .Where(f => f.DepartureAtUtc >= nowUtc && f.Status == FlightStatus.Scheduled)
+                    .Where(f => f.DepartureAtUtc > nowUtc && f.ArrivalAtUtc > nowUtc && (f.Status == FlightStatus.Scheduled || f.Status == FlightStatus.Delayed))
                     .Select(f => (decimal?)f.BasePrice)
                     .Min(),
                 NextDepartureAtUtc = x.Flights
-                    .Where(f => f.DepartureAtUtc >= nowUtc && f.Status == FlightStatus.Scheduled)
+                    .Where(f => f.DepartureAtUtc > nowUtc && f.ArrivalAtUtc > nowUtc && (f.Status == FlightStatus.Scheduled || f.Status == FlightStatus.Delayed))
                     .Select(f => (DateTime?)f.DepartureAtUtc)
                     .Min()
             })

@@ -163,6 +163,7 @@ public static class DependencyInjection
         services.AddScoped<ISupportMessageService, SupportMessageService>();
         services.AddScoped<ReservationStateMachine>();
         services.AddScoped<ReservationStatusSyncService>();
+        services.AddScoped<FlightLifecycleService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IdentityDataSeeder>();
 

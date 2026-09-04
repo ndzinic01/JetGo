@@ -14,17 +14,20 @@ public sealed class ReservationStatusSyncService
 
     private readonly JetGoDbContext _dbContext;
     private readonly ReservationStateMachine _stateMachine;
+    private readonly FlightLifecycleService _flightLifecycleService;
     private readonly INotificationEventPublisher _notificationEventPublisher;
     private readonly ILogger<ReservationStatusSyncService> _logger;
 
     public ReservationStatusSyncService(
         JetGoDbContext dbContext,
         ReservationStateMachine stateMachine,
+        FlightLifecycleService flightLifecycleService,
         INotificationEventPublisher notificationEventPublisher,
         ILogger<ReservationStatusSyncService> logger)
     {
         _dbContext = dbContext;
         _stateMachine = stateMachine;
+        _flightLifecycleService = flightLifecycleService;
         _notificationEventPublisher = notificationEventPublisher;
         _logger = logger;
     }
@@ -80,6 +83,29 @@ public sealed class ReservationStatusSyncService
             expiredReservationNotifications.Add((reservation.UserId, reservation.ReservationCode, reservation.Flight.FlightNumber));
         }
 
+        var completedFlightNotifications = new List<NotificationRequestedMessage>();
+        var flightsToComplete = await _dbContext.Flights
+            .Include(x => x.Reservations)
+                .ThenInclude(x => x.Payment)
+            .Include(x => x.Reservations)
+                .ThenInclude(x => x.Items)
+                    .ThenInclude(x => x.FlightSeat)
+            .Where(x =>
+                (x.Status == FlightStatus.Scheduled || x.Status == FlightStatus.Delayed) &&
+                x.ArrivalAtUtc <= nowUtc)
+            .ToListAsync(cancellationToken);
+
+        foreach (var flight in flightsToComplete)
+        {
+            var notifications = await _flightLifecycleService.ChangeStatusAsync(
+                flight,
+                FlightStatus.Completed,
+                SystemActorUserId,
+                nowUtc,
+                cancellationToken);
+            completedFlightNotifications.AddRange(notifications);
+        }
+
         var reservations = await _dbContext.Reservations
             .Include(x => x.Flight)
             .Include(x => x.Payment)
@@ -100,16 +126,17 @@ public sealed class ReservationStatusSyncService
             }
         }
 
-        if (expiredReservationNotifications.Count == 0 && completedReservations.Count == 0)
+        if (expiredReservationNotifications.Count == 0 && completedReservations.Count == 0 && completedFlightNotifications.Count == 0 && flightsToComplete.Count == 0)
         {
             return;
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogInformation(
-            "{ExpiredReservationCount} pending reservations expired and {CompletedReservationCount} reservations automatically marked as completed.",
+            "{ExpiredReservationCount} pending reservations expired, {CompletedReservationCount} reservations completed and {CompletedFlightCount} flights marked as completed.",
             expiredReservationNotifications.Count,
-            completedReservations.Count);
+            completedReservations.Count,
+            flightsToComplete.Count);
 
         foreach (var reservation in completedReservations)
         {
@@ -120,6 +147,8 @@ public sealed class ReservationStatusSyncService
                 nowUtc,
                 cancellationToken);
         }
+
+        await _flightLifecycleService.PublishNotificationsSafelyAsync(completedFlightNotifications, cancellationToken);
 
         foreach (var reservation in expiredReservationNotifications)
         {

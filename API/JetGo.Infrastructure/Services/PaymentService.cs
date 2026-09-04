@@ -353,15 +353,7 @@ public sealed class PaymentService : IPaymentService
             throw new ConflictException("Refundirano placanje se ne moze ponovo potvrditi.");
         }
 
-        if (payment.Reservation.Flight.DepartureAtUtc <= nowUtc)
-        {
-            throw new ValidationException(
-                "Placanje vise nije moguce jer je vrijeme polaska proslo.",
-                new Dictionary<string, string[]>
-                {
-                    ["flight"] = ["Placanje mora biti zavrseno prije polaska leta."]
-                });
-        }
+        EnsureFlightCanReceivePayment(payment.Reservation.Flight, nowUtc);
 
         if (payment.Reservation.Status != ReservationStatus.Pending)
         {
@@ -673,9 +665,12 @@ public sealed class PaymentService : IPaymentService
                 StatusReason = x.StatusReason,
                 CanBeConfirmed = x.Status == PaymentStatus.Pending &&
                     x.Reservation.Status == ReservationStatus.Pending &&
-                    x.Reservation.Flight.DepartureAtUtc > nowUtc,
+                    (x.Reservation.Flight.Status == FlightStatus.Scheduled || x.Reservation.Flight.Status == FlightStatus.Delayed) &&
+                    x.Reservation.Flight.DepartureAtUtc > nowUtc &&
+                    x.Reservation.Flight.ArrivalAtUtc > nowUtc,
                 CanBeRefunded = x.Status == PaymentStatus.Paid &&
                     x.Reservation.Status == ReservationStatus.Confirmed &&
+                    (x.Reservation.Flight.Status == FlightStatus.Scheduled || x.Reservation.Flight.Status == FlightStatus.Delayed) &&
                     x.Reservation.Flight.DepartureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours),
                 Customer = new PaymentCustomerDto
                 {
@@ -742,15 +737,22 @@ public sealed class PaymentService : IPaymentService
                 });
         }
 
-        if (reservation.Flight.DepartureAtUtc <= nowUtc)
+        EnsureFlightCanReceivePayment(reservation.Flight, nowUtc);
+    }
+
+    private static void EnsureFlightCanReceivePayment(Flight flight, DateTime nowUtc)
+    {
+        if (FlightLifecycleService.CanReceivePayment(flight, nowUtc))
         {
-            throw new ValidationException(
-                "Placanje vise nije moguce jer je vrijeme polaska proslo.",
-                new Dictionary<string, string[]>
-                {
-                    ["flight"] = ["Placanje mora biti zavrseno prije polaska leta."]
-                });
+            return;
         }
+
+        throw new ValidationException(
+            "Placanje za ovaj let trenutno nije moguce.",
+            new Dictionary<string, string[]>
+            {
+                ["flight"] = ["Placanje je dozvoljeno samo za aktivan let prije vremena polaska. Otkazan ili zavrsen let se ne moze platiti."]
+            });
     }
 
     private static int ReleaseReservedSeats(Reservation reservation)

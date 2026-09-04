@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.Flights;
@@ -6,6 +7,7 @@ using JetGo.Application.Requests.Flights;
 using JetGo.Domain.Entities;
 using JetGo.Infrastructure.Persistence;
 using JetGo.Infrastructure.Services.Common;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace JetGo.Infrastructure.Services;
@@ -13,14 +15,20 @@ namespace JetGo.Infrastructure.Services;
 public sealed class FlightAdminService : IFlightAdminService
 {
     private readonly JetGoDbContext _dbContext;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ReservationStatusSyncService _reservationStatusSyncService;
+    private readonly FlightLifecycleService _flightLifecycleService;
 
     public FlightAdminService(
         JetGoDbContext dbContext,
-        ReservationStatusSyncService reservationStatusSyncService)
+        IHttpContextAccessor httpContextAccessor,
+        ReservationStatusSyncService reservationStatusSyncService,
+        FlightLifecycleService flightLifecycleService)
     {
         _dbContext = dbContext;
+        _httpContextAccessor = httpContextAccessor;
         _reservationStatusSyncService = reservationStatusSyncService;
+        _flightLifecycleService = flightLifecycleService;
     }
 
     public async Task<PagedResponseDto<FlightListItemDto>> GetPagedAsync(FlightSearchRequest request, CancellationToken cancellationToken = default)
@@ -74,7 +82,7 @@ public sealed class FlightAdminService : IFlightAdminService
                 TotalSeats = x.TotalSeats,
                 Status = x.Status == Domain.Enums.FlightStatus.Cancelled
                     ? x.Status
-                    : x.ArrivalAtUtc < nowUtc
+                    : x.ArrivalAtUtc <= nowUtc
                         ? Domain.Enums.FlightStatus.Completed
                         : x.Status
             })
@@ -131,7 +139,7 @@ public sealed class FlightAdminService : IFlightAdminService
                 ReservedSeats = x.Seats.Count(s => s.IsReserved),
                 Status = x.Status == Domain.Enums.FlightStatus.Cancelled
                     ? x.Status
-                    : x.ArrivalAtUtc < nowUtc
+                    : x.ArrivalAtUtc <= nowUtc
                         ? Domain.Enums.FlightStatus.Completed
                         : x.Status,
                 SeatNumbers = x.Seats
@@ -179,9 +187,17 @@ public sealed class FlightAdminService : IFlightAdminService
     {
         ValidateRequest(request);
 
+        var nowUtc = DateTime.UtcNow;
+        var actorUserId = GetRequiredCurrentUserId();
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
+
         var flight = await _dbContext.Flights
             .Include(x => x.Seats)
             .Include(x => x.Reservations)
+                .ThenInclude(x => x.Payment)
+            .Include(x => x.Reservations)
+                .ThenInclude(x => x.Items)
+                    .ThenInclude(x => x.FlightSeat)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (flight is null)
@@ -212,8 +228,14 @@ public sealed class FlightAdminService : IFlightAdminService
         flight.DepartureAtUtc = request.DepartureAtUtc;
         flight.ArrivalAtUtc = request.ArrivalAtUtc;
         flight.BasePrice = decimal.Round(request.BasePrice, 2, MidpointRounding.AwayFromZero);
-        flight.Status = request.Status;
-        flight.UpdatedAtUtc = DateTime.UtcNow;
+
+        var lifecycleNotifications = await _flightLifecycleService.ChangeStatusAsync(
+            flight,
+            request.Status,
+            actorUserId,
+            nowUtc,
+            cancellationToken);
+        flight.UpdatedAtUtc = nowUtc;
 
         if (!hasReservations && flight.TotalSeats != request.TotalSeats)
         {
@@ -224,6 +246,7 @@ public sealed class FlightAdminService : IFlightAdminService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _flightLifecycleService.PublishNotificationsSafelyAsync(lifecycleNotifications, cancellationToken);
 
         return await GetByIdAsync(flight.Id, cancellationToken);
     }
@@ -297,12 +320,12 @@ public sealed class FlightAdminService : IFlightAdminService
             {
                 Domain.Enums.FlightStatus.Completed => query.Where(x =>
                     x.Status == Domain.Enums.FlightStatus.Completed ||
-                    (x.Status != Domain.Enums.FlightStatus.Cancelled && x.ArrivalAtUtc < nowUtc)),
+                    (x.Status != Domain.Enums.FlightStatus.Cancelled && x.ArrivalAtUtc <= nowUtc)),
                 Domain.Enums.FlightStatus.Cancelled => query.Where(x => x.Status == Domain.Enums.FlightStatus.Cancelled),
                 Domain.Enums.FlightStatus.Delayed => query.Where(x =>
-                    x.Status == Domain.Enums.FlightStatus.Delayed && x.ArrivalAtUtc >= nowUtc),
+                    x.Status == Domain.Enums.FlightStatus.Delayed && x.DepartureAtUtc > nowUtc && x.ArrivalAtUtc > nowUtc),
                 _ => query.Where(x =>
-                    x.Status == Domain.Enums.FlightStatus.Scheduled && x.ArrivalAtUtc >= nowUtc)
+                    x.Status == Domain.Enums.FlightStatus.Scheduled && x.DepartureAtUtc > nowUtc && x.ArrivalAtUtc > nowUtc)
             };
         }
 
@@ -370,6 +393,16 @@ public sealed class FlightAdminService : IFlightAdminService
                     ["arrivalAtUtc"] = ["Vrijeme dolaska mora biti nakon vremena polaska."]
                 });
         }
+
+        if (request.Status == Domain.Enums.FlightStatus.Completed && request.ArrivalAtUtc > DateTime.UtcNow)
+        {
+            throw new ValidationException(
+                "Let se ne moze oznaciti kao zavrsen prije planiranog dolaska.",
+                new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Status Completed je dozvoljen tek nakon vremena dolaska leta."]
+                });
+        }
     }
 
     private async Task EnsureReferencesExistAsync(int airlineId, int destinationId, CancellationToken cancellationToken)
@@ -411,6 +444,19 @@ public sealed class FlightAdminService : IFlightAdminService
         {
             throw new ConflictException("Let sa istim brojem leta vec postoji.");
         }
+    }
+
+    private string GetRequiredCurrentUserId()
+    {
+        var httpContext = _httpContextAccessor.HttpContext ?? throw new UnauthorizedException("Prijava je obavezna za ovu akciju.");
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            throw new UnauthorizedException("Nije moguce odrediti trenutnog korisnika.");
+        }
+
+        return userId;
     }
 
     private static List<FlightSeat> GenerateSeats(int totalSeats)

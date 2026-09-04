@@ -33,7 +33,8 @@ public sealed class RecommendationService : IRecommendationService
         CancellationToken cancellationToken = default)
     {
         var currentUserId = GetRequiredCurrentUserId();
-        await _reservationStatusSyncService.SyncCompletedReservationsAsync(DateTime.UtcNow, cancellationToken);
+        var nowUtc = DateTime.UtcNow;
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var recentSearches = await _dbContext.SearchHistories
             .AsNoTracking()
@@ -83,8 +84,9 @@ public sealed class RecommendationService : IRecommendationService
         var candidates = await _dbContext.Flights
             .AsNoTracking()
             .Where(x =>
-                x.Status == FlightStatus.Scheduled &&
-                x.DepartureAtUtc > DateTime.UtcNow &&
+                (x.Status == FlightStatus.Scheduled || x.Status == FlightStatus.Delayed) &&
+                x.DepartureAtUtc > nowUtc &&
+                x.ArrivalAtUtc > nowUtc &&
                 x.AvailableSeats > 0 &&
                 !x.Reservations.Any(r => r.UserId == currentUserId && r.Status != ReservationStatus.Cancelled))
             .Select(x => new RecommendationCandidate

@@ -64,23 +64,13 @@ public sealed class ReservationService : IReservationService
             throw new NotFoundException($"Let sa ID vrijednoscu {request.FlightId} nije pronadjen.");
         }
 
-        if (flight.Status != FlightStatus.Scheduled)
+        if (!FlightLifecycleService.CanAcceptReservations(flight.Status, flight.DepartureAtUtc, flight.ArrivalAtUtc, nowUtc))
         {
             throw new ValidationException(
-                "Rezervacija je moguca samo za letove u statusu Scheduled.",
+                "Odabrani let trenutno nije dostupan za rezervaciju.",
                 new Dictionary<string, string[]>
                 {
-                    ["flight"] = ["Odabrani let trenutno nije dostupan za rezervaciju."]
-                });
-        }
-
-        if (flight.DepartureAtUtc <= nowUtc)
-        {
-            throw new ValidationException(
-                "Nije moguce rezervisati let koji je vec poceo ili zavrsio.",
-                new Dictionary<string, string[]>
-                {
-                    ["flight"] = ["Polazak odabranog leta je vec prosao."]
+                    ["flight"] = ["Rezervacija je dozvoljena samo za aktivan let prije vremena polaska. Otkazan ili zavrsen let se ne moze rezervisati."]
                 });
         }
 
@@ -472,6 +462,7 @@ public sealed class ReservationService : IReservationService
                 ArrivalAirportCode = x.Flight.Destination.ArrivalAirport.IataCode,
                 DepartureAtUtc = x.Flight.DepartureAtUtc,
                 ArrivalAtUtc = x.Flight.ArrivalAtUtc,
+                FlightStatus = x.Flight.Status,
                 Status = x.Status,
                 TotalAmount = x.TotalAmount,
                 Currency = x.Currency,
@@ -596,6 +587,11 @@ public sealed class ReservationService : IReservationService
     {
         var nowUtc = DateTime.UtcNow;
         var actualStatus = GetEffectiveReservationStatus(reservation.Status, reservation.PaymentStatus, reservation.ArrivalAtUtc, nowUtc);
+        var flightAllowsUserActions = FlightLifecycleService.CanAcceptReservations(
+            reservation.FlightStatus,
+            reservation.DepartureAtUtc,
+            reservation.ArrivalAtUtc,
+            nowUtc);
 
         return new ReservationDetailsDto
         {
@@ -608,6 +604,7 @@ public sealed class ReservationService : IReservationService
             ArrivalAirportCode = reservation.ArrivalAirportCode,
             DepartureAtUtc = reservation.DepartureAtUtc,
             ArrivalAtUtc = reservation.ArrivalAtUtc,
+            FlightStatus = reservation.FlightStatus,
             Status = actualStatus,
             TotalAmount = reservation.TotalAmount,
             Currency = reservation.Currency,
@@ -624,17 +621,20 @@ public sealed class ReservationService : IReservationService
             StatusReason = GetDisplayStatusReason(reservation.Status, actualStatus, reservation.StatusReason),
             Customer = reservation.Customer,
             Seats = reservation.Seats,
-            CanBeCancelled = _stateMachine.CanCancel(actualStatus) &&
+            CanBeCancelled = flightAllowsUserActions &&
+                _stateMachine.CanCancel(actualStatus) &&
                 reservation.PaymentStatus is not PaymentStatus.Paid and not PaymentStatus.Refunded,
             CanBeConfirmed = false,
             CanBeCompleted = false,
             CanInitiatePayment =
+                flightAllowsUserActions &&
                 actualStatus == ReservationStatus.Pending && !reservation.IsPaid,
             CanBeRefunded =
+                flightAllowsUserActions &&
                 reservation.PaymentStatus == PaymentStatus.Paid &&
                 actualStatus == ReservationStatus.Confirmed &&
                 reservation.DepartureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours),
-            CanUpdateBaggage = CanUpdateBaggage(actualStatus, reservation.PaymentStatus, reservation.IsPaid)
+            CanUpdateBaggage = flightAllowsUserActions && CanUpdateBaggage(actualStatus, reservation.PaymentStatus, reservation.IsPaid)
         };
     }
 
