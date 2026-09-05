@@ -538,6 +538,12 @@ public sealed class ReservationService : IReservationService
                 });
         }
 
+        var flightAllowsUserActions = FlightLifecycleService.CanAcceptReservations(
+            reservation.Flight.Status,
+            reservation.Flight.DepartureAtUtc,
+            reservation.Flight.ArrivalAtUtc,
+            nowUtc);
+
         if (reservation.Payment is not null)
         {
             PaymentService.EnsureLedgerHasCurrentPaidCapture(reservation.Payment, nowUtc);
@@ -545,6 +551,21 @@ public sealed class ReservationService : IReservationService
 
         var hasCompletedPayment = reservation.Payment is not null &&
             PaymentLedger.CalculateNetPaidAmount(reservation.Payment) > 0m;
+
+        if (!CanCancelReservation(
+            effectiveStatus,
+            flightAllowsUserActions,
+            hasCompletedPayment,
+            reservation.Payment?.Status))
+        {
+            throw new ValidationException(
+                "Rezervaciju nije moguce otkazati u trenutnom stanju.",
+                new Dictionary<string, string[]>
+                {
+                    ["reservation"] = ["Otkazivanje je dozvoljeno samo za aktivnu rezervaciju bez evidentiranog PayPal capture placanja. Za placenu rezervaciju koristite refund tok."]
+                });
+        }
+
         _stateMachine.Cancel(reservation, actorUserId, request.Reason, nowUtc, hasCompletedPayment);
 
         foreach (var item in reservation.Items)
@@ -1109,6 +1130,30 @@ public sealed class ReservationService : IReservationService
         return reservation.Items.Sum(x => x.Price);
     }
 
+    private bool CanCancelReservation(
+        ReservationStatus reservationStatus,
+        bool flightAllowsUserActions,
+        bool hasCapturedPayment,
+        PaymentStatus? paymentStatus)
+    {
+        return flightAllowsUserActions &&
+            _stateMachine.CanCancel(reservationStatus) &&
+            !hasCapturedPayment &&
+            paymentStatus is not PaymentStatus.Refunded;
+    }
+
+    private static bool CanInitiateReservationPayment(
+        ReservationStatus reservationStatus,
+        bool flightAllowsUserActions,
+        bool isPaid,
+        PaymentStatus? paymentStatus)
+    {
+        return flightAllowsUserActions &&
+            reservationStatus == ReservationStatus.Pending &&
+            !isPaid &&
+            paymentStatus is not PaymentStatus.Refunded;
+    }
+
     private static bool CanUpdateBaggage(
         ReservationStatus reservationStatus,
         PaymentStatus? paymentStatus,
@@ -1162,15 +1207,18 @@ public sealed class ReservationService : IReservationService
             StatusReason = GetDisplayStatusReason(reservation.Status, actualStatus, reservation.StatusReason),
             Customer = reservation.Customer,
             Seats = reservation.Seats,
-            CanBeCancelled = flightAllowsUserActions &&
-                _stateMachine.CanCancel(actualStatus) &&
-                !hasCapturedPayment &&
-                reservation.PaymentStatus is not PaymentStatus.Refunded,
+            CanBeCancelled = CanCancelReservation(
+                actualStatus,
+                flightAllowsUserActions,
+                hasCapturedPayment,
+                reservation.PaymentStatus),
             CanBeConfirmed = false,
             CanBeCompleted = false,
-            CanInitiatePayment =
-                flightAllowsUserActions &&
-                actualStatus == ReservationStatus.Pending && !reservation.IsPaid,
+            CanInitiatePayment = CanInitiateReservationPayment(
+                actualStatus,
+                flightAllowsUserActions,
+                reservation.IsPaid,
+                reservation.PaymentStatus),
             CanBeRefunded =
                 flightAllowsUserActions &&
                 hasCapturedPayment &&

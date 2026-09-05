@@ -9,10 +9,7 @@ import 'mobile_display.dart';
 import 'mobile_models.dart';
 import 'mobile_status_values.dart';
 
-enum PayPalReturnStatus {
-  approved,
-  cancelled,
-}
+enum PayPalReturnStatus { approved, cancelled }
 
 class ReservationDetailsScreen extends StatefulWidget {
   const ReservationDetailsScreen({
@@ -41,6 +38,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   bool _isLoading = true;
   bool _isPaymentSubmitting = false;
   bool _isBaggageSubmitting = false;
+  bool _isCancelSubmitting = false;
   bool _hasOpenedPayPalApproval = false;
   String? _errorMessage;
   bool _markDirtyOnPop = false;
@@ -61,9 +59,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
           ? 'PayPal odobrenje je zaprimljeno. Sada kliknite "2. Zavrsi placanje".'
           : 'PayPal placanje je prekinuto. Mozete ga pokusati ponovo kada budete spremni.';
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     });
   }
 
@@ -85,7 +83,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
       setState(() {
         _details = details;
-        if (_paymentDetails != null && _paymentDetails!.id != details.paymentId) {
+        if (_paymentDetails != null &&
+            _paymentDetails!.id != details.paymentId) {
           _paymentDetails = null;
           _hasOpenedPayPalApproval = false;
         }
@@ -229,6 +228,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               ),
             ),
           ),
+          if (details.canBeCancelled) ...[
+            const SizedBox(height: 12),
+            _buildCancellationCard(context, details),
+          ],
           if (_shouldShowPaymentCard(details)) ...[
             const SizedBox(height: 12),
             _buildPaymentCard(context, details),
@@ -312,25 +315,73 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     );
   }
 
+  Widget _buildCancellationCard(
+    BuildContext context,
+    MobileReservationDetails details,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Otkazivanje rezervacije',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Rezervaciju mozete otkazati dok placanje nije zavrseno.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: _isCancelSubmitting
+                  ? null
+                  : () => _cancelReservation(details),
+              icon: _isCancelSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.cancel_outlined),
+              label: const Text('Otkazi rezervaciju'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPaymentCard(
     BuildContext context,
     MobileReservationDetails details,
   ) {
     final effectivePaymentId = _paymentDetails?.id ?? details.paymentId;
-    final effectivePaymentStatus = _paymentDetails?.status ?? details.paymentStatus;
-    final paymentStatusLabel =
-        MobileDisplay.paymentStatusLabel(effectivePaymentStatus);
+    final effectivePaymentStatus =
+        _paymentDetails?.status ?? details.paymentStatus;
+    final paymentStatusLabel = MobileDisplay.paymentStatusLabel(
+      effectivePaymentStatus,
+    );
     final amount = _paymentDetails?.amount ?? details.totalAmount;
     final currency = _paymentDetails?.currency ?? details.currency;
     final approvalUrl = _paymentDetails?.approvalUrl;
     final hasApprovalUrl = approvalUrl != null && approvalUrl.trim().isNotEmpty;
     final statusReason = _paymentDetails?.statusReason;
     final canInitializePayment =
-        !details.isPaid && (details.canInitiatePayment || _hasPendingPayment(details));
+        !details.isPaid &&
+        (details.canInitiatePayment || _hasPendingPayment(details));
     final canConfirmPayment =
         !details.isPaid &&
-            effectivePaymentId != null &&
-            effectivePaymentStatus == MobilePaymentStatus.pending;
+        effectivePaymentId != null &&
+        effectivePaymentStatus == MobilePaymentStatus.pending;
 
     return Card(
       child: Padding(
@@ -390,7 +441,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               ),
             ],
             const SizedBox(height: 16),
-            if (canInitializePayment || canConfirmPayment || details.canBeRefunded)
+            if (canInitializePayment ||
+                canConfirmPayment ||
+                details.canBeRefunded)
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -400,8 +453,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                       onPressed: _isPaymentSubmitting
                           ? null
                           : hasApprovalUrl
-                              ? () => _openApprovalUrl(approvalUrl)
-                              : () => _initializePayment(details),
+                          ? () => _openApprovalUrl(approvalUrl)
+                          : () => _initializePayment(details),
                       icon: _isPaymentSubmitting
                           ? const SizedBox(
                               width: 18,
@@ -413,8 +466,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                         hasApprovalUrl
                             ? '1. Otvori PayPal'
                             : _hasPendingPayment(details)
-                                ? 'Provjeri PayPal link'
-                                : '1. Pokreni PayPal',
+                            ? 'Provjeri PayPal link'
+                            : '1. Pokreni PayPal',
                       ),
                     ),
                   if (canConfirmPayment &&
@@ -542,7 +595,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   }
 
   bool _shouldShowPaymentCard(MobileReservationDetails details) {
-    return details.canInitiatePayment || details.paymentId != null || details.isPaid;
+    return details.canInitiatePayment ||
+        details.paymentId != null ||
+        details.isPaid;
   }
 
   bool _hasPendingPayment(MobileReservationDetails details) {
@@ -594,9 +649,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } catch (_) {
       if (!mounted) {
         return;
@@ -638,9 +693,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Placanje je uspjesno potvrdeno.'),
-        ),
+        const SnackBar(content: Text('Placanje je uspjesno potvrdeno.')),
       );
 
       await _load();
@@ -649,9 +702,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } catch (_) {
       if (!mounted) {
         return;
@@ -666,6 +719,68 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       if (mounted) {
         setState(() {
           _isPaymentSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _cancelReservation(MobileReservationDetails details) async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => const _CancelReservationDialog(),
+    );
+
+    if (reason == null) {
+      return;
+    }
+
+    setState(() {
+      _isCancelSubmitting = true;
+    });
+
+    try {
+      final updated = await _dataService.cancelReservation(
+        token: widget.token,
+        reservationId: details.id,
+        reason: reason,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _details = updated;
+        _paymentDetails = null;
+        _hasOpenedPayPalApproval = false;
+        _markDirtyOnPop = true;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Rezervacija je otkazana.')));
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Rezervaciju trenutno nije moguce otkazati.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCancelSubmitting = false;
         });
       }
     }
@@ -694,9 +809,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Zahtjev za refund je poslan podrsci.'),
-      ),
+      const SnackBar(content: Text('Zahtjev za refund je poslan podrsci.')),
     );
   }
 
@@ -710,7 +823,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       ),
     );
 
-    if (selectedCount == null || selectedCount == details.additionalBaggageCount) {
+    if (selectedCount == null ||
+        selectedCount == details.additionalBaggageCount) {
       return;
     }
 
@@ -748,9 +862,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } catch (_) {
       if (!mounted) {
         return;
@@ -783,10 +897,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       return;
     }
 
-    final launched = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
     if (!launched) {
       await _copyApprovalUrl(approvalUrl);
@@ -823,6 +934,74 @@ class _StatusChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+    );
+  }
+}
+
+class _CancelReservationDialog extends StatefulWidget {
+  const _CancelReservationDialog();
+
+  @override
+  State<_CancelReservationDialog> createState() =>
+      _CancelReservationDialogState();
+}
+
+class _CancelReservationDialogState extends State<_CancelReservationDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Otkazi rezervaciju'),
+      content: SizedBox(
+        width: 360,
+        child: Form(
+          key: _formKey,
+          child: TextFormField(
+            controller: _reasonController,
+            maxLength: 500,
+            minLines: 3,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: 'Razlog otkazivanja',
+              hintText: 'Npr. promjena plana putovanja',
+            ),
+            validator: (value) {
+              final trimmed = value?.trim() ?? '';
+              if (trimmed.isEmpty) {
+                return 'Razlog otkazivanja je obavezan.';
+              }
+              if (trimmed.length < 5) {
+                return 'Razlog mora imati najmanje 5 karaktera.';
+              }
+              return null;
+            },
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Odustani'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!(_formKey.currentState?.validate() ?? false)) {
+              return;
+            }
+
+            Navigator.of(context).pop(_reasonController.text.trim());
+          },
+          child: const Text('Potvrdi otkazivanje'),
+        ),
+      ],
     );
   }
 }

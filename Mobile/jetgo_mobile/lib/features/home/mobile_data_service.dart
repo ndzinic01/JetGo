@@ -2,7 +2,8 @@ import '../../core/network/api_client.dart';
 import 'mobile_models.dart';
 
 class MobileDataService {
-  MobileDataService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+  MobileDataService({ApiClient? apiClient})
+    : _apiClient = apiClient ?? ApiClient();
 
   final ApiClient _apiClient;
 
@@ -58,10 +59,7 @@ class MobileDataService {
     final response = await _apiClient.getJson(
       '/api/Reservations/my',
       token: token,
-      queryParameters: const <String, String>{
-        'page': '1',
-        'pageSize': '20',
-      },
+      queryParameters: const <String, String>{'page': '1', 'pageSize': '20'},
     );
 
     return _mapPagedResult(response, MobileReservation.fromJson);
@@ -106,9 +104,21 @@ class MobileDataService {
     final response = await _apiClient.putJson(
       '/api/Reservations/$reservationId/baggage',
       token: token,
-      body: <String, dynamic>{
-        'additionalBaggageCount': additionalBaggageCount,
-      },
+      body: <String, dynamic>{'additionalBaggageCount': additionalBaggageCount},
+    );
+
+    return MobileReservationDetails.fromJson(response);
+  }
+
+  Future<MobileReservationDetails> cancelReservation({
+    required String token,
+    required int reservationId,
+    required String reason,
+  }) async {
+    final response = await _apiClient.postJson(
+      '/api/Reservations/$reservationId/cancel',
+      token: token,
+      body: <String, dynamic>{'reason': reason.trim()},
     );
 
     return MobileReservationDetails.fromJson(response);
@@ -145,10 +155,7 @@ class MobileDataService {
     final response = await _apiClient.getJson(
       '/api/News',
       token: token,
-      queryParameters: const <String, String>{
-        'page': '1',
-        'pageSize': '20',
-      },
+      queryParameters: const <String, String>{'page': '1', 'pageSize': '20'},
     );
 
     return _mapPagedResult(response, NewsArticleSummary.fromJson);
@@ -171,10 +178,7 @@ class MobileDataService {
     final response = await _apiClient.getJson(
       '/api/Notifications',
       token: token,
-      queryParameters: const <String, String>{
-        'page': '1',
-        'pageSize': '50',
-      },
+      queryParameters: const <String, String>{'page': '1', 'pageSize': '50'},
     );
 
     return _mapPagedResult(response, MobileNotification.fromJson);
@@ -190,13 +194,8 @@ class MobileDataService {
     );
   }
 
-  Future<void> markAllNotificationsAsRead({
-    required String token,
-  }) async {
-    await _apiClient.postJson(
-      '/api/Notifications/read-all',
-      token: token,
-    );
+  Future<void> markAllNotificationsAsRead({required String token}) async {
+    await _apiClient.postJson('/api/Notifications/read-all', token: token);
   }
 
   Future<PagedResult<MobileSupportMessageSummary>> fetchSupportMessages({
@@ -205,10 +204,7 @@ class MobileDataService {
     final response = await _apiClient.getJson(
       '/api/SupportMessages/my',
       token: token,
-      queryParameters: const <String, String>{
-        'page': '1',
-        'pageSize': '50',
-      },
+      queryParameters: const <String, String>{'page': '1', 'pageSize': '50'},
     );
 
     return _mapPagedResult(response, MobileSupportMessageSummary.fromJson);
@@ -243,13 +239,8 @@ class MobileDataService {
     return MobileSupportMessageDetails.fromJson(response);
   }
 
-  Future<MobileProfile> fetchMyProfile({
-    required String token,
-  }) async {
-    final response = await _apiClient.getJson(
-      '/api/Profile/me',
-      token: token,
-    );
+  Future<MobileProfile> fetchMyProfile({required String token}) async {
+    final response = await _apiClient.getJson('/api/Profile/me', token: token);
 
     return MobileProfile.fromJson(response);
   }
