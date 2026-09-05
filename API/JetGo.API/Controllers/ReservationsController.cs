@@ -1,4 +1,4 @@
-using JetGo.Application.Constants;
+﻿using JetGo.Application.Constants;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.Reservations;
@@ -58,6 +58,15 @@ public sealed class ReservationsController : ControllerBase
     public async Task<ActionResult<ReservationDetailsDto>> UpdateBaggage(int id, [FromBody] UpdateReservationBaggageRequest request, CancellationToken cancellationToken)
     {
         var response = await _reservationService.UpdateBaggageAsync(id, request, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpPut("{id:int}/change")]
+    [Authorize(Roles = RoleNames.Admin)]
+    [ProducesResponseType(typeof(ReservationDetailsDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ReservationDetailsDto>> ChangeReservation(int id, [FromBody] ChangeReservationRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _reservationService.ChangeAsync(id, request, cancellationToken);
         return Ok(response);
     }
 

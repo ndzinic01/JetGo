@@ -65,6 +65,7 @@ public sealed class PaymentService : IPaymentService
 
         var reservation = await _dbContext.Reservations
             .Include(x => x.Payment)
+                .ThenInclude(x => x!.Transactions)
             .Include(x => x.Flight)
                 .ThenInclude(x => x.Destination)
             .SingleOrDefaultAsync(x => x.Id == reservationId, cancellationToken);
@@ -115,6 +116,13 @@ public sealed class PaymentService : IPaymentService
                     reservation.Payment.PaidAtUtc = null;
                     reservation.Payment.RefundedAtUtc = null;
                     reservation.Payment.UpdatedAtUtc = nowUtc;
+                    reservation.Payment.Transactions.Add(CreatePendingChargeTransaction(
+                        PaymentLedger.GetNextChargeType(reservation.Payment),
+                        order.Id,
+                        providerPricing.Amount,
+                        providerPricing.CurrencyCode,
+                        "Placanje je ponovo inicirano kroz PayPal.",
+                        nowUtc));
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
                     _logger.LogInformation("Payment {PaymentId} re-initialized through PayPal for reservation {ReservationId}.", reservation.Payment.Id, reservation.Id);
@@ -144,6 +152,14 @@ public sealed class PaymentService : IPaymentService
             Status = PaymentStatus.Pending,
             StatusReason = BuildInitializedStatusReason(reservation.Currency, pricing.CurrencyCode)
         };
+        payment.Transactions.Add(CreatePendingChargeTransaction(
+            PaymentTransactionType.InitialPayment,
+            createdOrder.Id,
+            pricing.Amount,
+            pricing.CurrencyCode,
+            "Inicijalno placanje rezervacije je pokrenuto kroz PayPal.",
+            nowUtc));
+
 
         await _dbContext.Payments.AddAsync(payment, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -204,7 +220,7 @@ public sealed class PaymentService : IPaymentService
         var payment = await _dbContext.Payments
             .AsNoTracking()
             .Include(x => x.Reservation)
-            .ThenInclude(x => x.Flight)
+                .ThenInclude(x => x.Flight)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (payment is null)
@@ -329,8 +345,9 @@ public sealed class PaymentService : IPaymentService
         await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var payment = await _dbContext.Payments
+            .Include(x => x.Transactions)
             .Include(x => x.Reservation)
-            .ThenInclude(x => x.Flight)
+                .ThenInclude(x => x.Flight)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (payment is null)
@@ -381,7 +398,8 @@ public sealed class PaymentService : IPaymentService
             throw new ConflictException("Placanje nema iniciranu PayPal narudzbu za potvrdu.");
         }
 
-        var orderSnapshot = await _payPalCheckoutClient.GetOrderAsync(payment.ProviderReference, cancellationToken);
+        var orderReference = payment.ProviderReference;
+        var orderSnapshot = await _payPalCheckoutClient.GetOrderAsync(orderReference, cancellationToken);
 
         if (string.Equals(orderSnapshot.Status, "CREATED", StringComparison.OrdinalIgnoreCase))
         {
@@ -396,26 +414,39 @@ public sealed class PaymentService : IPaymentService
         if (!string.Equals(orderSnapshot.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase))
         {
             orderSnapshot = await _payPalCheckoutClient.CaptureOrderAsync(
-                payment.ProviderReference,
+                orderReference,
                 payment.Reservation.ReservationCode,
                 cancellationToken);
         }
 
         var capturedPayment = ExtractCompletedCapture(orderSnapshot);
+        var capturedAmount = ParseAmount(capturedPayment.Amount.Value);
         var paidAtUtc = capturedPayment.CreateTime?.ToUniversalTime() ?? nowUtc;
+        var statusReason = string.IsNullOrWhiteSpace(request.Reason)
+            ? "Placanje je uspjesno potvrdjeno server-side PayPal capture verifikacijom."
+            : request.Reason.Trim();
+
+        CompletePendingChargeTransaction(
+            payment,
+            orderReference,
+            capturedPayment.Id,
+            capturedAmount,
+            capturedPayment.Amount.CurrencyCode,
+            paidAtUtc,
+            statusReason,
+            nowUtc);
 
         payment.ProviderReference = capturedPayment.Id;
         payment.Status = PaymentStatus.Paid;
+        payment.Amount = PaymentLedger.CalculateNetPaidAmount(payment);
+        payment.Currency = capturedPayment.Amount.CurrencyCode;
+        payment.PaidAtUtc ??= paidAtUtc;
+        payment.RefundedAtUtc = null;
+        payment.StatusReason = statusReason;
+        payment.UpdatedAtUtc = nowUtc;
+
         _stateMachine.MarkPaymentConfirmed(payment.Reservation, currentUserId, nowUtc);
         payment.Reservation.UpdatedAtUtc = nowUtc;
-        payment.Amount = ParseAmount(capturedPayment.Amount.Value);
-        payment.Currency = capturedPayment.Amount.CurrencyCode;
-        payment.PaidAtUtc = paidAtUtc;
-        payment.RefundedAtUtc = null;
-        payment.StatusReason = string.IsNullOrWhiteSpace(request.Reason)
-            ? "Placanje je uspjesno potvrdjeno server-side PayPal capture verifikacijom."
-            : request.Reason.Trim();
-        payment.UpdatedAtUtc = nowUtc;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishNotificationSafelyAsync(
@@ -439,6 +470,7 @@ public sealed class PaymentService : IPaymentService
         await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
 
         var payment = await _dbContext.Payments
+            .Include(x => x.Transactions)
             .Include(x => x.Reservation)
                 .ThenInclude(x => x.Flight)
             .Include(x => x.Reservation)
@@ -463,18 +495,22 @@ public sealed class PaymentService : IPaymentService
 
         var refundReason = request.Reason.Trim();
 
+        EnsureLedgerHasCurrentPaidCapture(payment, nowUtc);
+
         if (payment.Status == PaymentStatus.Refunded)
         {
             throw new ConflictException("Placanje je vec refundirano.");
         }
 
-        if (payment.Status != PaymentStatus.Paid)
+        var refundableAmount = PaymentLedger.CalculateNetPaidAmount(payment);
+
+        if (payment.Status is not (PaymentStatus.Paid or PaymentStatus.Pending) || refundableAmount <= 0m)
         {
             throw new ValidationException(
-                "Refund je moguc samo za uspjesno naplaceno placanje.",
+                "Refund je moguc samo za placanje koje ima stvarno evidentiran naplaceni iznos.",
                 new Dictionary<string, string[]>
                 {
-                    ["status"] = ["Refund mozete uraditi samo za placanje u statusu Paid."]
+                    ["status"] = ["Refund mozete uraditi samo za placanje koje ima PayPal capture zapis i pozitivan preostali iznos."]
                 });
         }
 
@@ -494,17 +530,17 @@ public sealed class PaymentService : IPaymentService
                 });
         }
 
-        if (payment.Reservation.Status != ReservationStatus.Confirmed)
+        if (payment.Reservation.Status is not (ReservationStatus.Confirmed or ReservationStatus.Pending))
         {
             throw new ValidationException(
-                "Refund je moguc samo za placenu i potvrdjenu rezervaciju.",
+                "Refund je moguc samo za aktivnu rezervaciju.",
                 new Dictionary<string, string[]>
                 {
-                    ["reservation"] = ["Rezervacija mora biti u statusu Confirmed prije refundacije placanja."]
+                    ["reservation"] = ["Rezervacija mora biti u statusu Pending ili Confirmed prije refundacije placanja."]
                 });
         }
 
-        if (!CanBeRefunded(payment.Status, payment.Reservation.Status, payment.Reservation.Flight.DepartureAtUtc, nowUtc))
+        if (!CanBeRefunded(payment.Status, payment.Reservation.Status, refundableAmount, payment.Reservation.Flight.DepartureAtUtc, nowUtc))
         {
             throw new ValidationException(
                 "Refund je moguc najkasnije 48 sati prije polaska leta.",
@@ -514,20 +550,16 @@ public sealed class PaymentService : IPaymentService
                 });
         }
 
-        if (string.IsNullOrWhiteSpace(payment.ProviderReference))
-        {
-            throw new ConflictException("Placanje nema evidentiran PayPal capture identifikator za refund.");
-        }
-
-        var refundResponse = await _payPalCheckoutClient.RefundCaptureAsync(
-            payment.ProviderReference,
-            payment.Amount,
-            payment.Currency,
-            payment.Reservation.ReservationCode,
+        var refundedAtUtc = await RefundPaymentAmountAsync(
+            payment,
+            refundableAmount,
+            PaymentTransactionType.FullRefund,
+            refundReason,
+            nowUtc,
             cancellationToken);
 
-        var refundedAtUtc = refundResponse.CreateTime?.ToUniversalTime() ?? nowUtc;
         payment.Status = PaymentStatus.Refunded;
+        payment.Amount = 0m;
         payment.RefundedAtUtc = refundedAtUtc;
         payment.StatusReason = refundReason;
         payment.UpdatedAtUtc = nowUtc;
@@ -552,6 +584,189 @@ public sealed class PaymentService : IPaymentService
         return await GetByIdInternalAsync(id, null, cancellationToken);
     }
 
+    internal async Task<DateTime> RefundPaymentAmountAsync(
+        Payment payment,
+        decimal amount,
+        PaymentTransactionType transactionType,
+        string reason,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        if (amount <= 0m)
+        {
+            throw new ValidationException(
+                "Iznos refundacije mora biti veci od 0.",
+                new Dictionary<string, string[]>
+                {
+                    ["amount"] = ["Refund je moguc samo za pozitivan evidentirani iznos."]
+                });
+        }
+
+        var refundableCaptures = PaymentLedger.GetRefundableCaptures(payment);
+
+        if (refundableCaptures.Count == 0)
+        {
+            throw new ConflictException("Placanje nema PayPal capture zapis koji se moze refundirati.");
+        }
+
+        var remainingAmount = amount;
+        var refundedAtUtc = nowUtc;
+
+        foreach (var capture in refundableCaptures)
+        {
+            if (remainingAmount <= 0m)
+            {
+                break;
+            }
+
+            var refundAmount = Math.Min(capture.Amount, remainingAmount);
+
+            if (refundAmount <= 0m)
+            {
+                continue;
+            }
+
+            var refundResponse = await _payPalCheckoutClient.RefundCaptureAsync(
+                capture.CaptureId,
+                refundAmount,
+                capture.Currency,
+                payment.Reservation.ReservationCode,
+                cancellationToken);
+
+            refundedAtUtc = refundResponse.CreateTime?.ToUniversalTime() ?? nowUtc;
+            payment.Transactions.Add(new PaymentTransaction
+            {
+                Type = transactionType,
+                Status = PaymentTransactionStatus.Completed,
+                Provider = DefaultProvider,
+                ProviderReference = refundResponse.Id,
+                RelatedProviderReference = capture.CaptureId,
+                Amount = refundAmount,
+                Currency = capture.Currency,
+                CompletedAtUtc = refundedAtUtc,
+                Note = reason.Trim(),
+                CreatedAtUtc = nowUtc,
+                UpdatedAtUtc = nowUtc
+            });
+
+            remainingAmount = decimal.Round(remainingAmount - refundAmount, 2, MidpointRounding.AwayFromZero);
+        }
+
+        if (remainingAmount > 0m)
+        {
+            throw new ConflictException("Nije moguce refundirati trazeni iznos jer evidentirani capture zapisi nemaju dovoljan preostali iznos.");
+        }
+
+        return refundedAtUtc;
+    }
+
+    internal static PaymentTransaction CreatePendingChargeTransaction(
+        PaymentTransactionType type,
+        string providerReference,
+        decimal amount,
+        string currency,
+        string note,
+        DateTime nowUtc)
+    {
+        return new PaymentTransaction
+        {
+            Type = type,
+            Status = PaymentTransactionStatus.Pending,
+            Provider = DefaultProvider,
+            ProviderReference = providerReference,
+            Amount = amount,
+            Currency = currency,
+            Note = note,
+            CreatedAtUtc = nowUtc
+        };
+    }
+
+    internal static void FailPendingChargeTransactions(Payment payment, string reason, DateTime nowUtc)
+    {
+        foreach (var transaction in payment.Transactions.Where(x =>
+            x.Status == PaymentTransactionStatus.Pending &&
+            (x.Type == PaymentTransactionType.InitialPayment || x.Type == PaymentTransactionType.AdditionalCharge)))
+        {
+            transaction.Status = PaymentTransactionStatus.Failed;
+            transaction.Note = reason;
+            transaction.UpdatedAtUtc = nowUtc;
+        }
+    }
+
+    internal static void EnsureLedgerHasCurrentPaidCapture(Payment payment, DateTime nowUtc)
+    {
+        var hasCompletedCharge = payment.Transactions.Any(x =>
+            x.Status == PaymentTransactionStatus.Completed &&
+            (x.Type == PaymentTransactionType.InitialPayment || x.Type == PaymentTransactionType.AdditionalCharge));
+
+        if (hasCompletedCharge ||
+            payment.Status != PaymentStatus.Paid ||
+            payment.Amount <= 0m ||
+            string.IsNullOrWhiteSpace(payment.ProviderReference))
+        {
+            return;
+        }
+
+        payment.Transactions.Add(new PaymentTransaction
+        {
+            Type = PaymentTransactionType.InitialPayment,
+            Status = PaymentTransactionStatus.Completed,
+            Provider = DefaultProvider,
+            ProviderReference = payment.ProviderReference,
+            Amount = payment.Amount,
+            Currency = payment.Currency,
+            CompletedAtUtc = payment.PaidAtUtc ?? payment.CreatedAtUtc,
+            Note = "Postojeci PayPal capture je evidentiran u ledger nakon uvodjenja payment transakcija.",
+            CreatedAtUtc = nowUtc,
+            UpdatedAtUtc = nowUtc
+        });
+    }
+    private static void CompletePendingChargeTransaction(
+        Payment payment,
+        string orderReference,
+        string captureReference,
+        decimal amount,
+        string currency,
+        DateTime completedAtUtc,
+        string note,
+        DateTime nowUtc)
+    {
+        var transaction = payment.Transactions
+            .Where(x =>
+                x.Status == PaymentTransactionStatus.Pending &&
+                (x.Type == PaymentTransactionType.InitialPayment || x.Type == PaymentTransactionType.AdditionalCharge))
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .FirstOrDefault(x => string.Equals(x.ProviderReference, orderReference, StringComparison.Ordinal))
+            ?? PaymentLedger.FindPendingCharge(payment);
+
+        if (transaction is null)
+        {
+            payment.Transactions.Add(new PaymentTransaction
+            {
+                Type = PaymentLedger.GetNextChargeType(payment),
+                Status = PaymentTransactionStatus.Completed,
+                Provider = DefaultProvider,
+                ProviderReference = captureReference,
+                RelatedProviderReference = orderReference,
+                Amount = amount,
+                Currency = currency,
+                CompletedAtUtc = completedAtUtc,
+                Note = note,
+                CreatedAtUtc = nowUtc,
+                UpdatedAtUtc = nowUtc
+            });
+            return;
+        }
+
+        transaction.Status = PaymentTransactionStatus.Completed;
+        transaction.ProviderReference = captureReference;
+        transaction.RelatedProviderReference = orderReference;
+        transaction.Amount = amount;
+        transaction.Currency = currency;
+        transaction.CompletedAtUtc = completedAtUtc;
+        transaction.Note = note;
+        transaction.UpdatedAtUtc = nowUtc;
+    }
     private async Task<PagedResponseDto<PaymentListItemDto>> GetPagedInternalAsync(
         PaymentSearchRequest request,
         string? userIdFilter,
@@ -668,8 +883,12 @@ public sealed class PaymentService : IPaymentService
                     (x.Reservation.Flight.Status == FlightStatus.Scheduled || x.Reservation.Flight.Status == FlightStatus.Delayed) &&
                     x.Reservation.Flight.DepartureAtUtc > nowUtc &&
                     x.Reservation.Flight.ArrivalAtUtc > nowUtc,
-                CanBeRefunded = x.Status == PaymentStatus.Paid &&
-                    x.Reservation.Status == ReservationStatus.Confirmed &&
+                CanBeRefunded =
+                    (x.Status == PaymentStatus.Paid ||
+                        (x.Status == PaymentStatus.Pending && x.Transactions.Any(t =>
+                            t.Status == PaymentTransactionStatus.Completed &&
+                            (t.Type == PaymentTransactionType.InitialPayment || t.Type == PaymentTransactionType.AdditionalCharge)))) &&
+                    (x.Reservation.Status == ReservationStatus.Confirmed || x.Reservation.Status == ReservationStatus.Pending) &&
                     (x.Reservation.Flight.Status == FlightStatus.Scheduled || x.Reservation.Flight.Status == FlightStatus.Delayed) &&
                     x.Reservation.Flight.DepartureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours),
                 Customer = new PaymentCustomerDto
@@ -780,11 +999,13 @@ public sealed class PaymentService : IPaymentService
     private static bool CanBeRefunded(
         PaymentStatus paymentStatus,
         ReservationStatus reservationStatus,
+        decimal refundableAmount,
         DateTime departureAtUtc,
         DateTime nowUtc)
     {
-        return paymentStatus == PaymentStatus.Paid &&
-            reservationStatus == ReservationStatus.Confirmed &&
+        return (paymentStatus is PaymentStatus.Paid or PaymentStatus.Pending) &&
+            (reservationStatus is ReservationStatus.Confirmed or ReservationStatus.Pending) &&
+            refundableAmount > 0m &&
             departureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours);
     }
 

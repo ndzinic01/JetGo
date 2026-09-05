@@ -152,6 +152,7 @@ class FlightItem {
     required this.durationMinutes,
     required this.basePrice,
     required this.currency,
+    required this.additionalBaggageUnitPrice,
     required this.availableSeats,
     required this.totalSeats,
     required this.status,
@@ -169,6 +170,7 @@ class FlightItem {
   final int durationMinutes;
   final double basePrice;
   final String currency;
+  final double additionalBaggageUnitPrice;
   final int availableSeats;
   final int totalSeats;
   final FlightStatusValue status;
@@ -193,6 +195,8 @@ class FlightItem {
       durationMinutes: json['durationMinutes'] as int? ?? 0,
       basePrice: (json['basePrice'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? 'BAM',
+      additionalBaggageUnitPrice:
+          (json['additionalBaggageUnitPrice'] as num?)?.toDouble() ?? 0,
       availableSeats: json['availableSeats'] as int? ?? 0,
       totalSeats: json['totalSeats'] as int? ?? 0,
       status: FlightStatusValue.fromValue(json['status'] as int? ?? 1),
@@ -215,6 +219,7 @@ class FlightDetails {
     required this.durationMinutes,
     required this.basePrice,
     required this.currency,
+    required this.additionalBaggageUnitPrice,
     required this.availableSeats,
     required this.totalSeats,
     required this.reservedSeats,
@@ -235,6 +240,7 @@ class FlightDetails {
   final int durationMinutes;
   final double basePrice;
   final String currency;
+  final double additionalBaggageUnitPrice;
   final int availableSeats;
   final int totalSeats;
   final int reservedSeats;
@@ -262,6 +268,8 @@ class FlightDetails {
       durationMinutes: json['durationMinutes'] as int? ?? 0,
       basePrice: (json['basePrice'] as num?)?.toDouble() ?? 0,
       currency: json['currency'] as String? ?? 'BAM',
+      additionalBaggageUnitPrice:
+          (json['additionalBaggageUnitPrice'] as num?)?.toDouble() ?? 0,
       availableSeats: json['availableSeats'] as int? ?? 0,
       totalSeats: json['totalSeats'] as int? ?? 0,
       reservedSeats: json['reservedSeats'] as int? ?? 0,

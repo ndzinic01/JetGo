@@ -195,6 +195,7 @@ public sealed class FlightAdminService : IFlightAdminService
             .Include(x => x.Seats)
             .Include(x => x.Reservations)
                 .ThenInclude(x => x.Payment)
+                    .ThenInclude(x => x!.Transactions)
             .Include(x => x.Reservations)
                 .ThenInclude(x => x.Items)
                     .ThenInclude(x => x.FlightSeat)

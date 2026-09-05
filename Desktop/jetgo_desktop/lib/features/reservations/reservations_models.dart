@@ -86,6 +86,7 @@ class ReservationDetails {
     required this.paymentId,
     required this.paymentStatus,
     required this.isPaid,
+    required this.hasCapturedPayment,
     required this.createdAtUtc,
     required this.statusChangedAtUtc,
     required this.statusChangedByUserId,
@@ -98,6 +99,7 @@ class ReservationDetails {
     required this.canInitiatePayment,
     required this.canBeRefunded,
     required this.canUpdateBaggage,
+    required this.canChangeReservation,
   });
 
   final int id;
@@ -119,6 +121,7 @@ class ReservationDetails {
   final int? paymentId;
   final PaymentStatusValue? paymentStatus;
   final bool isPaid;
+  final bool hasCapturedPayment;
   final DateTime createdAtUtc;
   final DateTime? statusChangedAtUtc;
   final String? statusChangedByUserId;
@@ -131,6 +134,7 @@ class ReservationDetails {
   final bool canInitiatePayment;
   final bool canBeRefunded;
   final bool canUpdateBaggage;
+  final bool canChangeReservation;
 
   factory ReservationDetails.fromJson(Map<String, dynamic> json) {
     return ReservationDetails(
@@ -157,6 +161,7 @@ class ReservationDetails {
           ? null
           : PaymentStatusValue.fromValue(json['paymentStatus'] as int),
       isPaid: json['isPaid'] as bool? ?? false,
+      hasCapturedPayment: json['hasCapturedPayment'] as bool? ?? false,
       createdAtUtc: DateTime.parse(json['createdAtUtc'] as String),
       statusChangedAtUtc: json['statusChangedAtUtc'] == null
           ? null
@@ -175,6 +180,7 @@ class ReservationDetails {
       canInitiatePayment: json['canInitiatePayment'] as bool? ?? false,
       canBeRefunded: json['canBeRefunded'] as bool? ?? false,
       canUpdateBaggage: json['canUpdateBaggage'] as bool? ?? false,
+      canChangeReservation: json['canChangeReservation'] as bool? ?? false,
     );
   }
 }

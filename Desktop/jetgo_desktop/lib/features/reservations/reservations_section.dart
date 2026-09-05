@@ -130,7 +130,8 @@ class _ReservationsSectionState extends State<ReservationsSection> {
         _selectedDetails = null;
         _detailsErrorMessage = null;
       } else {
-        final selectedExists = _selectedReservationId != null &&
+        final selectedExists =
+            _selectedReservationId != null &&
             _reservations.any((item) => item.id == _selectedReservationId);
         final nextId = selectedExists
             ? _selectedReservationId!
@@ -267,10 +268,84 @@ class _ReservationsSectionState extends State<ReservationsSection> {
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  Future<void> _handleChangeReservation(ReservationDetails details) async {
+    final nowUtc = DateTime.now().toUtc();
+    final eligibleFlights =
+        _flightOptions
+            .where(
+              (flight) =>
+                  flight.routeCode == details.routeCode &&
+                  (flight.status == FlightStatusValue.scheduled ||
+                      flight.status == FlightStatusValue.delayed) &&
+                  flight.departureAtUtc.toUtc().isAfter(nowUtc),
+            )
+            .toList()
+          ..sort((a, b) => a.departureAtUtc.compareTo(b.departureAtUtc));
+
+    if (!eligibleFlights.any((flight) => flight.id == details.flightId)) {
+      final currentFlightOptions = _flightOptions.where(
+        (flight) => flight.id == details.flightId,
+      );
+
+      if (currentFlightOptions.isNotEmpty) {
+        eligibleFlights.insert(0, currentFlightOptions.first);
+      }
+    }
+
+    if (eligibleFlights.isEmpty) {
+      _showMessage(
+        'Nema aktivnih letova na istoj ruti za izmjenu rezervacije.',
+      );
+      return;
+    }
+
+    final input = await showDialog<_ReservationChangeInput>(
+      context: context,
+      builder: (context) => _ReservationChangeDialog(
+        token: widget.token,
+        details: details,
+        flightOptions: eligibleFlights,
+        flightsService: _flightsService,
+      ),
     );
+
+    if (input == null) {
+      return;
+    }
+
+    try {
+      final updated = await _service.changeReservation(
+        token: widget.token,
+        id: details.id,
+        flightId: input.flightId,
+        seatNumbers: input.seatNumbers,
+        additionalBaggageCount: input.additionalBaggageCount,
+        reason: input.reason,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _selectedReservationId = updated.id;
+        _selectedDetails = updated;
+      });
+
+      await _refreshLookups();
+      await _loadReservations(showLoader: false);
+      _showMessage('Rezervacija je uspjesno izmijenjena.');
+    } on ApiException catch (error) {
+      _showMessage(error.message);
+    } catch (_) {
+      _showMessage('Izmjena rezervacije trenutno nije dostupna.');
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -472,7 +547,9 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                       DataCell(Text(item.status.label)),
                       DataCell(Text(_paymentSummary(item))),
                       DataCell(Text(item.seatsCount.toString())),
-                      DataCell(Text(_compactBaggageLabel(item.additionalBaggageCount))),
+                      DataCell(
+                        Text(_compactBaggageLabel(item.additionalBaggageCount)),
+                      ),
                       DataCell(
                         Text(
                           '${item.totalAmount.toStringAsFixed(2)} ${item.currency}',
@@ -555,6 +632,12 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                 icon: const Icon(Icons.cancel_outlined),
                 label: const Text('Otkazi'),
               ),
+            if (details.canChangeReservation)
+              FilledButton.icon(
+                onPressed: () => _handleChangeReservation(details),
+                icon: const Icon(Icons.edit_calendar_rounded),
+                label: const Text('Izmijeni'),
+              ),
           ],
         ),
         const SizedBox(height: 20),
@@ -564,13 +647,16 @@ class _ReservationsSectionState extends State<ReservationsSection> {
               _DetailsBlock(
                 title: 'Osnovno',
                 rows: [
-                  _DetailsRow('Polazak', _formatDateTime(details.departureAtUtc)),
-                  _DetailsRow('Dolazak', _formatDateTime(details.arrivalAtUtc)),
                   _DetailsRow(
-                    'Ukupno sjedista',
-                    '${details.seats.length}',
+                    'Polazak',
+                    _formatDateTime(details.departureAtUtc),
                   ),
-                  _DetailsRow('Kreirano', _formatDateTime(details.createdAtUtc)),
+                  _DetailsRow('Dolazak', _formatDateTime(details.arrivalAtUtc)),
+                  _DetailsRow('Ukupno sjedista', '${details.seats.length}'),
+                  _DetailsRow(
+                    'Kreirano',
+                    _formatDateTime(details.createdAtUtc),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -610,7 +696,10 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                 title: 'Kupac',
                 rows: [
                   _DetailsRow('Ime i prezime', details.customer.fullName),
-                  _DetailsRow('Korisnicko ime', '@${details.customer.username}'),
+                  _DetailsRow(
+                    'Korisnicko ime',
+                    '@${details.customer.username}',
+                  ),
                   _DetailsRow('Email', details.customer.email),
                 ],
               ),
@@ -622,10 +711,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                     'Status placanja',
                     details.paymentStatus?.label ?? '-',
                   ),
-                  _DetailsRow(
-                    'Placeno',
-                    details.isPaid ? 'Da' : 'Ne',
-                  ),
+                  _DetailsRow('Placeno', details.isPaid ? 'Da' : 'Ne'),
                   _DetailsRow(
                     'Moze placanje',
                     details.canInitiatePayment ? 'Da' : 'Ne',
@@ -765,20 +851,16 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
 }
 
 class _DetailsBlock extends StatelessWidget {
-  const _DetailsBlock({
-    required this.title,
-    this.rows,
-    this.child,
-  });
+  const _DetailsBlock({required this.title, this.rows, this.child});
 
   final String title;
   final List<_DetailsRow>? rows;
@@ -789,10 +871,7 @@ class _DetailsBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 10),
         if (rows != null)
           ...rows!.map(
@@ -806,10 +885,8 @@ class _DetailsBlock extends StatelessWidget {
                     child: Text(
                       row.label,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -880,6 +957,453 @@ class _ReservationReasonDialogState extends State<_ReservationReasonDialog> {
           child: const Text('Potvrdi'),
         ),
       ],
+    );
+  }
+}
+
+class _ReservationChangeInput {
+  const _ReservationChangeInput({
+    required this.flightId,
+    required this.seatNumbers,
+    required this.additionalBaggageCount,
+    required this.reason,
+  });
+
+  final int flightId;
+  final List<String> seatNumbers;
+  final int additionalBaggageCount;
+  final String reason;
+}
+
+class _ReservationChangeDialog extends StatefulWidget {
+  const _ReservationChangeDialog({
+    required this.token,
+    required this.details,
+    required this.flightOptions,
+    required this.flightsService,
+  });
+
+  final String token;
+  final ReservationDetails details;
+  final List<FlightItem> flightOptions;
+  final FlightsRoutesService flightsService;
+
+  @override
+  State<_ReservationChangeDialog> createState() =>
+      _ReservationChangeDialogState();
+}
+
+class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _reasonController = TextEditingController();
+
+  late int _selectedFlightId;
+  late int _baggageCount;
+  late Set<String> _selectedSeats;
+  FlightDetails? _flightDetails;
+  bool _isLoadingFlight = false;
+  String? _flightErrorMessage;
+  String? _seatErrorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedFlightId = widget.details.flightId;
+    _baggageCount = widget.details.additionalBaggageCount;
+    _selectedSeats = widget.details.seats
+        .map((seat) => seat.seatNumber)
+        .where((seat) => seat.trim().isNotEmpty)
+        .toSet();
+    _loadFlightDetails(_selectedFlightId);
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadFlightDetails(int flightId) async {
+    setState(() {
+      _isLoadingFlight = true;
+      _flightErrorMessage = null;
+    });
+
+    try {
+      final details = await widget.flightsService.getFlight(
+        token: widget.token,
+        id: flightId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _flightDetails = details;
+        final availableSeats = _seatOptions.toSet();
+        _selectedSeats = _selectedSeats
+            .where((seat) => availableSeats.contains(seat))
+            .toSet();
+        _isLoadingFlight = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _flightDetails = null;
+        _flightErrorMessage = error.message;
+        _isLoadingFlight = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _flightDetails = null;
+        _flightErrorMessage =
+            'Sjedista za odabrani let trenutno nisu dostupna.';
+        _isLoadingFlight = false;
+      });
+    }
+  }
+
+  List<String> get _seatOptions {
+    final seats = <String>{
+      ...?_flightDetails?.availableSeatNumbers,
+      if (_selectedFlightId == widget.details.flightId)
+        ...widget.details.seats.map((seat) => seat.seatNumber),
+    };
+
+    return seats.toList()..sort(_compareSeatNumbers);
+  }
+
+  double get _baggageUnitPrice {
+    final flightPrice = _flightDetails?.additionalBaggageUnitPrice ?? 0;
+    if (flightPrice > 0) {
+      return flightPrice;
+    }
+
+    if (widget.details.additionalBaggageUnitPrice > 0) {
+      return widget.details.additionalBaggageUnitPrice;
+    }
+
+    return 35;
+  }
+
+  double get _newTotalAmount {
+    final seatPrice = _flightDetails?.basePrice ?? 0;
+    return (seatPrice * _selectedSeats.length) +
+        (_baggageCount * _baggageUnitPrice);
+  }
+
+  double get _differenceAmount => _newTotalAmount - widget.details.totalAmount;
+
+  String get _currency => _flightDetails?.currency ?? widget.details.currency;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Izmijeni rezervaciju'),
+      content: SizedBox(
+        width: 660,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${widget.details.reservationCode} - ${widget.details.routeCode}',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  key: ValueKey<int>(_selectedFlightId),
+                  initialValue: _selectedFlightId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Let'),
+                  items: widget.flightOptions
+                      .map(
+                        (flight) => DropdownMenuItem<int>(
+                          value: flight.id,
+                          child: Text(
+                            '${flight.flightNumber} - ${_formatDateTime(flight.departureAtUtc)}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  validator: (value) => value == null
+                      ? 'Odaberite let za izmjenu rezervacije.'
+                      : null,
+                  onChanged: (value) {
+                    if (value == null || value == _selectedFlightId) {
+                      return;
+                    }
+
+                    setState(() {
+                      _selectedFlightId = value;
+                      _flightDetails = null;
+                      _seatErrorMessage = null;
+                      _selectedSeats = value == widget.details.flightId
+                          ? widget.details.seats
+                                .map((seat) => seat.seatNumber)
+                                .toSet()
+                          : <String>{};
+                    });
+                    _loadFlightDetails(value);
+                  },
+                ),
+                const SizedBox(height: 16),
+                if (_isLoadingFlight) const LinearProgressIndicator(),
+                if (_flightErrorMessage != null) ...[
+                  Text(
+                    _flightErrorMessage!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _buildSeatPicker(context),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  key: ValueKey<int>(_baggageCount),
+                  initialValue: _baggageCount,
+                  decoration: const InputDecoration(
+                    labelText: 'Dodatni prtljag',
+                  ),
+                  items: List.generate(
+                    7,
+                    (index) => DropdownMenuItem<int>(
+                      value: index,
+                      child: Text(
+                        index == 0 ? 'Bez dodatnog prtljaga' : '$index kom.',
+                      ),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+
+                    setState(() {
+                      _baggageCount = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _reasonController,
+                  maxLength: 500,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Razlog izmjene',
+                    hintText: 'Npr. zahtjev korisnika za drugi datum leta',
+                  ),
+                  validator: (value) {
+                    final trimmed = value?.trim() ?? '';
+                    if (trimmed.isEmpty) {
+                      return 'Razlog izmjene je obavezan.';
+                    }
+                    if (trimmed.length < 5) {
+                      return 'Razlog izmjene mora imati najmanje 5 karaktera.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildPricePreview(context),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Odustani'),
+        ),
+        FilledButton(
+          onPressed: _isLoadingFlight ? null : _submit,
+          child: const Text('Sacuvaj izmjenu'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSeatPicker(BuildContext context) {
+    final seats = _seatOptions;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Sjedista', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        if (seats.isEmpty)
+          Text(
+            'Odabrani let nema slobodnih sjedista.',
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: seats
+                .map(
+                  (seat) => FilterChip(
+                    label: Text(seat),
+                    selected: _selectedSeats.contains(seat),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedSeats.add(seat);
+                        } else {
+                          _selectedSeats.remove(seat);
+                        }
+                        _seatErrorMessage = null;
+                      });
+                    },
+                  ),
+                )
+                .toList(),
+          ),
+        if (_seatErrorMessage != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _seatErrorMessage!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPricePreview(BuildContext context) {
+    final difference = _differenceAmount;
+    final differenceLabel = difference.abs() < 0.005
+        ? 'Bez razlike za placanje'
+        : difference > 0
+        ? 'Doplata ${difference.toStringAsFixed(2)} $_currency'
+        : 'Djelimicni refund ${difference.abs().toStringAsFixed(2)} $_currency';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Obracun', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 10),
+          _PricePreviewRow(
+            label: 'Trenutni iznos',
+            value:
+                '${widget.details.totalAmount.toStringAsFixed(2)} ${widget.details.currency}',
+          ),
+          _PricePreviewRow(
+            label: 'Novi iznos',
+            value: '${_newTotalAmount.toStringAsFixed(2)} $_currency',
+          ),
+          _PricePreviewRow(label: 'Razlika', value: differenceLabel),
+          const SizedBox(height: 8),
+          Text(
+            'Ako je rezervacija vec placena, sistem automatski pokrece doplatu ili djelimicni refund.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _submit() {
+    final formValid = _formKey.currentState?.validate() ?? false;
+
+    if (_selectedSeats.isEmpty) {
+      setState(() {
+        _seatErrorMessage = 'Odaberite najmanje jedno sjediste.';
+      });
+    }
+
+    if (!formValid || _selectedSeats.isEmpty || _flightDetails == null) {
+      return;
+    }
+
+    final seats = _selectedSeats.toList()..sort(_compareSeatNumbers);
+    Navigator.of(context).pop(
+      _ReservationChangeInput(
+        flightId: _selectedFlightId,
+        seatNumbers: seats,
+        additionalBaggageCount: _baggageCount,
+        reason: _reasonController.text.trim(),
+      ),
+    );
+  }
+
+  static int _compareSeatNumbers(String first, String second) {
+    final numberPattern = RegExp(r'^\d+');
+    final firstRow = int.tryParse(numberPattern.stringMatch(first) ?? '');
+    final secondRow = int.tryParse(numberPattern.stringMatch(second) ?? '');
+
+    if (firstRow != null && secondRow != null && firstRow != secondRow) {
+      return firstRow.compareTo(secondRow);
+    }
+
+    return first.compareTo(second);
+  }
+
+  static String _formatDateTime(DateTime value) {
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day.$month.${local.year} $hour:$minute';
+  }
+}
+
+class _PricePreviewRow extends StatelessWidget {
+  const _PricePreviewRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

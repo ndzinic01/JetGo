@@ -41,10 +41,15 @@ public sealed class ReservationStatusSyncService
             .Include(x => x.Items)
                 .ThenInclude(x => x.FlightSeat)
             .Include(x => x.Payment)
+                .ThenInclude(x => x!.Transactions)
             .Where(x =>
                 x.Status == ReservationStatus.Pending &&
-                x.CreatedAtUtc <= paymentExpiredBeforeUtc &&
-                (x.Payment == null || x.Payment.Status != PaymentStatus.Paid))
+                (x.StatusChangedAtUtc ?? x.CreatedAtUtc) <= paymentExpiredBeforeUtc &&
+                (x.Payment == null ||
+                    (x.Payment.Status != PaymentStatus.Paid &&
+                        !x.Payment.Transactions.Any(t =>
+                            t.Status == PaymentTransactionStatus.Completed &&
+                            (t.Type == PaymentTransactionType.InitialPayment || t.Type == PaymentTransactionType.AdditionalCharge)))))
             .ToListAsync(cancellationToken);
 
         var expiredReservationNotifications = new List<(string UserId, string ReservationCode, string FlightNumber)>();
@@ -87,6 +92,7 @@ public sealed class ReservationStatusSyncService
         var flightsToComplete = await _dbContext.Flights
             .Include(x => x.Reservations)
                 .ThenInclude(x => x.Payment)
+                    .ThenInclude(x => x!.Transactions)
             .Include(x => x.Reservations)
                 .ThenInclude(x => x.Items)
                     .ThenInclude(x => x.FlightSeat)

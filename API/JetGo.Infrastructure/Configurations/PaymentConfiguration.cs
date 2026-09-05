@@ -1,4 +1,4 @@
-using JetGo.Domain.Entities;
+﻿using JetGo.Domain.Entities;
 using JetGo.Domain.Enums;
 using JetGo.Infrastructure.Configurations.Common;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +24,11 @@ public sealed class PaymentConfiguration : AuditableEntityConfiguration<Payment>
         builder.HasOne(x => x.Reservation)
             .WithOne(x => x.Payment)
             .HasForeignKey<Payment>(x => x.ReservationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(x => x.Transactions)
+            .WithOne(x => x.Payment)
+            .HasForeignKey(x => x.PaymentId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -24,4 +24,6 @@ public sealed class Payment : AuditableEntity
     public DateTime? RefundedAtUtc { get; set; }
 
     public string? StatusReason { get; set; }
+
+    public ICollection<PaymentTransaction> Transactions { get; set; } = new List<PaymentTransaction>();
 }

@@ -1,0 +1,21 @@
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace JetGo.Application.Requests.Reservations;
+
+public sealed class ChangeReservationRequest
+{
+    [Range(1, int.MaxValue, ErrorMessage = "FlightId mora biti veci od 0.")]
+    public int FlightId { get; init; }
+
+    [Required(ErrorMessage = "Morate odabrati najmanje jedno sjediste.")]
+    [MinLength(1, ErrorMessage = "Morate odabrati najmanje jedno sjediste.")]
+    [MaxLength(6, ErrorMessage = "Maksimalno je dozvoljeno odabrati 6 sjedista po rezervaciji.")]
+    public string[] SeatNumbers { get; init; } = Array.Empty<string>();
+
+    [Range(0, 6, ErrorMessage = "Dodatni prtljag mora biti izmedju 0 i 6 komada.")]
+    public int AdditionalBaggageCount { get; init; }
+
+    [Required(ErrorMessage = "Razlog izmjene rezervacije je obavezan.")]
+    [StringLength(500, MinimumLength = 5, ErrorMessage = "Razlog izmjene mora imati izmedju 5 i 500 karaktera.")]
+    public string Reason { get; init; } = string.Empty;
+}

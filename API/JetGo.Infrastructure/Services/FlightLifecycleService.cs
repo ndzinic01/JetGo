@@ -1,4 +1,4 @@
-﻿using JetGo.Application.Contracts.Messaging;
+using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Exceptions;
 using JetGo.Application.Messaging.Notifications;
 using JetGo.Domain.Entities;
@@ -118,9 +118,16 @@ public sealed class FlightLifecycleService
             var payment = reservation.Payment;
             var notificationBody = $"Let {flight.FlightNumber} za rezervaciju {reservation.ReservationCode} je otkazan.";
 
-            if (payment?.Status == PaymentStatus.Paid)
+            if (payment is not null)
             {
-                await RefundPaidReservationAsync(payment, reservation.ReservationCode, reason, nowUtc, cancellationToken);
+                PaymentService.EnsureLedgerHasCurrentPaidCapture(payment, nowUtc);
+            }
+
+            var refundableAmount = payment is null ? 0m : PaymentLedger.CalculateNetPaidAmount(payment);
+
+            if (payment is not null && refundableAmount > 0m)
+            {
+                await RefundPaidReservationAsync(payment, refundableAmount, reservation.ReservationCode, reason, nowUtc, cancellationToken);
                 _reservationStateMachine.CancelAfterRefund(reservation, actorUserId, reason, nowUtc);
                 notificationBody += " Placanje je automatski refundirano kroz PayPal sandbox.";
             }
@@ -130,6 +137,7 @@ public sealed class FlightLifecycleService
 
                 if (payment?.Status == PaymentStatus.Pending)
                 {
+                    PaymentService.FailPendingChargeTransactions(payment, "Placanje je zaustavljeno jer je let otkazan.", nowUtc);
                     payment.Status = PaymentStatus.Failed;
                     payment.StatusReason = "Placanje je zaustavljeno jer je let otkazan.";
                     payment.UpdatedAtUtc = nowUtc;
@@ -194,6 +202,10 @@ public sealed class FlightLifecycleService
 
             if (reservation.Payment?.Status == PaymentStatus.Pending)
             {
+                PaymentService.FailPendingChargeTransactions(
+                    reservation.Payment,
+                    "Placanje je zaustavljeno jer je let zavrsen prije finalizacije placanja.",
+                    nowUtc);
                 reservation.Payment.Status = PaymentStatus.Failed;
                 reservation.Payment.StatusReason = "Placanje je zaustavljeno jer je let zavrsen prije finalizacije placanja.";
                 reservation.Payment.UpdatedAtUtc = nowUtc;
@@ -233,25 +245,71 @@ public sealed class FlightLifecycleService
 
     private async Task RefundPaidReservationAsync(
         Payment payment,
+        decimal refundableAmount,
         string reservationCode,
         string reason,
         DateTime nowUtc,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(payment.ProviderReference))
+        var refundableCaptures = PaymentLedger.GetRefundableCaptures(payment);
+
+        if (refundableCaptures.Count == 0)
         {
             throw new ConflictException("Let ima placenu rezervaciju bez PayPal capture identifikatora, pa automatski refund nije moguc.");
         }
 
-        var refundResponse = await _payPalCheckoutClient.RefundCaptureAsync(
-            payment.ProviderReference,
-            payment.Amount,
-            payment.Currency,
-            reservationCode,
-            cancellationToken);
+        var remainingAmount = refundableAmount;
+        var refundedAtUtc = nowUtc;
 
+        foreach (var capture in refundableCaptures)
+        {
+            if (remainingAmount <= 0m)
+            {
+                break;
+            }
+
+            var refundAmount = Math.Min(capture.Amount, remainingAmount);
+
+            if (refundAmount <= 0m)
+            {
+                continue;
+            }
+
+            var refundResponse = await _payPalCheckoutClient.RefundCaptureAsync(
+                capture.CaptureId,
+                refundAmount,
+                capture.Currency,
+                reservationCode,
+                cancellationToken);
+
+            refundedAtUtc = refundResponse.CreateTime?.ToUniversalTime() ?? nowUtc;
+            payment.Transactions.Add(new PaymentTransaction
+            {
+                Type = PaymentTransactionType.FullRefund,
+                Status = PaymentTransactionStatus.Completed,
+                Provider = "PayPal",
+                ProviderReference = refundResponse.Id,
+                RelatedProviderReference = capture.CaptureId,
+                Amount = refundAmount,
+                Currency = capture.Currency,
+                CompletedAtUtc = refundedAtUtc,
+                Note = $"Automatski refund zbog otkazivanja leta. Razlog: {reason}",
+                CreatedAtUtc = nowUtc,
+                UpdatedAtUtc = nowUtc
+            });
+
+            remainingAmount = decimal.Round(remainingAmount - refundAmount, 2, MidpointRounding.AwayFromZero);
+        }
+
+        if (remainingAmount > 0m)
+        {
+            throw new ConflictException("Nije moguce automatski refundirati placanje jer capture zapisi nemaju dovoljan preostali iznos.");
+        }
+
+        PaymentService.FailPendingChargeTransactions(payment, "Placanje je zaustavljeno jer je let otkazan.", nowUtc);
         payment.Status = PaymentStatus.Refunded;
-        payment.RefundedAtUtc = refundResponse.CreateTime?.ToUniversalTime() ?? nowUtc;
+        payment.Amount = 0m;
+        payment.RefundedAtUtc = refundedAtUtc;
         payment.StatusReason = $"Automatski refund zbog otkazivanja leta. Razlog: {reason}";
         payment.UpdatedAtUtc = nowUtc;
     }
@@ -315,4 +373,3 @@ public sealed class FlightLifecycleService
         }
     }
 }
-

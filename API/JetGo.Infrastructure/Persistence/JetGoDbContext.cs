@@ -23,6 +23,7 @@ public sealed class JetGoDbContext : IdentityDbContext<AppUser, IdentityRole, st
     public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReservationItem> ReservationItems => Set<ReservationItem>();

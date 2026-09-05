@@ -39,6 +39,42 @@ public sealed class ReservationStateMachine
         reservation.StatusReason = "Rezervacija je potvrdjena nakon uspjesnog placanja.";
     }
 
+    public void MarkChanged(Reservation reservation, string actorUserId, string reason, DateTime nowUtc)
+    {
+        if (reservation.Status is ReservationStatus.Cancelled or ReservationStatus.Completed)
+        {
+            throw new ValidationException(
+                "Zavrsena ili otkazana rezervacija se ne moze mijenjati.",
+                new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Izmjena je dozvoljena samo za aktivne rezervacije."]
+                });
+        }
+
+        reservation.StatusChangedByUserId = actorUserId;
+        reservation.StatusChangedAtUtc = nowUtc;
+        reservation.StatusReason = reason.Trim();
+        reservation.UpdatedAtUtc = nowUtc;
+    }
+
+    public void MarkChangeRequiresPayment(Reservation reservation, string actorUserId, string reason, DateTime nowUtc)
+    {
+        if (reservation.Status is ReservationStatus.Cancelled or ReservationStatus.Completed)
+        {
+            throw new ValidationException(
+                "Zavrsena ili otkazana rezervacija se ne moze mijenjati.",
+                new Dictionary<string, string[]>
+                {
+                    ["status"] = ["Izmjena je dozvoljena samo za aktivne rezervacije."]
+                });
+        }
+
+        reservation.Status = ReservationStatus.Pending;
+        reservation.StatusChangedByUserId = actorUserId;
+        reservation.StatusChangedAtUtc = nowUtc;
+        reservation.StatusReason = reason.Trim();
+        reservation.UpdatedAtUtc = nowUtc;
+    }
     public bool TryExpirePendingPayment(
         Reservation reservation,
         string actorUserId,
@@ -50,7 +86,9 @@ public sealed class ReservationStateMachine
             return false;
         }
 
-        if (reservation.CreatedAtUtc.Add(paymentHoldDuration) > nowUtc)
+        var holdStartedAtUtc = reservation.StatusChangedAtUtc ?? reservation.CreatedAtUtc;
+
+        if (holdStartedAtUtc.Add(paymentHoldDuration) > nowUtc)
         {
             return false;
         }
@@ -125,13 +163,13 @@ public sealed class ReservationStateMachine
                 });
         }
 
-        if (reservation.Status != ReservationStatus.Confirmed)
+        if (reservation.Status is not (ReservationStatus.Confirmed or ReservationStatus.Pending))
         {
             throw new ValidationException(
-                "Refund moze otkazati samo potvrdjenu rezervaciju.",
+                "Refund moze otkazati samo aktivnu rezervaciju.",
                 new Dictionary<string, string[]>
                 {
-                    ["status"] = ["Rezervacija mora biti u statusu Confirmed prije refundacije placanja."]
+                    ["status"] = ["Rezervacija mora biti u statusu Pending ili Confirmed prije refundacije placanja."]
                 });
         }
 

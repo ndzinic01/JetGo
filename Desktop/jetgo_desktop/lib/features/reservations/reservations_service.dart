@@ -4,7 +4,7 @@ import 'reservations_models.dart';
 
 class ReservationsService {
   ReservationsService({ApiClient? apiClient})
-      : _apiClient = apiClient ?? ApiClient();
+    : _apiClient = apiClient ?? ApiClient();
 
   final ApiClient _apiClient;
 
@@ -51,8 +51,28 @@ class ReservationsService {
     final response = await _apiClient.postJson(
       '/api/Reservations/$id/cancel',
       token: token,
+      body: <String, dynamic>{'reason': _normalizeReason(reason)},
+    );
+
+    return ReservationDetails.fromJson(response);
+  }
+
+  Future<ReservationDetails> changeReservation({
+    required String token,
+    required int id,
+    required int flightId,
+    required List<String> seatNumbers,
+    required int additionalBaggageCount,
+    required String reason,
+  }) async {
+    final response = await _apiClient.putJson(
+      '/api/Reservations/$id/change',
+      token: token,
       body: <String, dynamic>{
-        'reason': _normalizeReason(reason),
+        'flightId': flightId,
+        'seatNumbers': seatNumbers,
+        'additionalBaggageCount': additionalBaggageCount,
+        'reason': reason.trim(),
       },
     );
 

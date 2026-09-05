@@ -44,6 +44,8 @@ public sealed class ReservationDetailsDto
 
     public bool IsPaid { get; init; }
 
+    public bool HasCapturedPayment { get; init; }
+
     public DateTime CreatedAtUtc { get; init; }
 
     public DateTime? StatusChangedAtUtc { get; init; }
@@ -67,4 +69,6 @@ public sealed class ReservationDetailsDto
     public bool CanBeRefunded { get; set; }
 
     public bool CanUpdateBaggage { get; set; }
+
+    public bool CanChangeReservation { get; set; }
 }

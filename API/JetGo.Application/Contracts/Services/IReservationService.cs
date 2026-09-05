@@ -1,4 +1,4 @@
-using JetGo.Application.DTOs.Common;
+﻿using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.Reservations;
 using JetGo.Application.Requests.Reservations;
 
@@ -15,6 +15,8 @@ public interface IReservationService
     Task<ReservationDetailsDto> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     Task<ReservationDetailsDto> UpdateBaggageAsync(int id, UpdateReservationBaggageRequest request, CancellationToken cancellationToken = default);
+
+    Task<ReservationDetailsDto> ChangeAsync(int id, ChangeReservationRequest request, CancellationToken cancellationToken = default);
 
     Task<ReservationDetailsDto> CancelAsync(int id, UpdateReservationStatusRequest request, CancellationToken cancellationToken = default);
 }

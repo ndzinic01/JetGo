@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Security.Claims;
+using JetGo.Application.Configuration;
 using JetGo.Application.Constants;
 using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Contracts.Services;
@@ -9,6 +11,7 @@ using JetGo.Application.Messaging.Notifications;
 using JetGo.Application.Requests.Reservations;
 using JetGo.Domain.Entities;
 using JetGo.Domain.Enums;
+using JetGo.Infrastructure.Payments;
 using JetGo.Infrastructure.Persistence;
 using JetGo.Infrastructure.Services.Common;
 using Microsoft.AspNetCore.Http;
@@ -26,6 +29,8 @@ public sealed class ReservationService : IReservationService
     private readonly ReservationStateMachine _stateMachine;
     private readonly ReservationStatusSyncService _reservationStatusSyncService;
     private readonly INotificationEventPublisher _notificationEventPublisher;
+    private readonly PayPalCheckoutClient _payPalCheckoutClient;
+    private readonly PayPalSettings _payPalSettings;
     private readonly ILogger<ReservationService> _logger;
 
     public ReservationService(
@@ -34,6 +39,8 @@ public sealed class ReservationService : IReservationService
         ReservationStateMachine stateMachine,
         ReservationStatusSyncService reservationStatusSyncService,
         INotificationEventPublisher notificationEventPublisher,
+        PayPalCheckoutClient payPalCheckoutClient,
+        PayPalSettings payPalSettings,
         ILogger<ReservationService> logger)
     {
         _dbContext = dbContext;
@@ -41,6 +48,8 @@ public sealed class ReservationService : IReservationService
         _stateMachine = stateMachine;
         _reservationStatusSyncService = reservationStatusSyncService;
         _notificationEventPublisher = notificationEventPublisher;
+        _payPalCheckoutClient = payPalCheckoutClient;
+        _payPalSettings = payPalSettings;
         _logger = logger;
     }
 
@@ -188,6 +197,212 @@ public sealed class ReservationService : IReservationService
         return BuildVisibleReservationDetails(reservation, isAdmin);
     }
 
+    public async Task<ReservationDetailsDto> ChangeAsync(int id, ChangeReservationRequest request, CancellationToken cancellationToken = default)
+    {
+        EnsureCurrentUserIsAdmin();
+
+        var actorUserId = GetRequiredCurrentUserId();
+        var nowUtc = DateTime.UtcNow;
+        var reason = NormalizeRequiredReason(
+            request.Reason,
+            "reason",
+            "Unesite razlog izmjene rezervacije.");
+        var normalizedSeatNumbers = NormalizeSeatNumbers(request.SeatNumbers);
+
+        await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
+
+        var reservation = await _dbContext.Reservations
+            .Include(x => x.Payment)
+                .ThenInclude(x => x!.Transactions)
+            .Include(x => x.Items)
+                .ThenInclude(x => x.FlightSeat)
+            .Include(x => x.Flight)
+                .ThenInclude(x => x.Destination)
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (reservation is null)
+        {
+            throw new NotFoundException($"Rezervacija sa ID vrijednoscu {id} nije pronadjena.");
+        }
+
+        var targetFlight = await _dbContext.Flights
+            .Include(x => x.Destination)
+            .Include(x => x.Seats)
+            .SingleOrDefaultAsync(x => x.Id == request.FlightId, cancellationToken);
+
+        if (targetFlight is null)
+        {
+            throw new NotFoundException($"Let sa ID vrijednoscu {request.FlightId} nije pronadjen.");
+        }
+
+        ValidateReservationCanBeChanged(reservation, nowUtc);
+        ValidateTargetFlightForChange(reservation, targetFlight, nowUtc);
+
+        var selectedSeats = GetSelectedSeatsForChange(reservation, targetFlight, normalizedSeatNumbers);
+        var previousFlightNumber = reservation.Flight.FlightNumber;
+        var previousTotalAmount = reservation.TotalAmount;
+        var newBaggageTotalAmount = CalculateAdditionalBaggageTotal(request.AdditionalBaggageCount);
+        var newTotalAmount = decimal.Round(
+            (targetFlight.BasePrice * selectedSeats.Count) + newBaggageTotalAmount,
+            2,
+            MidpointRounding.AwayFromZero);
+
+        var payment = reservation.Payment;
+
+        if (payment?.Status == PaymentStatus.Refunded)
+        {
+            throw new ConflictException("Refundirana rezervacija se ne moze mijenjati.");
+        }
+
+        if (payment is not null)
+        {
+            PaymentService.EnsureLedgerHasCurrentPaidCapture(payment, nowUtc);
+            PaymentService.FailPendingChargeTransactions(
+                payment,
+                "Prethodno pokrenuto placanje je zaustavljeno jer je administrator izmijenio rezervaciju.",
+                nowUtc);
+        }
+
+        ApplyReservationChange(
+            reservation,
+            targetFlight,
+            selectedSeats,
+            request.AdditionalBaggageCount,
+            newBaggageTotalAmount,
+            newTotalAmount,
+            nowUtc);
+
+        var notificationTitle = "Rezervacija izmijenjena";
+        var notificationBody =
+            $"Rezervacija {reservation.ReservationCode} je izmijenjena. Novi let: {targetFlight.FlightNumber}, ukupan iznos: {newTotalAmount.ToString("0.00", CultureInfo.InvariantCulture)} {reservation.Currency}.";
+
+        if (payment is null)
+        {
+            _stateMachine.MarkChangeRequiresPayment(
+                reservation,
+                actorUserId,
+                $"Rezervacija je izmijenjena i ceka placanje. Razlog: {reason}",
+                nowUtc);
+        }
+        else
+        {
+            var providerTotal = ConvertReservationAmountToProviderAmount(newTotalAmount, reservation.Currency);
+            var netPaidAmount = PaymentLedger.CalculateNetPaidAmount(payment);
+            var paymentDifference = decimal.Round(
+                providerTotal.Amount - netPaidAmount,
+                2,
+                MidpointRounding.AwayFromZero);
+
+            if (netPaidAmount <= 0m)
+            {
+                payment.Status = PaymentStatus.Failed;
+                payment.Amount = 0m;
+                payment.Currency = providerTotal.CurrencyCode;
+                payment.StatusReason = "Placanje je potrebno ponovo pokrenuti jer je rezervacija izmijenjena prije naplate.";
+                payment.UpdatedAtUtc = nowUtc;
+                _stateMachine.MarkChangeRequiresPayment(
+                    reservation,
+                    actorUserId,
+                    $"Rezervacija je izmijenjena i ceka placanje. Razlog: {reason}",
+                    nowUtc);
+            }
+            else if (paymentDifference > 0m)
+            {
+                EnsurePayPalConfigured();
+                var order = await _payPalCheckoutClient.CreateOrderAsync(
+                    paymentDifference,
+                    providerTotal.CurrencyCode,
+                    reservation.ReservationCode,
+                    BuildReservationChangePaymentDescription(reservation, paymentDifference, providerTotal.CurrencyCode),
+                    BuildPayPalCallbackUrl(_payPalSettings.ReturnUrl, reservation.Id),
+                    BuildPayPalCallbackUrl(_payPalSettings.CancelUrl, reservation.Id),
+                    cancellationToken);
+
+                payment.Status = PaymentStatus.Pending;
+                payment.Provider = "PayPal";
+                payment.ProviderReference = order.Id;
+                payment.Amount = paymentDifference;
+                payment.Currency = providerTotal.CurrencyCode;
+                payment.StatusReason = $"Izmjena rezervacije zahtijeva doplatu {paymentDifference.ToString("0.00", CultureInfo.InvariantCulture)} {providerTotal.CurrencyCode}.";
+                payment.RefundedAtUtc = null;
+                payment.UpdatedAtUtc = nowUtc;
+                payment.Transactions.Add(PaymentService.CreatePendingChargeTransaction(
+                    PaymentTransactionType.AdditionalCharge,
+                    order.Id,
+                    paymentDifference,
+                    providerTotal.CurrencyCode,
+                    $"Doplata nakon izmjene rezervacije. Razlog: {reason}",
+                    nowUtc));
+
+                _stateMachine.MarkChangeRequiresPayment(
+                    reservation,
+                    actorUserId,
+                    $"Rezervacija je izmijenjena i ceka doplatu. Razlog: {reason}",
+                    nowUtc);
+                notificationTitle = "Rezervacija izmijenjena - potrebna doplata";
+                notificationBody += $" Potrebna je doplata {paymentDifference.ToString("0.00", CultureInfo.InvariantCulture)} {providerTotal.CurrencyCode} kroz PayPal.";
+            }
+            else if (paymentDifference < 0m)
+            {
+                EnsurePayPalConfigured();
+                var refundAmount = Math.Abs(paymentDifference);
+                var refundReason = $"Djelimicni refund nakon izmjene rezervacije. Razlog: {reason}";
+                var refundedAtUtc = await RefundPaymentDifferenceAsync(
+                    payment,
+                    refundAmount,
+                    refundReason,
+                    nowUtc,
+                    cancellationToken);
+
+                payment.Status = PaymentStatus.Paid;
+                payment.Amount = PaymentLedger.CalculateNetPaidAmount(payment);
+                payment.Currency = providerTotal.CurrencyCode;
+                payment.RefundedAtUtc = refundedAtUtc;
+                payment.StatusReason = refundReason;
+                payment.UpdatedAtUtc = nowUtc;
+                _stateMachine.MarkChanged(
+                    reservation,
+                    actorUserId,
+                    $"Rezervacija je izmijenjena i razlika cijene je refundirana. Razlog: {reason}",
+                    nowUtc);
+                notificationTitle = "Rezervacija izmijenjena - razlika refundirana";
+                notificationBody += $" Razlika {refundAmount.ToString("0.00", CultureInfo.InvariantCulture)} {providerTotal.CurrencyCode} je refundirana kroz PayPal.";
+            }
+            else
+            {
+                payment.Status = PaymentStatus.Paid;
+                payment.Amount = netPaidAmount;
+                payment.Currency = providerTotal.CurrencyCode;
+                payment.StatusReason = $"Rezervacija je izmijenjena bez razlike za doplatu ili refund. Razlog: {reason}";
+                payment.UpdatedAtUtc = nowUtc;
+                _stateMachine.MarkChanged(
+                    reservation,
+                    actorUserId,
+                    $"Rezervacija je izmijenjena bez razlike u placanju. Razlog: {reason}",
+                    nowUtc);
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await PublishNotificationSafelyAsync(
+            reservation.UserId,
+            notificationTitle,
+            notificationBody,
+            nowUtc,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Reservation {ReservationCode} changed by admin {AdminUserId}: {PreviousFlightNumber} -> {NewFlightNumber}, {PreviousAmount} -> {NewAmount} {Currency}.",
+            reservation.ReservationCode,
+            actorUserId,
+            previousFlightNumber,
+            targetFlight.FlightNumber,
+            previousTotalAmount,
+            newTotalAmount,
+            reservation.Currency);
+
+        return await GetByIdAsync(reservation.Id, cancellationToken);
+    }
     public async Task<ReservationDetailsDto> UpdateBaggageAsync(int id, UpdateReservationBaggageRequest request, CancellationToken cancellationToken = default)
     {
         var actorUserId = GetRequiredCurrentUserId();
@@ -197,6 +412,7 @@ public sealed class ReservationService : IReservationService
 
         var reservation = await _dbContext.Reservations
             .Include(x => x.Payment)
+                .ThenInclude(x => x!.Transactions)
             .Include(x => x.Items)
             .Include(x => x.Flight)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -227,7 +443,15 @@ public sealed class ReservationService : IReservationService
                 });
         }
 
-        if (reservation.Payment?.Status is PaymentStatus.Paid or PaymentStatus.Refunded)
+        if (reservation.Payment is not null)
+        {
+            PaymentService.EnsureLedgerHasCurrentPaidCapture(reservation.Payment, nowUtc);
+        }
+
+        var hasCapturedPayment = reservation.Payment is not null &&
+            PaymentLedger.CalculateNetPaidAmount(reservation.Payment) > 0m;
+
+        if (hasCapturedPayment || reservation.Payment?.Status is PaymentStatus.Paid or PaymentStatus.Refunded)
         {
             throw new ConflictException("Dodatni prtljag nije moguce mijenjati nakon uspjesnog placanja ili refundacije.");
         }
@@ -240,6 +464,10 @@ public sealed class ReservationService : IReservationService
 
         if (reservation.Payment?.Status == PaymentStatus.Pending)
         {
+            PaymentService.FailPendingChargeTransactions(
+                reservation.Payment,
+                "Prethodno PayPal placanje je ponisteno jer je izmijenjen dodatni prtljag.",
+                nowUtc);
             reservation.Payment.Status = PaymentStatus.Failed;
             reservation.Payment.StatusReason =
                 "Prethodno PayPal placanje je ponisteno jer je izmijenjen dodatni prtljag. Pokrenite placanje ponovo za novi iznos.";
@@ -278,6 +506,7 @@ public sealed class ReservationService : IReservationService
 
         var reservation = await _dbContext.Reservations
             .Include(x => x.Payment)
+                .ThenInclude(x => x!.Transactions)
             .Include(x => x.Items)
                 .ThenInclude(x => x.FlightSeat)
             .Include(x => x.Flight)
@@ -309,7 +538,13 @@ public sealed class ReservationService : IReservationService
                 });
         }
 
-        var hasCompletedPayment = reservation.Payment?.Status == PaymentStatus.Paid;
+        if (reservation.Payment is not null)
+        {
+            PaymentService.EnsureLedgerHasCurrentPaidCapture(reservation.Payment, nowUtc);
+        }
+
+        var hasCompletedPayment = reservation.Payment is not null &&
+            PaymentLedger.CalculateNetPaidAmount(reservation.Payment) > 0m;
         _stateMachine.Cancel(reservation, actorUserId, request.Reason, nowUtc, hasCompletedPayment);
 
         foreach (var item in reservation.Items)
@@ -318,6 +553,17 @@ public sealed class ReservationService : IReservationService
         }
 
         reservation.Flight.AvailableSeats += reservation.Items.Count;
+
+        if (reservation.Payment?.Status == PaymentStatus.Pending)
+        {
+            PaymentService.FailPendingChargeTransactions(
+                reservation.Payment,
+                "Rezervacija je otkazana prije finalizacije placanja.",
+                nowUtc);
+            reservation.Payment.Status = PaymentStatus.Failed;
+            reservation.Payment.StatusReason = "Rezervacija je otkazana prije finalizacije placanja.";
+            reservation.Payment.UpdatedAtUtc = nowUtc;
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await PublishNotificationSafelyAsync(
@@ -473,6 +719,11 @@ public sealed class ReservationService : IReservationService
                 PaymentId = x.Payment != null ? x.Payment.Id : null,
                 PaymentStatus = x.Payment != null ? x.Payment.Status : null,
                 IsPaid = x.Payment != null && x.Payment.Status == PaymentStatus.Paid,
+                HasCapturedPayment = x.Payment != null &&
+                    (x.Payment.Status == PaymentStatus.Paid ||
+                        x.Payment.Transactions.Any(t =>
+                            t.Status == PaymentTransactionStatus.Completed &&
+                            (t.Type == PaymentTransactionType.InitialPayment || t.Type == PaymentTransactionType.AdditionalCharge))),
                 CreatedAtUtc = x.CreatedAtUtc,
                 StatusChangedAtUtc = x.StatusChangedAtUtc,
                 StatusChangedByUserId = x.StatusChangedByUserId,
@@ -505,6 +756,294 @@ public sealed class ReservationService : IReservationService
             });
     }
 
+    private static void ValidateReservationCanBeChanged(Reservation reservation, DateTime nowUtc)
+    {
+        var effectiveStatus = GetEffectiveReservationStatus(
+            reservation.Status,
+            reservation.Payment?.Status,
+            reservation.Flight.ArrivalAtUtc,
+            nowUtc);
+
+        if (effectiveStatus is ReservationStatus.Cancelled or ReservationStatus.Completed)
+        {
+            throw new ValidationException(
+                "Zavrsena ili otkazana rezervacija se ne moze mijenjati.",
+                new Dictionary<string, string[]>
+                {
+                    ["reservation"] = ["Izmjena je dozvoljena samo za aktivne rezervacije. Kreirajte novu rezervaciju ako je prethodna zavrsena ili otkazana."]
+                });
+        }
+    }
+
+    private static void ValidateTargetFlightForChange(Reservation reservation, Flight targetFlight, DateTime nowUtc)
+    {
+        if (targetFlight.DestinationId != reservation.Flight.DestinationId)
+        {
+            throw new ValidationException(
+                "Rezervaciju je moguce prebaciti samo na drugi let za istu rutu.",
+                new Dictionary<string, string[]>
+                {
+                    ["flightId"] = ["Odaberite let koji pripada istoj ruti kao trenutna rezervacija."]
+                });
+        }
+
+        if (!FlightLifecycleService.CanAcceptReservations(
+            targetFlight.Status,
+            targetFlight.DepartureAtUtc,
+            targetFlight.ArrivalAtUtc,
+            nowUtc))
+        {
+            throw new ValidationException(
+                "Odabrani let nije dostupan za izmjenu rezervacije.",
+                new Dictionary<string, string[]>
+                {
+                    ["flightId"] = ["Rezervaciju je moguce prebaciti samo na aktivan let prije vremena polaska."]
+                });
+        }
+    }
+
+    private static List<FlightSeat> GetSelectedSeatsForChange(
+        Reservation reservation,
+        Flight targetFlight,
+        string[] normalizedSeatNumbers)
+    {
+        var selectedSeats = targetFlight.Seats
+            .Where(x => normalizedSeatNumbers.Contains(x.SeatNumber))
+            .ToList();
+
+        if (selectedSeats.Count != normalizedSeatNumbers.Length)
+        {
+            throw new ValidationException(
+                "Neka od odabranih sjedista nisu pronadjena za odabrani let.",
+                new Dictionary<string, string[]>
+                {
+                    ["seatNumbers"] = ["Provjerite oznake sjedista i pokusajte ponovo."]
+                });
+        }
+
+        var currentSeatIds = reservation.FlightId == targetFlight.Id
+            ? reservation.Items.Select(x => x.FlightSeatId).ToHashSet()
+            : new HashSet<int>();
+
+        var unavailableSeats = selectedSeats
+            .Where(x => x.IsReserved && !currentSeatIds.Contains(x.Id))
+            .Select(x => x.SeatNumber)
+            .OrderBy(x => x)
+            .ToArray();
+
+        if (unavailableSeats.Length > 0)
+        {
+            throw new ConflictException($"Sjedista su vec rezervisana: {string.Join(", ", unavailableSeats)}.");
+        }
+
+        var reusableSeatsCount = reservation.FlightId == targetFlight.Id
+            ? reservation.Items.Count
+            : 0;
+
+        if (targetFlight.AvailableSeats + reusableSeatsCount < selectedSeats.Count)
+        {
+            throw new ValidationException(
+                "Na odabranom letu nema dovoljno raspolozivih sjedista.",
+                new Dictionary<string, string[]>
+                {
+                    ["seatNumbers"] = ["Broj raspolozivih sjedista se promijenio. Osvjezite podatke i pokusajte ponovo."]
+                });
+        }
+
+        return selectedSeats;
+    }
+
+    private void ApplyReservationChange(
+        Reservation reservation,
+        Flight targetFlight,
+        IReadOnlyCollection<FlightSeat> selectedSeats,
+        int additionalBaggageCount,
+        decimal additionalBaggageTotalAmount,
+        decimal totalAmount,
+        DateTime nowUtc)
+    {
+        var currentItems = reservation.Items.ToArray();
+        var oldFlight = reservation.Flight;
+        var releasedSeats = 0;
+
+        foreach (var item in currentItems)
+        {
+            if (!item.FlightSeat.IsReserved)
+            {
+                continue;
+            }
+
+            item.FlightSeat.IsReserved = false;
+            releasedSeats++;
+        }
+
+        oldFlight.AvailableSeats = Math.Min(oldFlight.TotalSeats, oldFlight.AvailableSeats + releasedSeats);
+        _dbContext.ReservationItems.RemoveRange(currentItems);
+        reservation.Items.Clear();
+
+        foreach (var seat in selectedSeats)
+        {
+            reservation.Items.Add(new ReservationItem
+            {
+                FlightSeatId = seat.Id,
+                FlightSeat = seat,
+                Price = targetFlight.BasePrice
+            });
+
+            seat.IsReserved = true;
+        }
+
+        targetFlight.AvailableSeats = Math.Max(0, targetFlight.AvailableSeats - selectedSeats.Count);
+        reservation.FlightId = targetFlight.Id;
+        reservation.Flight = targetFlight;
+        reservation.AdditionalBaggageCount = additionalBaggageCount;
+        reservation.AdditionalBaggageUnitPrice = ReservationPricingConstants.AdditionalBaggagePricePerPiece;
+        reservation.AdditionalBaggageTotalPrice = additionalBaggageTotalAmount;
+        reservation.TotalAmount = totalAmount;
+        reservation.Currency = "BAM";
+        reservation.UpdatedAtUtc = nowUtc;
+    }
+
+    private async Task<DateTime> RefundPaymentDifferenceAsync(
+        Payment payment,
+        decimal amount,
+        string reason,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var refundableCaptures = PaymentLedger.GetRefundableCaptures(payment);
+
+        if (refundableCaptures.Count == 0)
+        {
+            throw new ConflictException("Placanje nema PayPal capture zapis koji se moze djelimicno refundirati.");
+        }
+
+        var remainingAmount = amount;
+        var refundedAtUtc = nowUtc;
+
+        foreach (var capture in refundableCaptures)
+        {
+            if (remainingAmount <= 0m)
+            {
+                break;
+            }
+
+            var refundAmount = Math.Min(capture.Amount, remainingAmount);
+
+            if (refundAmount <= 0m)
+            {
+                continue;
+            }
+
+            var refundResponse = await _payPalCheckoutClient.RefundCaptureAsync(
+                capture.CaptureId,
+                refundAmount,
+                capture.Currency,
+                payment.Reservation.ReservationCode,
+                cancellationToken);
+
+            refundedAtUtc = refundResponse.CreateTime?.ToUniversalTime() ?? nowUtc;
+            payment.Transactions.Add(new PaymentTransaction
+            {
+                Type = PaymentTransactionType.PartialRefund,
+                Status = PaymentTransactionStatus.Completed,
+                Provider = "PayPal",
+                ProviderReference = refundResponse.Id,
+                RelatedProviderReference = capture.CaptureId,
+                Amount = refundAmount,
+                Currency = capture.Currency,
+                CompletedAtUtc = refundedAtUtc,
+                Note = reason,
+                CreatedAtUtc = nowUtc,
+                UpdatedAtUtc = nowUtc
+            });
+
+            remainingAmount = decimal.Round(remainingAmount - refundAmount, 2, MidpointRounding.AwayFromZero);
+        }
+
+        if (remainingAmount > 0m)
+        {
+            throw new ConflictException("Nije moguce refundirati razliku jer evidentirani capture zapisi nemaju dovoljan preostali iznos.");
+        }
+
+        return refundedAtUtc;
+    }
+
+    private void EnsurePayPalConfigured()
+    {
+        if (_payPalSettings.IsConfigured)
+        {
+            return;
+        }
+
+        throw new ValidationException(
+            "PayPal sandbox konfiguracija nije kompletna.",
+            new Dictionary<string, string[]>
+            {
+                ["payment"] =
+                [
+                    "Postavite JETGO_PAYPAL_CLIENT_ID, JETGO_PAYPAL_CLIENT_SECRET, JETGO_PAYPAL_RETURN_URL i JETGO_PAYPAL_CANCEL_URL u .env prije testiranja stvarnog placanja."
+                ]
+            });
+    }
+
+    private ProviderPricing ConvertReservationAmountToProviderAmount(decimal reservationAmount, string reservationCurrency)
+    {
+        if (string.Equals(reservationCurrency, _payPalSettings.CurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return new ProviderPricing(reservationAmount, _payPalSettings.CurrencyCode);
+        }
+
+        if (string.Equals(reservationCurrency, "BAM", StringComparison.OrdinalIgnoreCase))
+        {
+            var convertedAmount = Math.Round(
+                reservationAmount / _payPalSettings.BamToCurrencyRate,
+                2,
+                MidpointRounding.AwayFromZero);
+
+            return new ProviderPricing(convertedAmount, _payPalSettings.CurrencyCode);
+        }
+
+        throw new ValidationException(
+            "Valuta rezervacije nije podrzana za PayPal sandbox integraciju.",
+            new Dictionary<string, string[]>
+            {
+                ["payment"] = [$"Trenutno je podrzana samo konverzija iz BAM u {_payPalSettings.CurrencyCode} za PayPal sandbox placanja."]
+            });
+    }
+
+    private static string BuildPayPalCallbackUrl(string baseUrl, int reservationId)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return baseUrl;
+        }
+
+        var separator = baseUrl.Contains('?') ? "&" : "?";
+        return $"{baseUrl}{separator}reservationId={reservationId}";
+    }
+
+    private static string BuildReservationChangePaymentDescription(Reservation reservation, decimal amount, string currency)
+    {
+        return $"Additional charge for reservation {reservation.ReservationCode}, flight {reservation.Flight.FlightNumber}: {amount.ToString("0.00", CultureInfo.InvariantCulture)} {currency}";
+    }
+
+    private static string NormalizeRequiredReason(string? value, string key, string message)
+    {
+        var trimmed = value?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(trimmed))
+        {
+            return trimmed;
+        }
+
+        throw new ValidationException(
+            "Razlog je obavezan.",
+            new Dictionary<string, string[]>
+            {
+                [key] = [message]
+            });
+    }
     private async Task PublishNotificationSafelyAsync(
         string userId,
         string title,
@@ -592,6 +1131,7 @@ public sealed class ReservationService : IReservationService
             reservation.DepartureAtUtc,
             reservation.ArrivalAtUtc,
             nowUtc);
+        var hasCapturedPayment = reservation.HasCapturedPayment || reservation.IsPaid;
 
         return new ReservationDetailsDto
         {
@@ -615,6 +1155,7 @@ public sealed class ReservationService : IReservationService
             PaymentId = reservation.PaymentId,
             PaymentStatus = reservation.PaymentStatus,
             IsPaid = reservation.IsPaid,
+            HasCapturedPayment = hasCapturedPayment,
             CreatedAtUtc = reservation.CreatedAtUtc,
             StatusChangedAtUtc = reservation.StatusChangedAtUtc,
             StatusChangedByUserId = reservation.StatusChangedByUserId,
@@ -623,7 +1164,8 @@ public sealed class ReservationService : IReservationService
             Seats = reservation.Seats,
             CanBeCancelled = flightAllowsUserActions &&
                 _stateMachine.CanCancel(actualStatus) &&
-                reservation.PaymentStatus is not PaymentStatus.Paid and not PaymentStatus.Refunded,
+                !hasCapturedPayment &&
+                reservation.PaymentStatus is not PaymentStatus.Refunded,
             CanBeConfirmed = false,
             CanBeCompleted = false,
             CanInitiatePayment =
@@ -631,10 +1173,16 @@ public sealed class ReservationService : IReservationService
                 actualStatus == ReservationStatus.Pending && !reservation.IsPaid,
             CanBeRefunded =
                 flightAllowsUserActions &&
-                reservation.PaymentStatus == PaymentStatus.Paid &&
-                actualStatus == ReservationStatus.Confirmed &&
+                hasCapturedPayment &&
+                (actualStatus is ReservationStatus.Pending or ReservationStatus.Confirmed) &&
                 reservation.DepartureAtUtc >= nowUtc.AddHours(RefundLeadTimeHours),
-            CanUpdateBaggage = flightAllowsUserActions && CanUpdateBaggage(actualStatus, reservation.PaymentStatus, reservation.IsPaid)
+            CanUpdateBaggage = flightAllowsUserActions &&
+                !hasCapturedPayment &&
+                CanUpdateBaggage(actualStatus, reservation.PaymentStatus, reservation.IsPaid),
+            CanChangeReservation = isAdmin &&
+                flightAllowsUserActions &&
+                (actualStatus is ReservationStatus.Pending or ReservationStatus.Confirmed) &&
+                reservation.PaymentStatus is not PaymentStatus.Refunded
         };
     }
 
@@ -704,4 +1252,6 @@ public sealed class ReservationService : IReservationService
                 });
         }
     }
+
+    private readonly record struct ProviderPricing(decimal Amount, string CurrencyCode);
 }
