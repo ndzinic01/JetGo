@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using JetGo.Application.Constants;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
@@ -354,83 +354,59 @@ public sealed class FlightService : IFlightService
 
     private async Task<SearchHistory?> BuildSearchHistoryAsync(string userId, FlightSearchRequest request, CancellationToken cancellationToken)
     {
-        int? destinationId = null;
+        var departureAirportId = request.DepartureAirportId;
+        var arrivalAirportId = request.ArrivalAirportId;
+        var airlineId = request.AirlineId;
         var searchTerms = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(request.SearchText))
+        AddSearchTerm(searchTerms, request.SearchText);
+        AddSearchTerm(searchTerms, request.DepartureSearchText);
+        AddSearchTerm(searchTerms, request.ArrivalSearchText);
+        AddSearchTerm(searchTerms, request.AirlineCode);
+
+        if (!departureAirportId.HasValue)
         {
-            searchTerms.Add(request.SearchText.Trim());
+            departureAirportId = await ResolveAirportIdAsync(request.DepartureSearchText, cancellationToken);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.DepartureSearchText))
+        if (!arrivalAirportId.HasValue)
         {
-            searchTerms.Add(request.DepartureSearchText.Trim());
+            arrivalAirportId = await ResolveAirportIdAsync(request.ArrivalSearchText, cancellationToken);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.ArrivalSearchText))
+        if (!airlineId.HasValue)
         {
-            searchTerms.Add(request.ArrivalSearchText.Trim());
+            airlineId = await ResolveAirlineIdAsync(request.AirlineCode, cancellationToken);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.AirlineCode))
+        var destinationMatch = await ResolveDestinationAsync(departureAirportId, arrivalAirportId, cancellationToken);
+
+        if (destinationMatch is null && !string.IsNullOrWhiteSpace(request.SearchText))
         {
-            searchTerms.Add(request.AirlineCode.Trim());
+            destinationMatch = await ResolveDestinationFromSearchTextAsync(request.SearchText, cancellationToken);
         }
 
-        string? searchTerm = searchTerms.Count == 0
-            ? null
-            : string.Join(' ', searchTerms);
-        if (request.DepartureAirportId.HasValue && request.ArrivalAirportId.HasValue)
+        if (destinationMatch is not null)
         {
-            var destinationData = await _dbContext.Destinations
-                .AsNoTracking()
-                .Where(x =>
-                    x.DepartureAirportId == request.DepartureAirportId.Value &&
-                    x.ArrivalAirportId == request.ArrivalAirportId.Value)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.RouteCode
-                })
-                .SingleOrDefaultAsync(cancellationToken);
-
-            if (destinationData is not null)
-            {
-                destinationId = destinationData.Id;
-                searchTerm = string.IsNullOrWhiteSpace(searchTerm)
-                    ? destinationData.RouteCode
-                    : $"{destinationData.RouteCode} {searchTerm}";
-            }
+            departureAirportId ??= destinationMatch.DepartureAirportId;
+            arrivalAirportId ??= destinationMatch.ArrivalAirportId;
+            AddSearchTerm(searchTerms, destinationMatch.RouteCode);
         }
 
-        if (string.IsNullOrWhiteSpace(searchTerm) && request.DepartureAirportId.HasValue)
+        if (searchTerms.Count == 0)
         {
-            searchTerm = await _dbContext.Airports
-                .AsNoTracking()
-                .Where(x => x.Id == request.DepartureAirportId.Value)
-                .Select(x => x.IataCode)
-                .SingleOrDefaultAsync(cancellationToken);
+            await AddResolvedSearchTermAsync(searchTerms, departureAirportId, arrivalAirportId, airlineId, cancellationToken);
         }
 
-        if (string.IsNullOrWhiteSpace(searchTerm) && request.ArrivalAirportId.HasValue)
-        {
-            searchTerm = await _dbContext.Airports
-                .AsNoTracking()
-                .Where(x => x.Id == request.ArrivalAirportId.Value)
-                .Select(x => x.IataCode)
-                .SingleOrDefaultAsync(cancellationToken);
-        }
+        var searchTerm = searchTerms.Count == 0
+            ? "StructuredSearch"
+            : string.Join(' ', searchTerms.Distinct(StringComparer.OrdinalIgnoreCase));
 
-        if (string.IsNullOrWhiteSpace(searchTerm) && request.AirlineId.HasValue)
-        {
-            searchTerm = await _dbContext.Airlines
-                .AsNoTracking()
-                .Where(x => x.Id == request.AirlineId.Value)
-                .Select(x => x.Code)
-                .SingleOrDefaultAsync(cancellationToken);
-        }
-
-        if (string.IsNullOrWhiteSpace(searchTerm))
+        if (!departureAirportId.HasValue &&
+            !arrivalAirportId.HasValue &&
+            !airlineId.HasValue &&
+            destinationMatch is null &&
+            string.IsNullOrWhiteSpace(searchTerm))
         {
             return null;
         }
@@ -439,9 +415,162 @@ public sealed class FlightService : IFlightService
         {
             UserId = userId,
             SearchTerm = Truncate(searchTerm.Trim(), 200),
-            DestinationId = destinationId
+            DestinationId = destinationMatch?.Id,
+            DepartureAirportId = departureAirportId,
+            ArrivalAirportId = arrivalAirportId,
+            AirlineId = airlineId
         };
     }
+
+    private async Task<int?> ResolveAirportIdAsync(string? searchText, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return null;
+        }
+
+        var term = searchText.Trim();
+
+        return await _dbContext.Airports
+            .AsNoTracking()
+            .Where(x =>
+                x.IataCode.Contains(term) ||
+                x.Name.Contains(term) ||
+                x.City.Name.Contains(term))
+            .OrderBy(x => x.IataCode == term ? 0 : 1)
+            .ThenBy(x => x.IataCode)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<int?> ResolveAirlineIdAsync(string? searchText, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return null;
+        }
+
+        var term = searchText.Trim();
+
+        return await _dbContext.Airlines
+            .AsNoTracking()
+            .Where(x =>
+                x.IsActive &&
+                (x.Code.Contains(term) || x.Name.Contains(term)))
+            .OrderBy(x => x.Code == term ? 0 : 1)
+            .ThenBy(x => x.Code)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<DestinationSearchMatch?> ResolveDestinationAsync(
+        int? departureAirportId,
+        int? arrivalAirportId,
+        CancellationToken cancellationToken)
+    {
+        if (!departureAirportId.HasValue || !arrivalAirportId.HasValue)
+        {
+            return null;
+        }
+
+        return await _dbContext.Destinations
+            .AsNoTracking()
+            .Where(x =>
+                x.IsActive &&
+                x.DepartureAirportId == departureAirportId.Value &&
+                x.ArrivalAirportId == arrivalAirportId.Value)
+            .Select(x => new DestinationSearchMatch(
+                x.Id,
+                x.RouteCode,
+                x.DepartureAirportId,
+                x.ArrivalAirportId))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<DestinationSearchMatch?> ResolveDestinationFromSearchTextAsync(
+        string? searchText,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return null;
+        }
+
+        var term = searchText.Trim();
+
+        return await _dbContext.Destinations
+            .AsNoTracking()
+            .Where(x =>
+                x.IsActive &&
+                (x.RouteCode.Contains(term) ||
+                 x.DepartureAirport.IataCode.Contains(term) ||
+                 x.DepartureAirport.City.Name.Contains(term) ||
+                 x.ArrivalAirport.IataCode.Contains(term) ||
+                 x.ArrivalAirport.City.Name.Contains(term)))
+            .OrderBy(x => x.RouteCode == term ? 0 : 1)
+            .ThenBy(x => x.RouteCode)
+            .Select(x => new DestinationSearchMatch(
+                x.Id,
+                x.RouteCode,
+                x.DepartureAirportId,
+                x.ArrivalAirportId))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task AddResolvedSearchTermAsync(
+        ICollection<string> searchTerms,
+        int? departureAirportId,
+        int? arrivalAirportId,
+        int? airlineId,
+        CancellationToken cancellationToken)
+    {
+        if (departureAirportId.HasValue)
+        {
+            AddSearchTerm(searchTerms, await GetAirportCodeAsync(departureAirportId.Value, cancellationToken));
+        }
+
+        if (arrivalAirportId.HasValue)
+        {
+            AddSearchTerm(searchTerms, await GetAirportCodeAsync(arrivalAirportId.Value, cancellationToken));
+        }
+
+        if (airlineId.HasValue)
+        {
+            AddSearchTerm(searchTerms, await GetAirlineCodeAsync(airlineId.Value, cancellationToken));
+        }
+    }
+
+    private async Task<string?> GetAirportCodeAsync(int airportId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Airports
+            .AsNoTracking()
+            .Where(x => x.Id == airportId)
+            .Select(x => x.IataCode)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<string?> GetAirlineCodeAsync(int airlineId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Airlines
+            .AsNoTracking()
+            .Where(x => x.Id == airlineId)
+            .Select(x => x.Code)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private static void AddSearchTerm(ICollection<string> searchTerms, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            searchTerms.Add(value.Trim());
+        }
+    }
+
+    private sealed record DestinationSearchMatch(
+        int Id,
+        string RouteCode,
+        int DepartureAirportId,
+        int ArrivalAirportId);
 
     private string? TryGetCurrentUserId()
     {
