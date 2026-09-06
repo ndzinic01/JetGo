@@ -20,13 +20,17 @@ class SupportMessagesScreen extends StatefulWidget {
 
 class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
   static const Duration _autoRefreshInterval = Duration(seconds: 20);
+  static const int _supportPageSize = 50;
+  static const int _maxPageSize = 100;
 
   final MobileDataService _dataService = MobileDataService();
   Timer? _autoRefreshTimer;
 
   bool _isLoading = true;
   bool _isPolling = false;
+  bool _isLoadingMore = false;
   String? _errorMessage;
+  PagedResult<MobileSupportMessageSummary>? _messagesPage;
   List<MobileSupportMessageSummary> _messages = const [];
 
   @override
@@ -49,6 +53,15 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
     });
   }
 
+  int get _supportRefreshPageSize {
+    final loadedCount = _messages.length;
+    if (loadedCount <= _supportPageSize) {
+      return _supportPageSize;
+    }
+
+    return loadedCount > _maxPageSize ? _maxPageSize : loadedCount;
+  }
+
   Future<void> _refreshSilently() async {
     if (!mounted || _isLoading || _isPolling) {
       return;
@@ -59,6 +72,8 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
     try {
       final response = await _dataService.fetchSupportMessages(
         token: widget.token,
+        page: 1,
+        pageSize: _supportRefreshPageSize,
       );
 
       if (!mounted) {
@@ -66,6 +81,7 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
       }
 
       setState(() {
+        _messagesPage = response;
         _messages = response.items;
         _errorMessage = null;
       });
@@ -79,12 +95,15 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
   Future<void> _load() async {
     setState(() {
       _isLoading = true;
+      _isLoadingMore = false;
       _errorMessage = null;
     });
 
     try {
       final response = await _dataService.fetchSupportMessages(
         token: widget.token,
+        page: 1,
+        pageSize: _supportPageSize,
       );
 
       if (!mounted) {
@@ -92,6 +111,7 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
       }
 
       setState(() {
+        _messagesPage = response;
         _messages = response.items;
       });
     } on ApiException catch (error) {
@@ -107,12 +127,57 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
     }
   }
 
+  Future<void> _loadMoreMessages() async {
+    final currentPage = _messagesPage;
+    if (currentPage == null || !currentPage.hasNextPage || _isLoadingMore) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPage = await _dataService.fetchSupportMessages(
+        token: widget.token,
+        page: currentPage.page + 1,
+        pageSize: _supportPageSize,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _messagesPage = nextPage;
+        _messages = [..._messages, ...nextPage.items];
+      });
+    } on ApiException catch (error) {
+      _showMessage(error.message);
+    } catch (_) {
+      _showMessage('Naredna stranica upita trenutno nije dostupna.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _openComposer() async {
-    final created = await Navigator.of(context).push<MobileSupportMessageDetails>(
-      MaterialPageRoute<MobileSupportMessageDetails>(
-        builder: (_) => CreateSupportMessageScreen(token: widget.token),
-      ),
-    );
+    final created = await Navigator.of(context)
+        .push<MobileSupportMessageDetails>(
+          MaterialPageRoute<MobileSupportMessageDetails>(
+            builder: (_) => CreateSupportMessageScreen(token: widget.token),
+          ),
+        );
 
     if (!mounted || created == null) {
       return;
@@ -171,10 +236,7 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
         icon: const Icon(Icons.add_rounded),
         label: const Text('Novi upit'),
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _buildBody(context),
-      ),
+      body: RefreshIndicator(onRefresh: _load, child: _buildBody(context)),
     );
   }
 
@@ -205,7 +267,8 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
           _SupportListEmptyState(
             icon: Icons.mark_email_unread_outlined,
             title: 'Nemate poslanih upita',
-            message: 'Kada posaljete poruku podrsci, ovdje cete vidjeti tok komunikacije.',
+            message:
+                'Kada posaljete poruku podrsci, ovdje cete vidjeti tok komunikacije.',
           ),
         ],
       );
@@ -260,12 +323,40 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
         ),
         const SizedBox(height: 16),
         ..._messages.map(
-          (item) => _SupportMessageCard(
-            item: item,
-            onTap: () => _openDetails(item),
-          ),
+          (item) =>
+              _SupportMessageCard(item: item, onTap: () => _openDetails(item)),
         ),
+        _buildLoadMoreButton(),
       ],
+    );
+  }
+
+  Widget _buildLoadMoreButton() {
+    if (!(_messagesPage?.hasNextPage ?? false)) {
+      return const SizedBox.shrink();
+    }
+
+    final icon = _isLoadingMore
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.expand_more_rounded);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Center(
+        child: OutlinedButton.icon(
+          onPressed: _isLoadingMore
+              ? null
+              : () {
+                  unawaited(_loadMoreMessages());
+                },
+          icon: icon,
+          label: Text(_isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos'),
+        ),
+      ),
     );
   }
 }
@@ -294,10 +385,7 @@ class _ReplyBadge extends StatelessWidget {
 }
 
 class _SupportFactChip extends StatelessWidget {
-  const _SupportFactChip({
-    required this.icon,
-    required this.label,
-  });
+  const _SupportFactChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -325,10 +413,7 @@ class _SupportFactChip extends StatelessWidget {
 }
 
 class _SupportMessageCard extends StatelessWidget {
-  const _SupportMessageCard({
-    required this.item,
-    required this.onTap,
-  });
+  const _SupportMessageCard({required this.item, required this.onTap});
 
   final MobileSupportMessageSummary item;
   final VoidCallback onTap;
@@ -350,8 +435,9 @@ class _SupportMessageCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.75),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.75,
+                ),
               ),
               child: Row(
                 children: [
@@ -405,10 +491,7 @@ class _SupportMessageCard extends StatelessWidget {
 }
 
 class _SupportInlineChip extends StatelessWidget {
-  const _SupportInlineChip({
-    required this.icon,
-    required this.label,
-  });
+  const _SupportInlineChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -428,10 +511,7 @@ class _SupportInlineChip extends StatelessWidget {
         children: [
           Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall,
-          ),
+          Text(label, style: theme.textTheme.bodySmall),
         ],
       ),
     );

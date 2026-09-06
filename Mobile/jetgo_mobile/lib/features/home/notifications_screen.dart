@@ -20,6 +20,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   static const _heroImageUrl =
       'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=80';
   static const Duration _autoRefreshInterval = Duration(seconds: 20);
+  static const int _notificationPageSize = 50;
+  static const int _maxPageSize = 100;
 
   final MobileDataService _dataService = MobileDataService();
 
@@ -27,10 +29,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   bool _isPolling = false;
+  bool _isLoadingMore = false;
   bool _showUnreadOnly = false;
   String _typeFilter = 'Sve';
   String? _errorMessage;
   MobileNotificationSummary? _summary;
+  PagedResult<MobileNotification>? _notificationsPage;
   List<MobileNotification> _notifications = const [];
 
   @override
@@ -53,6 +57,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
   }
 
+  int get _notificationRefreshPageSize {
+    final loadedCount = _notifications.length;
+    if (loadedCount <= _notificationPageSize) {
+      return _notificationPageSize;
+    }
+
+    return loadedCount > _maxPageSize ? _maxPageSize : loadedCount;
+  }
+
   Future<void> _refreshSilently() async {
     if (!mounted || _isLoading || _isSubmitting || _isPolling) {
       return;
@@ -66,6 +79,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
       final notifications = await _dataService.fetchNotifications(
         token: widget.token,
+        page: 1,
+        pageSize: _notificationRefreshPageSize,
       );
 
       if (!mounted) {
@@ -74,6 +89,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
       setState(() {
         _summary = summary;
+        _notificationsPage = notifications;
         _notifications = notifications.items;
         _errorMessage = null;
       });
@@ -87,6 +103,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _load() async {
     setState(() {
       _isLoading = true;
+      _isLoadingMore = false;
       _errorMessage = null;
     });
 
@@ -96,6 +113,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
       final notifications = await _dataService.fetchNotifications(
         token: widget.token,
+        page: 1,
+        pageSize: _notificationPageSize,
       );
 
       if (!mounted) {
@@ -104,6 +123,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
       setState(() {
         _summary = summary;
+        _notificationsPage = notifications;
         _notifications = notifications.items;
       });
     } on ApiException catch (error) {
@@ -114,6 +134,44 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMoreNotifications() async {
+    final currentPage = _notificationsPage;
+    if (currentPage == null || !currentPage.hasNextPage || _isLoadingMore) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPage = await _dataService.fetchNotifications(
+        token: widget.token,
+        page: currentPage.page + 1,
+        pageSize: _notificationPageSize,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _notificationsPage = nextPage;
+        _notifications = [..._notifications, ...nextPage.items];
+      });
+    } on ApiException catch (error) {
+      _showMessage(error.message);
+    } catch (_) {
+      _showMessage('Naredna stranica notifikacija trenutno nije dostupna.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
         });
       }
     }
@@ -139,7 +197,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notifikacija je oznacena kao procitana.')),
+        const SnackBar(
+          content: Text('Notifikacija je oznacena kao procitana.'),
+        ),
       );
       await _load();
     } on ApiException catch (error) {
@@ -173,7 +233,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sve notifikacije su oznacene kao procitane.')),
+        const SnackBar(
+          content: Text('Sve notifikacije su oznacene kao procitane.'),
+        ),
       );
       await _load();
     } on ApiException catch (error) {
@@ -190,9 +252,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -210,17 +272,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
           IconButton(
             tooltip: 'Oznaci sve kao procitano',
-            onPressed: summary == null || summary.unreadCount == 0 || _isSubmitting
+            onPressed:
+                summary == null || summary.unreadCount == 0 || _isSubmitting
                 ? null
                 : _markAllAsRead,
             icon: const Icon(Icons.done_all_rounded),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _buildBody(context),
-      ),
+      body: RefreshIndicator(onRefresh: _load, child: _buildBody(context)),
     );
   }
 
@@ -293,10 +353,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           labelText: 'Vrsta prikaza',
                         ),
                         items: const [
-                          DropdownMenuItem(
-                            value: 'Sve',
-                            child: Text('Sve'),
-                          ),
+                          DropdownMenuItem(value: 'Sve', child: Text('Sve')),
                           DropdownMenuItem(
                             value: 'Neprocitane',
                             child: Text('Neprocitane'),
@@ -330,9 +387,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         });
                       },
                     ),
-                    const Expanded(
-                      child: Text('Samo neprocitane'),
-                    ),
+                    const Expanded(child: Text('Samo neprocitane')),
                     if (summary.unreadCount > 0)
                       TextButton.icon(
                         onPressed: _isSubmitting ? null : _markAllAsRead,
@@ -346,15 +401,48 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        if (visibleNotifications.isEmpty)
+        if (visibleNotifications.isEmpty) ...[
           const _NotificationsEmptyState(
             icon: Icons.notifications_none_rounded,
             title: 'Nemate notifikacija',
-            message: 'Kad backend zabiljezi nove dogadjaje, pojavit ce se ovdje.',
-          )
-        else
+            message:
+                'Kad backend zabiljezi nove dogadjaje, pojavit ce se ovdje.',
+          ),
+          _buildLoadMoreButton(),
+        ] else ...[
           ...visibleNotifications.map(_buildNotificationCard),
+          _buildLoadMoreButton(),
+        ],
       ],
+    );
+  }
+
+  Widget _buildLoadMoreButton() {
+    if (!(_notificationsPage?.hasNextPage ?? false)) {
+      return const SizedBox.shrink();
+    }
+
+    final icon = _isLoadingMore
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.expand_more_rounded);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Center(
+        child: OutlinedButton.icon(
+          onPressed: _isLoadingMore
+              ? null
+              : () {
+                  unawaited(_loadMoreNotifications());
+                },
+          icon: icon,
+          label: Text(_isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos'),
+        ),
+      ),
     );
   }
 
@@ -427,10 +515,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              notification.body,
-              style: theme.textTheme.bodyMedium,
-            ),
+            Text(notification.body, style: theme.textTheme.bodyMedium),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -450,16 +535,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 if (isUnread)
                   TextButton.icon(
-                    onPressed:
-                        _isSubmitting ? null : () => _markAsRead(notification),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => _markAsRead(notification),
                     icon: const Icon(Icons.arrow_forward_rounded),
                     label: const Text('Procitaj'),
                   )
                 else
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    size: 18,
-                  ),
+                  const Icon(Icons.check_circle_rounded, size: 18),
               ],
             ),
           ],
@@ -527,10 +610,9 @@ class _NotificationsHero extends StatelessWidget {
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.14),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.14),
                 );
               },
             ),
@@ -554,16 +636,16 @@ class _NotificationsHero extends StatelessWidget {
                   const Spacer(),
                   Text(
                     'Notifikacije',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineSmall?.copyWith(color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Ukupno: ${summary.totalCount}  |  Neprocitane: ${summary.unreadCount}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.white),
                   ),
                   const SizedBox(height: 6),
                   Text(

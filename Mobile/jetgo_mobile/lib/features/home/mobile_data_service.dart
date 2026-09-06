@@ -9,17 +9,27 @@ class MobileDataService {
 
   Future<PagedResult<MobileFlight>> fetchFlights({
     required String token,
+    int page = 1,
+    int pageSize = 20,
     String? searchText,
+    String? departureSearchText,
+    String? arrivalSearchText,
+    String? airlineCode,
+    DateTime? departureFromUtc,
+    DateTime? departureToUtc,
   }) async {
+    final query = _pagedQuery(page: page, pageSize: pageSize);
+    _addTrimmedQuery(query, 'searchText', searchText);
+    _addTrimmedQuery(query, 'departureSearchText', departureSearchText);
+    _addTrimmedQuery(query, 'arrivalSearchText', arrivalSearchText);
+    _addTrimmedQuery(query, 'airlineCode', airlineCode);
+    _addDateTimeQuery(query, 'departureFromUtc', departureFromUtc);
+    _addDateTimeQuery(query, 'departureToUtc', departureToUtc);
+
     final response = await _apiClient.getJson(
       '/api/Flights',
       token: token,
-      queryParameters: <String, String>{
-        'page': '1',
-        'pageSize': '100',
-        if (searchText != null && searchText.trim().isNotEmpty)
-          'searchText': searchText.trim(),
-      },
+      queryParameters: query,
     );
 
     return _mapPagedResult(response, MobileFlight.fromJson);
@@ -27,15 +37,13 @@ class MobileDataService {
 
   Future<PagedResult<MobileRecommendedFlight>> fetchRecommendedFlights({
     required String token,
+    int page = 1,
     int pageSize = 5,
   }) async {
     final response = await _apiClient.getJson(
       '/api/Recommendations/flights',
       token: token,
-      queryParameters: <String, String>{
-        'page': '1',
-        'pageSize': pageSize.toString(),
-      },
+      queryParameters: _pagedQuery(page: page, pageSize: pageSize),
     );
 
     return _mapPagedResult(response, MobileRecommendedFlight.fromJson);
@@ -55,11 +63,13 @@ class MobileDataService {
 
   Future<PagedResult<MobileReservation>> fetchMyReservations({
     required String token,
+    int page = 1,
+    int pageSize = 20,
   }) async {
     final response = await _apiClient.getJson(
       '/api/Reservations/my',
       token: token,
-      queryParameters: const <String, String>{'page': '1', 'pageSize': '20'},
+      queryParameters: _pagedQuery(page: page, pageSize: pageSize),
     );
 
     return _mapPagedResult(response, MobileReservation.fromJson);
@@ -151,11 +161,13 @@ class MobileDataService {
 
   Future<PagedResult<NewsArticleSummary>> fetchNews({
     required String token,
+    int page = 1,
+    int pageSize = 20,
   }) async {
     final response = await _apiClient.getJson(
       '/api/News',
       token: token,
-      queryParameters: const <String, String>{'page': '1', 'pageSize': '20'},
+      queryParameters: _pagedQuery(page: page, pageSize: pageSize),
     );
 
     return _mapPagedResult(response, NewsArticleSummary.fromJson);
@@ -174,11 +186,13 @@ class MobileDataService {
 
   Future<PagedResult<MobileNotification>> fetchNotifications({
     required String token,
+    int page = 1,
+    int pageSize = 50,
   }) async {
     final response = await _apiClient.getJson(
       '/api/Notifications',
       token: token,
-      queryParameters: const <String, String>{'page': '1', 'pageSize': '50'},
+      queryParameters: _pagedQuery(page: page, pageSize: pageSize),
     );
 
     return _mapPagedResult(response, MobileNotification.fromJson);
@@ -200,11 +214,13 @@ class MobileDataService {
 
   Future<PagedResult<MobileSupportMessageSummary>> fetchSupportMessages({
     required String token,
+    int page = 1,
+    int pageSize = 50,
   }) async {
     final response = await _apiClient.getJson(
       '/api/SupportMessages/my',
       token: token,
-      queryParameters: const <String, String>{'page': '1', 'pageSize': '50'},
+      queryParameters: _pagedQuery(page: page, pageSize: pageSize),
     );
 
     return _mapPagedResult(response, MobileSupportMessageSummary.fromJson);
@@ -283,6 +299,34 @@ class MobileDataService {
         'confirmPassword': confirmPassword,
       },
     );
+  }
+
+  Map<String, String> _pagedQuery({required int page, required int pageSize}) {
+    return <String, String>{
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+    };
+  }
+
+  void _addTrimmedQuery(Map<String, String> query, String key, String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return;
+    }
+
+    query[key] = trimmed;
+  }
+
+  void _addDateTimeQuery(
+    Map<String, String> query,
+    String key,
+    DateTime? value,
+  ) {
+    if (value == null) {
+      return;
+    }
+
+    query[key] = value.toUtc().toIso8601String();
   }
 
   PagedResult<T> _mapPagedResult<T>(

@@ -212,6 +212,14 @@ public sealed class FlightService : IFlightService
             query = query.Where(x => x.AirlineId == request.AirlineId.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(request.AirlineCode))
+        {
+            var airlineCode = request.AirlineCode.Trim();
+
+            query = query.Where(x =>
+                x.Airline.Code.Contains(airlineCode) ||
+                x.Airline.Name.Contains(airlineCode));
+        }
         if (request.DepartureFromUtc.HasValue)
         {
             query = query.Where(x => x.DepartureAtUtc >= request.DepartureFromUtc.Value);
@@ -274,6 +282,25 @@ public sealed class FlightService : IFlightService
                 x.Destination.ArrivalAirport.City.Name.Contains(searchText));
         }
 
+        if (!string.IsNullOrWhiteSpace(request.DepartureSearchText))
+        {
+            var departureSearchText = request.DepartureSearchText.Trim();
+
+            query = query.Where(x =>
+                x.Destination.DepartureAirport.Name.Contains(departureSearchText) ||
+                x.Destination.DepartureAirport.IataCode.Contains(departureSearchText) ||
+                x.Destination.DepartureAirport.City.Name.Contains(departureSearchText));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ArrivalSearchText))
+        {
+            var arrivalSearchText = request.ArrivalSearchText.Trim();
+
+            query = query.Where(x =>
+                x.Destination.ArrivalAirport.Name.Contains(arrivalSearchText) ||
+                x.Destination.ArrivalAirport.IataCode.Contains(arrivalSearchText) ||
+                x.Destination.ArrivalAirport.City.Name.Contains(arrivalSearchText));
+        }
         return query;
     }
 
@@ -328,10 +355,31 @@ public sealed class FlightService : IFlightService
     private async Task<SearchHistory?> BuildSearchHistoryAsync(string userId, FlightSearchRequest request, CancellationToken cancellationToken)
     {
         int? destinationId = null;
-        string? searchTerm = string.IsNullOrWhiteSpace(request.SearchText)
-            ? null
-            : request.SearchText.Trim();
+        var searchTerms = new List<string>();
 
+        if (!string.IsNullOrWhiteSpace(request.SearchText))
+        {
+            searchTerms.Add(request.SearchText.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.DepartureSearchText))
+        {
+            searchTerms.Add(request.DepartureSearchText.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ArrivalSearchText))
+        {
+            searchTerms.Add(request.ArrivalSearchText.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.AirlineCode))
+        {
+            searchTerms.Add(request.AirlineCode.Trim());
+        }
+
+        string? searchTerm = searchTerms.Count == 0
+            ? null
+            : string.Join(' ', searchTerms);
         if (request.DepartureAirportId.HasValue && request.ArrivalAirportId.HasValue)
         {
             var destinationData = await _dbContext.Destinations
@@ -410,6 +458,9 @@ public sealed class FlightService : IFlightService
     private static bool HasRecommendationRelevantFilters(FlightSearchRequest request)
     {
         return !string.IsNullOrWhiteSpace(request.SearchText) ||
+               !string.IsNullOrWhiteSpace(request.DepartureSearchText) ||
+               !string.IsNullOrWhiteSpace(request.ArrivalSearchText) ||
+               !string.IsNullOrWhiteSpace(request.AirlineCode) ||
                request.DepartureAirportId.HasValue ||
                request.ArrivalAirportId.HasValue ||
                request.AirlineId.HasValue;

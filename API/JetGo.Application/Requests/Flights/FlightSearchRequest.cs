@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using JetGo.Application.Requests.Common;
 using JetGo.Domain.Enums;
 
@@ -14,6 +14,15 @@ public sealed class FlightSearchRequest : PagedRequest
 
     [MaxLength(100, ErrorMessage = "Pretraga moze sadrzavati maksimalno 100 karaktera.")]
     public string? SearchText { get; init; }
+
+    [MaxLength(100, ErrorMessage = "Polaziste moze sadrzavati maksimalno 100 karaktera.")]
+    public string? DepartureSearchText { get; init; }
+
+    [MaxLength(100, ErrorMessage = "Odrediste moze sadrzavati maksimalno 100 karaktera.")]
+    public string? ArrivalSearchText { get; init; }
+
+    [MaxLength(20, ErrorMessage = "Kod aviokompanije moze sadrzavati maksimalno 20 karaktera.")]
+    public string? AirlineCode { get; init; }
 
     public DateTime? DepartureFromUtc { get; init; }
 

@@ -27,6 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _heroImageUrl =
       'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=80';
   static const Duration _notificationPollingInterval = Duration(seconds: 20);
+  static const int _flightPageSize = 20;
+  static const int _reservationPageSize = 20;
+  static const int _newsPageSize = 20;
 
   final MobileDataService _dataService = MobileDataService();
   final TextEditingController _departureSearchController =
@@ -37,10 +40,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _notificationPollingTimer;
   int _currentIndex = 0;
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   String? _errorMessage;
 
-  List<MobileFlight> _allFlights = const [];
+  PagedResult<MobileFlight>? _flightPage;
+  PagedResult<MobileReservation>? _reservationPage;
+  PagedResult<NewsArticleSummary>? _newsPage;
   List<MobileFlight> _flights = const [];
+  List<AirlineSummary> _airlineOptions = const [];
   List<MobileRecommendedFlight> _recommendedFlights = const [];
   List<MobileReservation> _reservations = const [];
   List<NewsArticleSummary> _news = const [];
@@ -103,25 +110,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _isLoading = true;
+      _isLoadingMore = false;
       _errorMessage = null;
     });
 
     try {
       switch (_currentIndex) {
         case 0:
-          final flights = await _dataService.fetchFlights(token: _token);
-          _allFlights = flights.items;
-          _flights = _filterFlights(_allFlights);
+          final flights = await _fetchFlightsPage(1);
+          _flightPage = flights;
+          _flights = flights.items;
+          _airlineOptions = _mergeAirlineOptions(flights.items);
           unawaited(_loadRecommendations());
           break;
         case 1:
           final reservations = await _dataService.fetchMyReservations(
             token: _token,
+            page: 1,
+            pageSize: _reservationPageSize,
           );
+          _reservationPage = reservations;
           _reservations = reservations.items;
           break;
         case 2:
-          final news = await _dataService.fetchNews(token: _token);
+          final news = await _dataService.fetchNews(
+            token: _token,
+            page: 1,
+            pageSize: _newsPageSize,
+          );
+          _newsPage = news;
           _news = news.items;
           break;
         case 3:
@@ -225,18 +242,69 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _trackRecommendationSearchSignal() async {
-    final searchText = _buildRecommendationSearchText();
-    if (searchText == null || _token.isEmpty) {
+  Future<PagedResult<MobileFlight>> _fetchFlightsPage(int page) {
+    return _dataService.fetchFlights(
+      token: _token,
+      page: page,
+      pageSize: _flightPageSize,
+      departureSearchText: _departureSearchController.text,
+      arrivalSearchText: _arrivalSearchController.text,
+      airlineCode: _selectedAirlineCode,
+      departureFromUtc: _departureFromFilterUtc(),
+      departureToUtc: _departureToFilterUtc(),
+    );
+  }
+
+  Future<void> _loadMoreFlights() async {
+    final currentPage = _flightPage;
+    if (currentPage == null || !currentPage.hasNextPage || _isLoadingMore) {
       return;
     }
 
-    try {
-      await _dataService.fetchFlights(token: _token, searchText: searchText);
+    setState(() {
+      _isLoadingMore = true;
+    });
 
-      final recommendations = await _dataService.fetchRecommendedFlights(
+    try {
+      final nextPage = await _fetchFlightsPage(currentPage.page + 1);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _flightPage = nextPage;
+        _flights = [..._flights, ...nextPage.items];
+        _airlineOptions = _mergeAirlineOptions(nextPage.items);
+      });
+    } on ApiException catch (error) {
+      _showPagingError(error.message);
+    } catch (_) {
+      _showPagingError('Naredna stranica letova trenutno nije dostupna.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMoreReservations() async {
+    final currentPage = _reservationPage;
+    if (currentPage == null || !currentPage.hasNextPage || _isLoadingMore) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPage = await _dataService.fetchMyReservations(
         token: _token,
-        pageSize: 6,
+        page: currentPage.page + 1,
+        pageSize: _reservationPageSize,
       );
 
       if (!mounted) {
@@ -244,128 +312,120 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       setState(() {
-        _recommendedFlights = recommendations.items;
-        _recommendationsErrorMessage = null;
+        _reservationPage = nextPage;
+        _reservations = [..._reservations, ...nextPage.items];
       });
+    } on ApiException catch (error) {
+      _showPagingError(error.message);
     } catch (_) {
-      // Ignorisemo problem pri pracenju preporuka da ne prekidamo korisnika.
+      _showPagingError('Naredna stranica rezervacija trenutno nije dostupna.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
     }
   }
 
-  String? _buildRecommendationSearchText() {
-    final parts = <String>[
-      _departureSearchController.text.trim(),
-      _arrivalSearchController.text.trim(),
-      _selectedAirlineCode?.trim() ?? '',
-    ].where((value) => value.isNotEmpty).toList();
-
-    if (parts.isEmpty) {
-      return null;
+  Future<void> _loadMoreNews() async {
+    final currentPage = _newsPage;
+    if (currentPage == null || !currentPage.hasNextPage || _isLoadingMore) {
+      return;
     }
 
-    return parts.join(' ');
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPage = await _dataService.fetchNews(
+        token: _token,
+        page: currentPage.page + 1,
+        pageSize: _newsPageSize,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _newsPage = nextPage;
+        _news = [..._news, ...nextPage.items];
+      });
+    } on ApiException catch (error) {
+      _showPagingError(error.message);
+    } catch (_) {
+      _showPagingError('Naredna stranica novosti trenutno nije dostupna.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    }
   }
 
-  List<MobileFlight> get _airlineSortedFlights {
-    final flights = _allFlights.toList()
-      ..sort((left, right) => left.airline.name.compareTo(right.airline.name));
-    return flights;
+  void _showPagingError(String message) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  List<AirlineSummary> get _availableAirlines {
-    final unique = <String, AirlineSummary>{};
-    for (final flight in _airlineSortedFlights) {
+  List<AirlineSummary> _mergeAirlineOptions(Iterable<MobileFlight> flights) {
+    final unique = <String, AirlineSummary>{
+      for (final airline in _airlineOptions) airline.code: airline,
+    };
+
+    for (final flight in flights) {
       unique.putIfAbsent(flight.airline.code, () => flight.airline);
     }
 
-    return unique.values.toList();
+    final options = unique.values.toList()
+      ..sort((left, right) => left.name.compareTo(right.name));
+    return options;
   }
 
-  List<MobileFlight> _filterFlights(List<MobileFlight> flights) {
-    final departureQuery = _departureSearchController.text.trim().toLowerCase();
-    final arrivalQuery = _arrivalSearchController.text.trim().toLowerCase();
+  List<AirlineSummary> get _availableAirlines {
+    final options = _airlineOptions.toList();
+    final selectedCode = _selectedAirlineCode;
 
-    return flights.where((flight) {
-      final matchesDeparture =
-          departureQuery.isEmpty ||
-          _matchFlightLocation(
-            query: departureQuery,
-            cityName: flight.departureAirport.cityName,
-            airportCode: flight.departureAirport.iataCode,
-            airportName: flight.departureAirport.name,
-          );
-      final matchesArrival =
-          arrivalQuery.isEmpty ||
-          _matchFlightLocation(
-            query: arrivalQuery,
-            cityName: flight.arrivalAirport.cityName,
-            airportCode: flight.arrivalAirport.iataCode,
-            airportName: flight.arrivalAirport.name,
-          );
-      final matchesAirline =
-          _selectedAirlineCode == null ||
-          flight.airline.code == _selectedAirlineCode;
-      final departureDate = flight.departureAtUtc.toLocal();
-      final matchesFromDate =
-          _departureFromDate == null ||
-          !_isBeforeDate(departureDate, _departureFromDate!);
-      final matchesToDate =
-          _departureToDate == null ||
-          !_isAfterDate(departureDate, _departureToDate!);
+    if (selectedCode != null &&
+        !options.any((airline) => airline.code == selectedCode)) {
+      options.add(
+        AirlineSummary(id: 0, name: selectedCode, code: selectedCode),
+      );
+    }
 
-      return matchesDeparture &&
-          matchesArrival &&
-          matchesAirline &&
-          matchesFromDate &&
-          matchesToDate;
-    }).toList();
+    options.sort((left, right) => left.name.compareTo(right.name));
+    return options;
   }
 
-  bool _matchFlightLocation({
-    required String query,
-    required String cityName,
-    required String airportCode,
-    required String airportName,
-  }) {
-    final haystack =
-        '${cityName.toLowerCase()} ${airportCode.toLowerCase()} ${airportName.toLowerCase()}';
-    return haystack.contains(query);
+  DateTime? _departureFromFilterUtc() {
+    final date = _departureFromDate;
+    if (date == null) {
+      return null;
+    }
+
+    return DateTime(date.year, date.month, date.day).toUtc();
   }
 
-  bool _isBeforeDate(DateTime candidate, DateTime filterDate) {
-    final candidateOnly = DateTime(
-      candidate.year,
-      candidate.month,
-      candidate.day,
-    );
-    final filterOnly = DateTime(
-      filterDate.year,
-      filterDate.month,
-      filterDate.day,
-    );
-    return candidateOnly.isBefore(filterOnly);
+  DateTime? _departureToFilterUtc() {
+    final date = _departureToDate;
+    if (date == null) {
+      return null;
+    }
+
+    return DateTime(date.year, date.month, date.day, 23, 59, 59, 999).toUtc();
   }
 
-  bool _isAfterDate(DateTime candidate, DateTime filterDate) {
-    final candidateOnly = DateTime(
-      candidate.year,
-      candidate.month,
-      candidate.day,
-    );
-    final filterOnly = DateTime(
-      filterDate.year,
-      filterDate.month,
-      filterDate.day,
-    );
-    return candidateOnly.isAfter(filterOnly);
-  }
-
-  void _applyFlightFilters() {
+  Future<void> _applyFlightFilters() async {
     FocusScope.of(context).unfocus();
-    setState(() {
-      _flights = _filterFlights(_allFlights);
-    });
-    unawaited(_trackRecommendationSearchSignal());
+    await _loadCurrentTab();
   }
 
   void _clearFlightFilters() {
@@ -375,8 +435,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _departureFromDate = null;
       _departureToDate = null;
       _selectedAirlineCode = null;
-      _flights = _filterFlights(_allFlights);
     });
+    unawaited(_loadCurrentTab());
   }
 
   Future<void> _pickFlightDate({required bool isFromDate}) async {
@@ -403,8 +463,8 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         _departureToDate = picked;
       }
-      _flights = _filterFlights(_allFlights);
     });
+    unawaited(_loadCurrentTab());
   }
 
   Future<void> _openFlightDetails(MobileFlight flight) async {
@@ -758,9 +818,46 @@ class _HomeScreenState extends State<HomeScreen> {
             title: 'Nema rezultata',
             message: 'Trenutno nema letova za prikaz po zadanim filterima.',
           )
-        else
+        else ...[
           ..._flights.map(_buildFlightCard),
+          _buildLoadMoreButton(
+            visible: _flightPage?.hasNextPage ?? false,
+            onPressed: _loadMoreFlights,
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildLoadMoreButton({
+    required bool visible,
+    required Future<void> Function() onPressed,
+  }) {
+    if (!visible) {
+      return const SizedBox.shrink();
+    }
+
+    final icon = _isLoadingMore
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.expand_more_rounded);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Center(
+        child: OutlinedButton.icon(
+          onPressed: _isLoadingMore
+              ? null
+              : () {
+                  unawaited(onPressed());
+                },
+          icon: icon,
+          label: Text(_isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos'),
+        ),
+      ),
     );
   }
 
@@ -928,8 +1025,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onChanged: (value) {
                   setState(() {
                     _selectedAirlineCode = value;
-                    _flights = _filterFlights(_allFlights);
                   });
+                  unawaited(_loadCurrentTab());
                 },
               ),
             ),
@@ -1378,6 +1475,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ..._reservations.map(
           (reservation) => _buildReservationCard(context, reservation),
         ),
+        _buildLoadMoreButton(
+          visible: _reservationPage?.hasNextPage ?? false,
+          onPressed: _loadMoreReservations,
+        ),
       ],
     );
   }
@@ -1438,6 +1539,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 10),
           ...remainingArticles.map(_buildNewsCard),
         ],
+        _buildLoadMoreButton(
+          visible: _newsPage?.hasNextPage ?? false,
+          onPressed: _loadMoreNews,
+        ),
       ],
     );
   }
