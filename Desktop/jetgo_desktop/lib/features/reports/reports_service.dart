@@ -1,8 +1,6 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import '../../core/network/api_client.dart';
-import '../payments/payments_models.dart' as payments;
-import '../reservations/reservations_models.dart' as reservations;
 import 'reports_models.dart';
 
 class ReportsService {
@@ -11,203 +9,56 @@ class ReportsService {
 
   final ApiClient _apiClient;
 
-  Future<ReservationsReportPreview> loadReservationsPreview({
+  Future<SavedReportFile> downloadReport({
     required String token,
-    ReservationReportStatus? status,
-    DateTime? createdFromLocal,
-    DateTime? createdToLocal,
-  }) async {
-    var page = 1;
-    var totalReservations = 0;
-    var paidReservations = 0;
-    var totalSeats = 0;
-    final amounts = <String, double>{};
-    final sampleItems = <ReservationReportPreviewItem>[];
-
-    while (true) {
-      final response = await _apiClient.getJson(
-        '/api/Reservations',
-        token: token,
-        queryParameters: <String, String>{
-          'page': page.toString(),
-          'pageSize': '100',
-          ..._buildQueryParameters(
-            statusValue: status?.value,
-            createdFromLocal: createdFromLocal,
-            createdToLocal: createdToLocal,
-          ),
-        },
-      );
-
-      final payload = _mapPagedPayload(
-        response,
-        reservations.ReservationItem.fromJson,
-      );
-
-      for (final item in payload.items) {
-        totalReservations++;
-        if (item.isPaid) {
-          paidReservations++;
-        }
-        totalSeats += item.seatsCount;
-        _addAmount(amounts, item.currency, item.totalAmount);
-
-        if (sampleItems.length < 5) {
-          sampleItems.add(
-            ReservationReportPreviewItem(
-              reservationCode: item.reservationCode,
-              customerName: item.customerName,
-              routeCode: item.routeCode,
-              statusLabel: item.status.label,
-              amount: item.totalAmount,
-              currency: item.currency,
-              createdAtUtc: item.createdAtUtc,
-            ),
-          );
-        }
-      }
-
-      if (!payload.hasNextPage || page >= payload.totalPages) {
-        break;
-      }
-
-      page++;
-    }
-
-    return ReservationsReportPreview(
-      totalReservations: totalReservations,
-      paidReservations: paidReservations,
-      unpaidReservations: totalReservations - paidReservations,
-      totalSeats: totalSeats,
-      amounts: _mapAmounts(amounts),
-      sampleItems: sampleItems,
-      generatedAtLocal: DateTime.now(),
-    );
-  }
-
-  Future<PaymentsReportPreview> loadPaymentsPreview({
-    required String token,
-    PaymentReportStatus? status,
-    DateTime? createdFromLocal,
-    DateTime? createdToLocal,
-  }) async {
-    var page = 1;
-    var totalPayments = 0;
-    var paidPayments = 0;
-    var refundedPayments = 0;
-    var pendingPayments = 0;
-    var failedPayments = 0;
-    final amounts = <String, double>{};
-    final sampleItems = <PaymentReportPreviewItem>[];
-
-    while (true) {
-      final response = await _apiClient.getJson(
-        '/api/Payments',
-        token: token,
-        queryParameters: <String, String>{
-          'page': page.toString(),
-          'pageSize': '100',
-          ..._buildQueryParameters(
-            statusValue: status?.value,
-            createdFromLocal: createdFromLocal,
-            createdToLocal: createdToLocal,
-          ),
-        },
-      );
-
-      final payload = _mapPagedPayload(response, payments.PaymentItem.fromJson);
-
-      for (final item in payload.items) {
-        totalPayments++;
-        switch (item.status) {
-          case payments.PaymentStatusValue.pending:
-            pendingPayments++;
-            break;
-          case payments.PaymentStatusValue.paid:
-            paidPayments++;
-            break;
-          case payments.PaymentStatusValue.failed:
-            failedPayments++;
-            break;
-          case payments.PaymentStatusValue.refunded:
-            refundedPayments++;
-            break;
-        }
-
-        _addAmount(amounts, item.currency, item.amount);
-
-        if (sampleItems.length < 5) {
-          sampleItems.add(
-            PaymentReportPreviewItem(
-              reservationCode: item.reservationCode,
-              customerName: item.customerName,
-              routeCode: item.routeCode,
-              statusLabel: item.status.label,
-              amount: item.amount,
-              currency: item.currency,
-              createdAtUtc: item.createdAtUtc,
-            ),
-          );
-        }
-      }
-
-      if (!payload.hasNextPage || page >= payload.totalPages) {
-        break;
-      }
-
-      page++;
-    }
-
-    return PaymentsReportPreview(
-      totalPayments: totalPayments,
-      paidPayments: paidPayments,
-      refundedPayments: refundedPayments,
-      pendingPayments: pendingPayments,
-      failedPayments: failedPayments,
-      amounts: _mapAmounts(amounts),
-      sampleItems: sampleItems,
-      generatedAtLocal: DateTime.now(),
-    );
-  }
-
-  Future<SavedReportFile> downloadReservationsReport({
-    required String token,
-    ReservationReportStatus? status,
-    DateTime? createdFromLocal,
-    DateTime? createdToLocal,
+    required BusinessReportType type,
+    required ReportFileFormat format,
+    DateTime? fromLocal,
+    DateTime? toLocal,
   }) async {
     final response = await _apiClient.downloadFile(
-      '/api/Reports/reservations.pdf',
+      '/api/Reports/${type.path}.${format.name}',
       token: token,
-      fallbackFileName: 'jetgo-reservations-report.pdf',
-      queryParameters: _buildQueryParameters(
-        statusValue: status?.value,
-        createdFromLocal: createdFromLocal,
-        createdToLocal: createdToLocal,
+      fallbackFileName: type.fallbackFileName,
+      queryParameters: _buildPeriodQueryParameters(
+        fromLocal: fromLocal,
+        toLocal: toLocal,
       ),
     );
 
     return _saveReport(response);
   }
 
-  Future<SavedReportFile> downloadPaymentsReport({
-    required String token,
-    PaymentReportStatus? status,
-    DateTime? createdFromLocal,
-    DateTime? createdToLocal,
-  }) async {
-    final response = await _apiClient.downloadFile(
-      '/api/Reports/payments.pdf',
-      token: token,
-      fallbackFileName: 'jetgo-payments-report.pdf',
-      queryParameters: _buildQueryParameters(
-        statusValue: status?.value,
-        createdFromLocal: createdFromLocal,
-        createdToLocal: createdToLocal,
-      ),
-    );
+  Future<void> printReport(String filePath) async {
+    if (filePath.trim().isEmpty) {
+      return;
+    }
 
-    return _saveReport(response);
+    if (Platform.isWindows) {
+      final result = await Process.run(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'Start-Process -FilePath ([string]$args[0]) -Verb Print',
+          filePath,
+        ],
+      );
+
+      if (result.exitCode != 0) {
+        throw const FileSystemException('PDF nije moguce poslati na ispis.');
+      }
+
+      return;
+    }
+
+    final result = await Process.run('lp', [filePath]);
+
+    if (result.exitCode != 0) {
+      throw const FileSystemException('PDF nije moguce poslati na ispis.');
+    }
   }
 
   Future<void> openContainingFolder(String filePath) async {
@@ -226,17 +77,15 @@ class ReportsService {
     await Process.start('xdg-open', [directoryPath]);
   }
 
-  Map<String, String> _buildQueryParameters({
-    required int? statusValue,
-    required DateTime? createdFromLocal,
-    required DateTime? createdToLocal,
+  Map<String, String> _buildPeriodQueryParameters({
+    required DateTime? fromLocal,
+    required DateTime? toLocal,
   }) {
     return <String, String>{
-      if (statusValue != null) 'status': statusValue.toString(),
-      if (createdFromLocal != null)
-        'createdFromUtc': _toUtcStartOfDay(createdFromLocal).toIso8601String(),
-      if (createdToLocal != null)
-        'createdToUtc': _toUtcEndOfDay(createdToLocal).toIso8601String(),
+      if (fromLocal != null)
+        'fromUtc': _toUtcStartOfDay(fromLocal).toIso8601String(),
+      if (toLocal != null)
+        'toUtc': _toUtcEndOfDay(toLocal).toIso8601String(),
     };
   }
 
@@ -258,10 +107,9 @@ class ReportsService {
 
   Future<Directory> _resolveReportsDirectory() async {
     final userProfile = Platform.environment['USERPROFILE']?.trim();
-    final downloadsRoot =
-        (userProfile == null || userProfile.isEmpty)
-            ? Directory.systemTemp.path
-            : '$userProfile${Platform.pathSeparator}Downloads';
+    final downloadsRoot = (userProfile == null || userProfile.isEmpty)
+        ? Directory.systemTemp.path
+        : '$userProfile${Platform.pathSeparator}Downloads';
 
     final directory = Directory(
       '$downloadsRoot${Platform.pathSeparator}JetGoReports',
@@ -275,11 +123,7 @@ class ReportsService {
   }
 
   DateTime _toUtcStartOfDay(DateTime value) {
-    return DateTime(
-      value.year,
-      value.month,
-      value.day,
-    ).toUtc();
+    return DateTime(value.year, value.month, value.day).toUtc();
   }
 
   DateTime _toUtcEndOfDay(DateTime value) {
@@ -293,54 +137,4 @@ class ReportsService {
       999,
     ).toUtc();
   }
-
-  void _addAmount(Map<String, double> amounts, String currency, double amount) {
-    final normalizedCurrency = currency.trim().isEmpty ? 'N/A' : currency;
-    amounts.update(
-      normalizedCurrency,
-      (current) => current + amount,
-      ifAbsent: () => amount,
-    );
-  }
-
-  List<ReportAmountSummary> _mapAmounts(Map<String, double> amounts) {
-    final entries = amounts.entries.toList()
-      ..sort((left, right) => left.key.compareTo(right.key));
-
-    return entries
-        .map(
-          (entry) => ReportAmountSummary(
-            currency: entry.key,
-            amount: entry.value,
-          ),
-        )
-        .toList();
-  }
-
-  _PagedPayload<T> _mapPagedPayload<T>(
-    Map<String, dynamic> json,
-    T Function(Map<String, dynamic>) fromJson,
-  ) {
-    final rawItems = json['items'] as List<dynamic>? ?? const [];
-
-    return _PagedPayload<T>(
-      items: rawItems
-          .map((item) => fromJson(item as Map<String, dynamic>))
-          .toList(),
-      totalPages: json['totalPages'] as int? ?? 1,
-      hasNextPage: json['hasNextPage'] as bool? ?? false,
-    );
-  }
-}
-
-class _PagedPayload<T> {
-  _PagedPayload({
-    required this.items,
-    required this.totalPages,
-    required this.hasNextPage,
-  });
-
-  final List<T> items;
-  final int totalPages;
-  final bool hasNextPage;
 }

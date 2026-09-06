@@ -1,4 +1,4 @@
-class SavedReportFile {
+﻿class SavedReportFile {
   SavedReportFile({
     required this.fileName,
     required this.filePath,
@@ -12,118 +12,49 @@ class SavedReportFile {
   final DateTime savedAtLocal;
 }
 
-class ReportAmountSummary {
-  ReportAmountSummary({
-    required this.currency,
-    required this.amount,
-  });
+enum BusinessReportType {
+  sales(
+    'sales',
+    'Izvjestaj o prodaji',
+    'Prodane karte, rute, korisnici i naplaceni iznosi po valutama.',
+    'jetgo-sales-report.pdf',
+  ),
+  occupancy(
+    'occupancy',
+    'Popunjenost letova',
+    'Ukupna, zauzeta i slobodna sjedista po letu u odabranom periodu.',
+    'jetgo-occupancy-report.pdf',
+  ),
+  financial(
+    'financial',
+    'Finansijski izvjestaj',
+    'Naplaceno, refundirano i neto po valutama iz PayPal transakcija.',
+    'jetgo-financial-report.pdf',
+  ),
+  users(
+    'users',
+    'Izvjestaj o korisnicima',
+    'Korisnici, uloge, status naloga, rezervacije, placanja i pretrage.',
+    'jetgo-users-report.pdf',
+  );
 
-  final String currency;
-  final double amount;
+  const BusinessReportType(
+    this.path,
+    this.title,
+    this.description,
+    this.fallbackFileName,
+  );
+
+  final String path;
+  final String title;
+  final String description;
+  final String fallbackFileName;
 }
 
-class ReservationReportPreviewItem {
-  ReservationReportPreviewItem({
-    required this.reservationCode,
-    required this.customerName,
-    required this.routeCode,
-    required this.statusLabel,
-    required this.amount,
-    required this.currency,
-    required this.createdAtUtc,
-  });
+enum ReportFileFormat {
+  pdf('PDF');
 
-  final String reservationCode;
-  final String customerName;
-  final String routeCode;
-  final String statusLabel;
-  final double amount;
-  final String currency;
-  final DateTime createdAtUtc;
-}
+  const ReportFileFormat(this.label);
 
-class ReservationsReportPreview {
-  ReservationsReportPreview({
-    required this.totalReservations,
-    required this.paidReservations,
-    required this.unpaidReservations,
-    required this.totalSeats,
-    required this.amounts,
-    required this.sampleItems,
-    required this.generatedAtLocal,
-  });
-
-  final int totalReservations;
-  final int paidReservations;
-  final int unpaidReservations;
-  final int totalSeats;
-  final List<ReportAmountSummary> amounts;
-  final List<ReservationReportPreviewItem> sampleItems;
-  final DateTime generatedAtLocal;
-}
-
-class PaymentReportPreviewItem {
-  PaymentReportPreviewItem({
-    required this.reservationCode,
-    required this.customerName,
-    required this.routeCode,
-    required this.statusLabel,
-    required this.amount,
-    required this.currency,
-    required this.createdAtUtc,
-  });
-
-  final String reservationCode;
-  final String customerName;
-  final String routeCode;
-  final String statusLabel;
-  final double amount;
-  final String currency;
-  final DateTime createdAtUtc;
-}
-
-class PaymentsReportPreview {
-  PaymentsReportPreview({
-    required this.totalPayments,
-    required this.paidPayments,
-    required this.refundedPayments,
-    required this.pendingPayments,
-    required this.failedPayments,
-    required this.amounts,
-    required this.sampleItems,
-    required this.generatedAtLocal,
-  });
-
-  final int totalPayments;
-  final int paidPayments;
-  final int refundedPayments;
-  final int pendingPayments;
-  final int failedPayments;
-  final List<ReportAmountSummary> amounts;
-  final List<PaymentReportPreviewItem> sampleItems;
-  final DateTime generatedAtLocal;
-}
-
-enum ReservationReportStatus {
-  pending(1, 'Na cekanju'),
-  confirmed(2, 'Potvrdjeno'),
-  cancelled(3, 'Otkazano'),
-  completed(4, 'Zavrseno');
-
-  const ReservationReportStatus(this.value, this.label);
-
-  final int value;
-  final String label;
-}
-
-enum PaymentReportStatus {
-  pending(1, 'Na cekanju'),
-  paid(2, 'Placeno'),
-  failed(3, 'Neuspjelo'),
-  refunded(4, 'Refundirano');
-
-  const PaymentReportStatus(this.value, this.label);
-
-  final int value;
   final String label;
 }
