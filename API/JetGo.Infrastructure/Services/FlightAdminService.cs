@@ -160,7 +160,7 @@ public sealed class FlightAdminService : IFlightAdminService
     public async Task<FlightDetailsDto> CreateAsync(UpsertFlightRequest request, CancellationToken cancellationToken = default)
     {
         ValidateRequest(request);
-        await EnsureReferencesExistAsync(request.AirlineId, request.DestinationId, cancellationToken);
+        await EnsureReferencesExistAsync(request.AirlineId, request.DestinationId, requireActive: true, cancellationToken);
         await EnsureFlightNumberUniqueAsync(request.FlightNumber.Trim(), null, cancellationToken);
 
         var flight = new Flight
@@ -206,13 +206,13 @@ public sealed class FlightAdminService : IFlightAdminService
             throw new NotFoundException($"Let sa ID vrijednoscu {id} nije pronadjen.");
         }
 
-        await EnsureReferencesExistAsync(request.AirlineId, request.DestinationId, cancellationToken);
+        var referencesChanged = flight.AirlineId != request.AirlineId || flight.DestinationId != request.DestinationId;
+        await EnsureReferencesExistAsync(request.AirlineId, request.DestinationId, requireActive: referencesChanged, cancellationToken);
         await EnsureFlightNumberUniqueAsync(request.FlightNumber.Trim(), id, cancellationToken);
 
         var hasReservations = flight.Reservations.Count > 0;
         var sensitiveDataChanged =
-            flight.AirlineId != request.AirlineId ||
-            flight.DestinationId != request.DestinationId ||
+            referencesChanged ||
             !string.Equals(flight.FlightNumber, request.FlightNumber.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
             flight.DepartureAtUtc != request.DepartureAtUtc ||
             flight.ArrivalAtUtc != request.ArrivalAtUtc ||
@@ -406,11 +406,15 @@ public sealed class FlightAdminService : IFlightAdminService
         }
     }
 
-    private async Task EnsureReferencesExistAsync(int airlineId, int destinationId, CancellationToken cancellationToken)
+    private async Task EnsureReferencesExistAsync(int airlineId, int destinationId, bool requireActive, CancellationToken cancellationToken)
     {
-        var airlineExists = await _dbContext.Airlines.AnyAsync(x => x.Id == airlineId, cancellationToken);
+        var airline = await _dbContext.Airlines
+            .AsNoTracking()
+            .Where(x => x.Id == airlineId)
+            .Select(x => new { x.IsActive })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        if (!airlineExists)
+        if (airline is null)
         {
             throw new ValidationException(
                 "Odabrana aviokompanija ne postoji.",
@@ -420,15 +424,39 @@ public sealed class FlightAdminService : IFlightAdminService
                 });
         }
 
-        var destinationExists = await _dbContext.Destinations.AnyAsync(x => x.Id == destinationId, cancellationToken);
+        if (requireActive && !airline.IsActive)
+        {
+            throw new ValidationException(
+                "Odabrana aviokompanija nije aktivna.",
+                new Dictionary<string, string[]>
+                {
+                    ["airlineId"] = ["Za novi ili izmijenjeni let odaberite aktivnu aviokompaniju."]
+                });
+        }
 
-        if (!destinationExists)
+        var destination = await _dbContext.Destinations
+            .AsNoTracking()
+            .Where(x => x.Id == destinationId)
+            .Select(x => new { x.IsActive })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (destination is null)
         {
             throw new ValidationException(
                 "Odabrana destinacija ne postoji.",
                 new Dictionary<string, string[]>
                 {
                     ["destinationId"] = ["Odabrana destinacija ne postoji."]
+                });
+        }
+
+        if (requireActive && !destination.IsActive)
+        {
+            throw new ValidationException(
+                "Odabrana destinacija nije aktivna.",
+                new Dictionary<string, string[]>
+                {
+                    ["destinationId"] = ["Za novi ili izmijenjeni let odaberite aktivnu destinaciju."]
                 });
         }
     }

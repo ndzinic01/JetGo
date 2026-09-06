@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -8,10 +8,7 @@ import '../reference_data/reference_data_service.dart';
 import 'flights_routes_models.dart';
 import 'flights_routes_service.dart';
 
-enum FlightsRoutesTab {
-  destinations,
-  flights,
-}
+enum FlightsRoutesTab { destinations, flights }
 
 class FlightsRoutesSection extends StatefulWidget {
   const FlightsRoutesSection({required this.token, super.key});
@@ -124,7 +121,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
     _destinationOptions = destinations.items;
 
     if (_destinationDepartureFilter != null &&
-        !_airportOptions.any((item) => item.id == _destinationDepartureFilter)) {
+        !_airportOptions.any(
+          (item) => item.id == _destinationDepartureFilter,
+        )) {
       _destinationDepartureFilter = null;
     }
 
@@ -226,9 +225,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
     }
   }
 
-  Future<void> _reloadAfterMutation({
-    required bool refreshLookups,
-  }) async {
+  Future<void> _reloadAfterMutation({required bool refreshLookups}) async {
     if (refreshLookups) {
       await _refreshLookups();
     }
@@ -236,9 +233,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _deleteEntity({
@@ -285,10 +282,8 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
   Future<void> _openDestinationDialog({DestinationDetails? initial}) async {
     final value = await showDialog<_DestinationFormValue>(
       context: context,
-      builder: (context) => _DestinationDialog(
-        initial: initial,
-        airports: _airportOptions,
-      ),
+      builder: (context) =>
+          _DestinationDialog(initial: initial, airports: _airportOptions),
     );
 
     if (value == null) {
@@ -522,8 +517,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
                     child: DropdownButtonFormField<int?>(
                       key: ValueKey<int?>(_destinationDepartureFilter),
                       initialValue: _destinationDepartureFilter,
-                      decoration:
-                          const InputDecoration(labelText: 'Polazni aerodrom'),
+                      decoration: const InputDecoration(
+                        labelText: 'Polazni aerodrom',
+                      ),
                       items: [
                         const DropdownMenuItem<int?>(
                           value: null,
@@ -551,8 +547,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
                     child: DropdownButtonFormField<int?>(
                       key: ValueKey<int?>(_destinationArrivalFilter),
                       initialValue: _destinationArrivalFilter,
-                      decoration:
-                          const InputDecoration(labelText: 'Dolazni aerodrom'),
+                      decoration: const InputDecoration(
+                        labelText: 'Dolazni aerodrom',
+                      ),
                       items: [
                         const DropdownMenuItem<int?>(
                           value: null,
@@ -628,8 +625,8 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
                 FilledButton.icon(
                   onPressed:
                       _airlineOptions.isEmpty || _destinationOptions.isEmpty
-                          ? null
-                          : () => _openFlightDialog(),
+                      ? null
+                      : () => _openFlightDialog(),
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Novi let'),
                 ),
@@ -653,8 +650,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
                     child: DropdownButtonFormField<int?>(
                       key: ValueKey<int?>(_flightDepartureFilter),
                       initialValue: _flightDepartureFilter,
-                      decoration:
-                          const InputDecoration(labelText: 'Polazni aerodrom'),
+                      decoration: const InputDecoration(
+                        labelText: 'Polazni aerodrom',
+                      ),
                       items: [
                         const DropdownMenuItem<int?>(
                           value: null,
@@ -682,8 +680,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
                     child: DropdownButtonFormField<int?>(
                       key: ValueKey<int?>(_flightArrivalFilter),
                       initialValue: _flightArrivalFilter,
-                      decoration:
-                          const InputDecoration(labelText: 'Dolazni aerodrom'),
+                      decoration: const InputDecoration(
+                        labelText: 'Dolazni aerodrom',
+                      ),
                       items: [
                         const DropdownMenuItem<int?>(
                           value: null,
@@ -711,8 +710,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
                     child: DropdownButtonFormField<int?>(
                       key: ValueKey<int?>(_flightAirlineFilter),
                       initialValue: _flightAirlineFilter,
-                      decoration:
-                          const InputDecoration(labelText: 'Aviokompanija'),
+                      decoration: const InputDecoration(
+                        labelText: 'Aviokompanija',
+                      ),
                       items: [
                         const DropdownMenuItem<int?>(
                           value: null,
@@ -781,10 +781,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
             children: [
               const Icon(Icons.cloud_off_rounded, size: 36),
               const SizedBox(height: 12),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-              ),
+              Text(_errorMessage!, textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -801,7 +798,7 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
 
   Widget _buildDestinationsTable() {
     if (_destinations.isEmpty) {
-        return const _EmptyTableState(
+      return const _EmptyTableState(
         title: 'Nema ruta za prikaz',
         message: 'Pokusajte druge filtere ili dodajte novu rutu.',
       );
@@ -891,7 +888,9 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
               DataCell(Text(_formatDateTime(item.departureAtUtc))),
               DataCell(Text(_formatDateTime(item.arrivalAtUtc))),
               DataCell(Text('${item.durationMinutes} min')),
-              DataCell(Text('${item.basePrice.toStringAsFixed(2)} ${item.currency}')),
+              DataCell(
+                Text('${item.basePrice.toStringAsFixed(2)} ${item.currency}'),
+              ),
               DataCell(Text('${item.availableSeats}/${item.totalSeats}')),
               DataCell(Text(item.status.label)),
               DataCell(
@@ -939,7 +938,6 @@ class _FlightsRoutesSectionState extends State<FlightsRoutesSection> {
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day.$month.${local.year} $hour:$minute';
   }
-
 }
 
 class _AirportCellText extends StatelessWidget {
@@ -1019,10 +1017,7 @@ class _TableScrollWrapper extends StatelessWidget {
 }
 
 class _EmptyTableState extends StatelessWidget {
-  const _EmptyTableState({
-    required this.title,
-    required this.message,
-  });
+  const _EmptyTableState({required this.title, required this.message});
 
   final String title;
   final String message;
@@ -1048,10 +1043,7 @@ class _EmptyTableState extends StatelessWidget {
 }
 
 class _DestinationDialog extends StatefulWidget {
-  const _DestinationDialog({
-    required this.airports,
-    this.initial,
-  });
+  const _DestinationDialog({required this.airports, this.initial});
 
   final List<AirportItem> airports;
   final DestinationDetails? initial;
@@ -1070,9 +1062,11 @@ class _DestinationDialogState extends State<_DestinationDialog> {
   @override
   void initState() {
     super.initState();
-    _departureAirportId = widget.initial?.departureAirport.id ??
+    _departureAirportId =
+        widget.initial?.departureAirport.id ??
         (widget.airports.isNotEmpty ? widget.airports.first.id : 0);
-    _arrivalAirportId = widget.initial?.arrivalAirport.id ??
+    _arrivalAirportId =
+        widget.initial?.arrivalAirport.id ??
         (widget.airports.length > 1
             ? widget.airports[1].id
             : (widget.airports.isNotEmpty ? widget.airports.first.id : 0));
@@ -1091,9 +1085,7 @@ class _DestinationDialogState extends State<_DestinationDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(
-        widget.initial == null ? 'Nova ruta' : 'Uredi rutu',
-      ),
+      title: Text(widget.initial == null ? 'Nova ruta' : 'Uredi rutu'),
       content: SizedBox(
         width: 460,
         child: Form(
@@ -1102,7 +1094,9 @@ class _DestinationDialogState extends State<_DestinationDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<int>(
-                initialValue: _departureAirportId == 0 ? null : _departureAirportId,
+                initialValue: _departureAirportId == 0
+                    ? null
+                    : _departureAirportId,
                 decoration: const InputDecoration(
                   labelText: 'Polazni aerodrom',
                 ),
@@ -1270,24 +1264,34 @@ class _FlightDialogState extends State<_FlightDialog> {
   @override
   void initState() {
     super.initState();
-    _flightNumberController =
-        TextEditingController(text: widget.initial?.flightNumber ?? '');
+    _flightNumberController = TextEditingController(
+      text: widget.initial?.flightNumber ?? '',
+    );
     _basePriceController = TextEditingController(
       text: widget.initial?.basePrice.toStringAsFixed(2) ?? '',
     );
     _totalSeatsController = TextEditingController(
       text: widget.initial?.totalSeats.toString() ?? '',
     );
-    _airlineId = widget.initial?.airline.id ??
-        (widget.airlines.isNotEmpty ? widget.airlines.first.id : 0);
-    _destinationId = widget.initial?.destinationId ??
-        (widget.destinations.isNotEmpty ? widget.destinations.first.id : 0);
+    final airlineOptions = widget.initial == null
+        ? widget.airlines.where((item) => item.isActive).toList()
+        : widget.airlines;
+    final destinationOptions = widget.initial == null
+        ? widget.destinations.where((item) => item.isActive).toList()
+        : widget.destinations;
+    _airlineId =
+        widget.initial?.airline.id ??
+        (airlineOptions.isNotEmpty ? airlineOptions.first.id : 0);
+    _destinationId =
+        widget.initial?.destinationId ??
+        (destinationOptions.isNotEmpty ? destinationOptions.first.id : 0);
     _status = widget.initial?.status ?? FlightStatusValue.scheduled;
-    _departureAtLocal =
-        (widget.initial?.departureAtUtc ?? DateTime.now()).toLocal();
-    _arrivalAtLocal = (widget.initial?.arrivalAtUtc ??
-            DateTime.now().add(const Duration(hours: 2)))
+    _departureAtLocal = (widget.initial?.departureAtUtc ?? DateTime.now())
         .toLocal();
+    _arrivalAtLocal =
+        (widget.initial?.arrivalAtUtc ??
+                DateTime.now().add(const Duration(hours: 2)))
+            .toLocal();
   }
 
   @override
@@ -1300,6 +1304,13 @@ class _FlightDialogState extends State<_FlightDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final airlineOptions = widget.initial == null
+        ? widget.airlines.where((item) => item.isActive).toList()
+        : widget.airlines;
+    final destinationOptions = widget.initial == null
+        ? widget.destinations.where((item) => item.isActive).toList()
+        : widget.destinations;
+
     return AlertDialog(
       title: Text(widget.initial == null ? 'Novi let' : 'Uredi let'),
       content: SizedBox(
@@ -1312,10 +1323,8 @@ class _FlightDialogState extends State<_FlightDialog> {
               children: [
                 DropdownButtonFormField<int>(
                   initialValue: _airlineId == 0 ? null : _airlineId,
-                  decoration: const InputDecoration(
-                    labelText: 'Aviokompanija',
-                  ),
-                  items: widget.airlines
+                  decoration: const InputDecoration(labelText: 'Aviokompanija'),
+                  items: airlineOptions
                       .map(
                         (airline) => DropdownMenuItem<int>(
                           value: airline.id,
@@ -1341,10 +1350,8 @@ class _FlightDialogState extends State<_FlightDialog> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   initialValue: _destinationId == 0 ? null : _destinationId,
-                  decoration: const InputDecoration(
-                    labelText: 'Ruta',
-                  ),
-                  items: widget.destinations
+                  decoration: const InputDecoration(labelText: 'Ruta'),
+                  items: destinationOptions
                       .map(
                         (destination) => DropdownMenuItem<int>(
                           value: destination.id,
@@ -1375,9 +1382,7 @@ class _FlightDialogState extends State<_FlightDialog> {
                   controller: _flightNumberController,
                   maxLength: 20,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    labelText: 'Broj leta',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Broj leta'),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Broj leta je obavezan.';
@@ -1567,13 +1572,7 @@ class _DateTimePickerField extends StatelessWidget {
         }
 
         onChanged(
-          DateTime(
-            date.year,
-            date.month,
-            date.day,
-            time.hour,
-            time.minute,
-          ),
+          DateTime(date.year, date.month, date.day, time.hour, time.minute),
         );
       },
       child: InputDecorator(

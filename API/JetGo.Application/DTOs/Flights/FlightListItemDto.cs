@@ -34,4 +34,8 @@ public sealed class FlightListItemDto
     public int TotalSeats { get; init; }
 
     public FlightStatus Status { get; init; }
+
+    public bool CanReserve { get; init; }
+
+    public string? UnavailableReason { get; init; }
 }

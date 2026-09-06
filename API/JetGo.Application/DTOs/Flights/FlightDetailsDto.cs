@@ -41,6 +41,10 @@ public sealed class FlightDetailsDto
 
     public FlightStatus Status { get; init; }
 
+    public bool CanReserve { get; init; }
+
+    public string? UnavailableReason { get; init; }
+
     public IReadOnlyCollection<string> SeatNumbers { get; init; } = Array.Empty<string>();
 
     public IReadOnlyCollection<string> AvailableSeatNumbers { get; init; } = Array.Empty<string>();

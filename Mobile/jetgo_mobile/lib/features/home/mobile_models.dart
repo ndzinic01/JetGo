@@ -86,6 +86,8 @@ class MobileFlight {
     required this.availableSeats,
     required this.totalSeats,
     required this.status,
+    required this.canReserve,
+    this.unavailableReason,
   });
 
   final int id;
@@ -103,6 +105,8 @@ class MobileFlight {
   final int availableSeats;
   final int totalSeats;
   final int status;
+  final bool canReserve;
+  final String? unavailableReason;
 
   factory MobileFlight.fromJson(Map<String, dynamic> json) {
     return MobileFlight(
@@ -129,6 +133,8 @@ class MobileFlight {
       availableSeats: json['availableSeats'] as int? ?? 0,
       totalSeats: json['totalSeats'] as int? ?? 0,
       status: json['status'] as int? ?? MobileFlightStatus.unknown,
+      canReserve: json['canReserve'] as bool? ?? false,
+      unavailableReason: json['unavailableReason'] as String?,
     );
   }
 }
@@ -155,6 +161,8 @@ class MobileFlightDetails {
     required this.status,
     required this.seatNumbers,
     required this.availableSeatNumbers,
+    required this.canReserve,
+    this.unavailableReason,
   });
 
   final int id;
@@ -177,6 +185,8 @@ class MobileFlightDetails {
   final int status;
   final List<String> seatNumbers;
   final List<String> availableSeatNumbers;
+  final bool canReserve;
+  final String? unavailableReason;
 
   factory MobileFlightDetails.fromJson(Map<String, dynamic> json) {
     return MobileFlightDetails(
@@ -214,6 +224,8 @@ class MobileFlightDetails {
           ((json['availableSeatNumbers'] as List<dynamic>?) ?? const [])
               .map((item) => item.toString())
               .toList(),
+      canReserve: json['canReserve'] as bool? ?? false,
+      unavailableReason: json['unavailableReason'] as String?,
     );
   }
 }
@@ -431,7 +443,10 @@ class MobileReservationDetails {
         json['customer'] as Map<String, dynamic>? ?? const <String, dynamic>{},
       ),
       seats: ((json['seats'] as List<dynamic>?) ?? const [])
-          .map((item) => MobileReservationSeat.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) =>
+                MobileReservationSeat.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
       canBeCancelled: json['canBeCancelled'] as bool? ?? false,
       canBeConfirmed: json['canBeConfirmed'] as bool? ?? false,

@@ -84,6 +84,8 @@ public sealed class RecommendationService : IRecommendationService
         var candidates = await _dbContext.Flights
             .AsNoTracking()
             .Where(x =>
+                x.Airline.IsActive &&
+                x.Destination.IsActive &&
                 (x.Status == FlightStatus.Scheduled || x.Status == FlightStatus.Delayed) &&
                 x.DepartureAtUtc > nowUtc &&
                 x.ArrivalAtUtc > nowUtc &&

@@ -67,6 +67,8 @@ public sealed class PaymentService : IPaymentService
             .Include(x => x.Payment)
                 .ThenInclude(x => x!.Transactions)
             .Include(x => x.Flight)
+                .ThenInclude(x => x.Airline)
+            .Include(x => x.Flight)
                 .ThenInclude(x => x.Destination)
             .SingleOrDefaultAsync(x => x.Id == reservationId, cancellationToken);
 
@@ -348,6 +350,10 @@ public sealed class PaymentService : IPaymentService
             .Include(x => x.Transactions)
             .Include(x => x.Reservation)
                 .ThenInclude(x => x.Flight)
+                    .ThenInclude(x => x.Airline)
+            .Include(x => x.Reservation)
+                .ThenInclude(x => x.Flight)
+                    .ThenInclude(x => x.Destination)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (payment is null)
@@ -961,7 +967,9 @@ public sealed class PaymentService : IPaymentService
 
     private static void EnsureFlightCanReceivePayment(Flight flight, DateTime nowUtc)
     {
-        if (FlightLifecycleService.CanReceivePayment(flight, nowUtc))
+        var availability = FlightLifecycleService.GetCustomerActionAvailability(flight, nowUtc);
+
+        if (availability.IsAllowed)
         {
             return;
         }
@@ -970,7 +978,7 @@ public sealed class PaymentService : IPaymentService
             "Placanje za ovaj let trenutno nije moguce.",
             new Dictionary<string, string[]>
             {
-                ["flight"] = ["Placanje je dozvoljeno samo za aktivan let prije vremena polaska. Otkazan ili zavrsen let se ne moze platiti."]
+                ["flight"] = [availability.Reason ?? "Placanje je dozvoljeno samo za aktivan let prije vremena polaska."]
             });
     }
 

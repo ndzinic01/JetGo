@@ -82,7 +82,14 @@ public sealed class FlightService : IFlightService
                     ? x.Status
                     : x.ArrivalAtUtc <= nowUtc
                         ? Domain.Enums.FlightStatus.Completed
-                        : x.Status
+                        : x.Status,
+                CanReserve = x.Airline.IsActive &&
+                    x.Destination.IsActive &&
+                    (x.Status == Domain.Enums.FlightStatus.Scheduled || x.Status == Domain.Enums.FlightStatus.Delayed) &&
+                    x.DepartureAtUtc > nowUtc &&
+                    x.ArrivalAtUtc > nowUtc &&
+                    x.AvailableSeats > 0,
+                UnavailableReason = null
             })
             .ToListAsync(cancellationToken);
 
@@ -98,63 +105,80 @@ public sealed class FlightService : IFlightService
 
         var flight = await _dbContext.Flights
             .AsNoTracking()
-            .Where(x => x.Id == id)
-            .Select(x => new FlightDetailsDto
-            {
-                Id = x.Id,
-                DestinationId = x.DestinationId,
-                FlightNumber = x.FlightNumber,
-                RouteCode = x.Destination.RouteCode,
-                DestinationImageUrl = x.Destination.ImageUrl,
-                Airline = new AirlineSummaryDto
-                {
-                    Id = x.Airline.Id,
-                    Name = x.Airline.Name,
-                    Code = x.Airline.Code,
-                    LogoUrl = x.Airline.LogoUrl
-                },
-                DepartureAirport = new AirportSummaryDto
-                {
-                    Id = x.Destination.DepartureAirport.Id,
-                    Name = x.Destination.DepartureAirport.Name,
-                    IataCode = x.Destination.DepartureAirport.IataCode,
-                    CityName = x.Destination.DepartureAirport.City.Name,
-                    CountryName = x.Destination.DepartureAirport.City.Country.Name
-                },
-                ArrivalAirport = new AirportSummaryDto
-                {
-                    Id = x.Destination.ArrivalAirport.Id,
-                    Name = x.Destination.ArrivalAirport.Name,
-                    IataCode = x.Destination.ArrivalAirport.IataCode,
-                    CityName = x.Destination.ArrivalAirport.City.Name,
-                    CountryName = x.Destination.ArrivalAirport.City.Country.Name
-                },
-                DepartureAtUtc = x.DepartureAtUtc,
-                ArrivalAtUtc = x.ArrivalAtUtc,
-                DurationMinutes = EF.Functions.DateDiffMinute(x.DepartureAtUtc, x.ArrivalAtUtc),
-                BasePrice = x.BasePrice,
-                AdditionalBaggageUnitPrice = ReservationPricingConstants.AdditionalBaggagePricePerPiece,
-                AvailableSeats = x.Seats.Count(s => !s.IsReserved),
-                TotalSeats = x.Seats.Count(),
-                ReservedSeats = x.Seats.Count(s => s.IsReserved),
-                Status = x.Status == Domain.Enums.FlightStatus.Cancelled
-                    ? x.Status
-                    : x.ArrivalAtUtc <= nowUtc
-                        ? Domain.Enums.FlightStatus.Completed
-                        : x.Status,
-                SeatNumbers = x.Seats
-                    .OrderBy(s => s.SeatNumber)
-                    .Select(s => s.SeatNumber)
-                    .ToArray(),
-                AvailableSeatNumbers = x.Seats
-                    .Where(s => !s.IsReserved)
-                    .OrderBy(s => s.SeatNumber)
-                    .Select(s => s.SeatNumber)
-                    .ToArray()
-            })
-            .SingleOrDefaultAsync(cancellationToken);
+            .Include(x => x.Airline)
+            .Include(x => x.Destination)
+                .ThenInclude(x => x.DepartureAirport)
+                    .ThenInclude(x => x.City)
+                        .ThenInclude(x => x.Country)
+            .Include(x => x.Destination)
+                .ThenInclude(x => x.ArrivalAirport)
+                    .ThenInclude(x => x.City)
+                        .ThenInclude(x => x.Country)
+            .Include(x => x.Seats)
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-        return flight ?? throw new NotFoundException($"Let sa ID vrijednoscu {id} nije pronadjen.");
+        return flight is null
+            ? throw new NotFoundException($"Let sa ID vrijednoscu {id} nije pronadjen.")
+            : MapFlightDetails(flight, nowUtc);
+    }
+
+    private static FlightDetailsDto MapFlightDetails(Flight flight, DateTime nowUtc)
+    {
+        var seats = flight.Seats
+            .OrderBy(x => x.SeatNumber)
+            .ToArray();
+        var availableSeatNumbers = seats
+            .Where(x => !x.IsReserved)
+            .Select(x => x.SeatNumber)
+            .ToArray();
+        var availability = FlightLifecycleService.GetReservationAvailability(flight, nowUtc);
+
+        return new FlightDetailsDto
+        {
+            Id = flight.Id,
+            DestinationId = flight.DestinationId,
+            FlightNumber = flight.FlightNumber,
+            RouteCode = flight.Destination.RouteCode,
+            DestinationImageUrl = flight.Destination.ImageUrl,
+            Airline = new AirlineSummaryDto
+            {
+                Id = flight.Airline.Id,
+                Name = flight.Airline.Name,
+                Code = flight.Airline.Code,
+                LogoUrl = flight.Airline.LogoUrl
+            },
+            DepartureAirport = new AirportSummaryDto
+            {
+                Id = flight.Destination.DepartureAirport.Id,
+                Name = flight.Destination.DepartureAirport.Name,
+                IataCode = flight.Destination.DepartureAirport.IataCode,
+                CityName = flight.Destination.DepartureAirport.City.Name,
+                CountryName = flight.Destination.DepartureAirport.City.Country.Name
+            },
+            ArrivalAirport = new AirportSummaryDto
+            {
+                Id = flight.Destination.ArrivalAirport.Id,
+                Name = flight.Destination.ArrivalAirport.Name,
+                IataCode = flight.Destination.ArrivalAirport.IataCode,
+                CityName = flight.Destination.ArrivalAirport.City.Name,
+                CountryName = flight.Destination.ArrivalAirport.City.Country.Name
+            },
+            DepartureAtUtc = flight.DepartureAtUtc,
+            ArrivalAtUtc = flight.ArrivalAtUtc,
+            DurationMinutes = (int)Math.Round((flight.ArrivalAtUtc - flight.DepartureAtUtc).TotalMinutes),
+            BasePrice = flight.BasePrice,
+            AdditionalBaggageUnitPrice = ReservationPricingConstants.AdditionalBaggagePricePerPiece,
+            AvailableSeats = availableSeatNumbers.Length,
+            TotalSeats = seats.Length,
+            ReservedSeats = seats.Length - availableSeatNumbers.Length,
+            Status = FlightLifecycleService.GetEffectiveStatus(flight.Status, flight.ArrivalAtUtc, nowUtc),
+            CanReserve = availability.IsAllowed,
+            UnavailableReason = availability.Reason,
+            SeatNumbers = seats
+                .Select(x => x.SeatNumber)
+                .ToArray(),
+            AvailableSeatNumbers = availableSeatNumbers
+        };
     }
 
     private IQueryable<JetGo.Domain.Entities.Flight> BuildQuery(FlightSearchRequest request)
@@ -165,9 +189,12 @@ public sealed class FlightService : IFlightService
         if (!request.Status.HasValue)
         {
             query = query.Where(x =>
+                x.Airline.IsActive &&
+                x.Destination.IsActive &&
                 (x.Status == Domain.Enums.FlightStatus.Scheduled || x.Status == Domain.Enums.FlightStatus.Delayed) &&
                 x.DepartureAtUtc > nowUtc &&
-                x.ArrivalAtUtc > nowUtc);
+                x.ArrivalAtUtc > nowUtc &&
+                x.AvailableSeats > 0);
         }
 
         if (request.DepartureAirportId.HasValue)
@@ -214,9 +241,19 @@ public sealed class FlightService : IFlightService
                     (x.Status != Domain.Enums.FlightStatus.Cancelled && x.ArrivalAtUtc <= nowUtc)),
                 Domain.Enums.FlightStatus.Cancelled => query.Where(x => x.Status == Domain.Enums.FlightStatus.Cancelled),
                 Domain.Enums.FlightStatus.Delayed => query.Where(x =>
-                    x.Status == Domain.Enums.FlightStatus.Delayed && x.DepartureAtUtc > nowUtc && x.ArrivalAtUtc > nowUtc),
+                    x.Airline.IsActive &&
+                    x.Destination.IsActive &&
+                    x.Status == Domain.Enums.FlightStatus.Delayed &&
+                    x.DepartureAtUtc > nowUtc &&
+                    x.ArrivalAtUtc > nowUtc &&
+                    x.AvailableSeats > 0),
                 _ => query.Where(x =>
-                    x.Status == Domain.Enums.FlightStatus.Scheduled && x.DepartureAtUtc > nowUtc && x.ArrivalAtUtc > nowUtc)
+                    x.Airline.IsActive &&
+                    x.Destination.IsActive &&
+                    x.Status == Domain.Enums.FlightStatus.Scheduled &&
+                    x.DepartureAtUtc > nowUtc &&
+                    x.ArrivalAtUtc > nowUtc &&
+                    x.AvailableSeats > 0)
             };
         }
 

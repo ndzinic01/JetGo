@@ -1,4 +1,4 @@
-using JetGo.Application.Contracts.Messaging;
+﻿using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Exceptions;
 using JetGo.Application.Messaging.Notifications;
 using JetGo.Domain.Entities;
@@ -91,17 +91,80 @@ public sealed class FlightLifecycleService
         return arrivalAtUtc <= nowUtc ? FlightStatus.Completed : status;
     }
 
-    public static bool CanAcceptReservations(FlightStatus status, DateTime departureAtUtc, DateTime arrivalAtUtc, DateTime nowUtc)
+    public static FlightActionAvailability GetReservationAvailability(Flight flight, DateTime nowUtc)
     {
-        var effectiveStatus = GetEffectiveStatus(status, arrivalAtUtc, nowUtc);
+        var customerActionAvailability = GetCustomerActionAvailability(flight, nowUtc);
 
-        return effectiveStatus is FlightStatus.Scheduled or FlightStatus.Delayed &&
-            departureAtUtc > nowUtc;
+        if (!customerActionAvailability.IsAllowed)
+        {
+            return customerActionAvailability;
+        }
+
+        if (flight.AvailableSeats <= 0)
+        {
+            return FlightActionAvailability.Blocked("Na letu vise nema slobodnih sjedista.");
+        }
+
+        return FlightActionAvailability.Allowed;
     }
 
-    public static bool CanReceivePayment(Flight flight, DateTime nowUtc)
+    public static FlightActionAvailability GetCustomerActionAvailability(Flight flight, DateTime nowUtc)
     {
-        return CanAcceptReservations(flight.Status, flight.DepartureAtUtc, flight.ArrivalAtUtc, nowUtc);
+        return GetCustomerActionAvailability(
+            flight.Status,
+            flight.DepartureAtUtc,
+            flight.ArrivalAtUtc,
+            nowUtc,
+            flight.Airline?.IsActive ?? true,
+            flight.Destination?.IsActive ?? true);
+    }
+
+    public static FlightActionAvailability GetCustomerActionAvailability(
+        FlightStatus status,
+        DateTime departureAtUtc,
+        DateTime arrivalAtUtc,
+        DateTime nowUtc,
+        bool airlineIsActive,
+        bool destinationIsActive)
+    {
+        if (!airlineIsActive)
+        {
+            return FlightActionAvailability.Blocked("Let nije dostupan jer aviokompanija vise nije aktivna.");
+        }
+
+        if (!destinationIsActive)
+        {
+            return FlightActionAvailability.Blocked("Let nije dostupan jer destinacija vise nije aktivna.");
+        }
+
+        var effectiveStatus = GetEffectiveStatus(status, arrivalAtUtc, nowUtc);
+
+        if (effectiveStatus == FlightStatus.Cancelled)
+        {
+            return FlightActionAvailability.Blocked("Otkazan let se ne moze rezervisati niti platiti.");
+        }
+
+        if (effectiveStatus == FlightStatus.Completed)
+        {
+            return FlightActionAvailability.Blocked("Zavrsen let se ne moze rezervisati niti platiti.");
+        }
+
+        if (effectiveStatus is not (FlightStatus.Scheduled or FlightStatus.Delayed))
+        {
+            return FlightActionAvailability.Blocked("Let trenutno nije dostupan za rezervaciju.");
+        }
+
+        if (departureAtUtc <= nowUtc)
+        {
+            return FlightActionAvailability.Blocked("Rezervacija i placanje nisu dostupni nakon vremena polaska leta.");
+        }
+
+        if (arrivalAtUtc <= nowUtc)
+        {
+            return FlightActionAvailability.Blocked("Let je zavrsen i vise nije dostupan za rezervaciju.");
+        }
+
+        return FlightActionAvailability.Allowed;
     }
 
     private async Task<IReadOnlyCollection<NotificationRequestedMessage>> CancelActiveReservationsAsync(
@@ -372,4 +435,10 @@ public sealed class FlightLifecycleService
                 });
         }
     }
+}
+public sealed record FlightActionAvailability(bool IsAllowed, string? Reason)
+{
+    public static FlightActionAvailability Allowed { get; } = new(true, null);
+
+    public static FlightActionAvailability Blocked(string reason) => new(false, reason);
 }

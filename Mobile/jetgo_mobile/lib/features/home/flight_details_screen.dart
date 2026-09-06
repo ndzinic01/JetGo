@@ -87,7 +87,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
 
   Future<void> _createReservation() async {
     final details = _details;
-    if (details == null || _selectedSeats.isEmpty) {
+    if (details == null || !details.canReserve || _selectedSeats.isEmpty) {
       return;
     }
 
@@ -125,9 +125,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } catch (_) {
       if (!mounted) {
         return;
@@ -193,9 +193,21 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
         : details.totalSeats;
   }
 
+  String _reservationUnavailableReason(MobileFlightDetails details) {
+    final reason = details.unavailableReason?.trim();
+    return reason == null || reason.isEmpty
+        ? 'Let trenutno nije dostupan za rezervaciju.'
+        : reason;
+  }
+
   @override
   Widget build(BuildContext context) {
     final details = _details;
+    final canCreateReservation =
+        details != null &&
+        details.canReserve &&
+        _selectedSeats.isNotEmpty &&
+        !_isSubmitting;
 
     return Scaffold(
       appBar: AppBar(
@@ -213,22 +225,38 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
           ? null
           : SafeArea(
               minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: FilledButton.icon(
-                onPressed: _selectedSeats.isEmpty || _isSubmitting
-                    ? null
-                    : _createReservation,
-                icon: _isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.confirmation_num_rounded),
-                label: Text(
-                  _isSubmitting
-                      ? 'Kreiranje...'
-                      : 'Rezervisi (${_selectedSeats.length}) - ${MobileDisplay.formatMoney(_reservationTotal(details), details.currency)}',
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!details.canReserve) ...[
+                    Text(
+                      _reservationUnavailableReason(details),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  FilledButton.icon(
+                    onPressed: canCreateReservation ? _createReservation : null,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.confirmation_num_rounded),
+                    label: Text(
+                      _isSubmitting
+                          ? 'Kreiranje...'
+                          : !details.canReserve
+                          ? 'Rezervacija nije dostupna'
+                          : 'Rezervisi (${_selectedSeats.length}) - ${MobileDisplay.formatMoney(_reservationTotal(details), details.currency)}',
+                    ),
+                  ),
+                ],
               ),
             ),
     );
@@ -369,7 +397,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                     ),
                     _MetaBadge(
                       icon: Icons.event_seat_rounded,
-                      label: '${_displayAvailableSeats(details)}/${_displayTotalSeats(details)}',
+                      label:
+                          '${_displayAvailableSeats(details)}/${_displayTotalSeats(details)}',
                     ),
                     _MetaBadge(
                       icon: Icons.route_rounded,
@@ -462,7 +491,42 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
     );
   }
 
-  Widget _buildSeatSelectionCard(BuildContext context, MobileFlightDetails details) {
+  Widget _buildReservationUnavailableNotice(
+    BuildContext context,
+    MobileFlightDetails details,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lock_clock_rounded, color: colorScheme.error, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _reservationUnavailableReason(details),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeatSelectionCard(
+    BuildContext context,
+    MobileFlightDetails details,
+  ) {
     final seatLayout = _buildSeatLayout(details);
     final splitIndex = seatLayout.letters.length <= 3
         ? seatLayout.letters.length
@@ -505,16 +569,18 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
             Text(
               'Odaberite slobodna sjedista za ovu rezervaciju. Maksimalno mozete izabrati 6 mjesta odjednom.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
+            if (!details.canReserve) ...[
+              const SizedBox(height: 12),
+              _buildReservationUnavailableNotice(context, details),
+            ],
             const SizedBox(height: 16),
             if (seatLayout.rows.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  'Trenutno nema slobodnih sjedista za odabir.',
-                ),
+                child: Text('Trenutno nema slobodnih sjedista za odabir.'),
               )
             else
               Column(
@@ -524,15 +590,13 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                     child: Row(
                       children: [
                         ...leftLetters.map(
-                          (letter) => Expanded(
-                            child: Center(child: Text(letter)),
-                          ),
+                          (letter) =>
+                              Expanded(child: Center(child: Text(letter))),
                         ),
                         if (rightLetters.isNotEmpty) const SizedBox(width: 20),
                         ...rightLetters.map(
-                          (letter) => Expanded(
-                            child: Center(child: Text(letter)),
-                          ),
+                          (letter) =>
+                              Expanded(child: Center(child: Text(letter))),
                         ),
                       ],
                     ),
@@ -554,8 +618,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                           ...leftLetters.map(
                             (letter) => Expanded(
                               child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 3),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
                                 child: _buildSeatCell(
                                   context,
                                   seatNumber: row.seatsByLetter[letter],
@@ -564,12 +629,14 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                               ),
                             ),
                           ),
-                          if (rightLetters.isNotEmpty) const SizedBox(width: 20),
+                          if (rightLetters.isNotEmpty)
+                            const SizedBox(width: 20),
                           ...rightLetters.map(
                             (letter) => Expanded(
                               child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 3),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
                                 child: _buildSeatCell(
                                   context,
                                   seatNumber: row.seatsByLetter[letter],
@@ -587,14 +654,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
             const SizedBox(height: 16),
             const _SeatLegendCard(
               items: [
-                _SeatLegendItem(
-                  color: Color(0xFF4B8EF7),
-                  label: 'Slobodno',
-                ),
-                _SeatLegendItem(
-                  color: Color(0xFFC86565),
-                  label: 'Rezervisano',
-                ),
+                _SeatLegendItem(color: Color(0xFF4B8EF7), label: 'Slobodno'),
+                _SeatLegendItem(color: Color(0xFFC86565), label: 'Rezervisano'),
                 _SeatLegendItem(
                   color: Color(0xFF42B66D),
                   label: 'Odabrano sjediste',
@@ -607,10 +668,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest
-                      .withValues(alpha: 0.75),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -639,10 +699,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .secondaryContainer
-                    .withValues(alpha: 0.55),
+                color: Theme.of(
+                  context,
+                ).colorScheme.secondaryContainer.withValues(alpha: 0.55),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -681,6 +740,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
       context,
       seatNumber: seatNumber,
       isAvailable: details.availableSeatNumbers.contains(seatNumber),
+      canReserve: details.canReserve,
     );
   }
 
@@ -688,20 +748,25 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
     BuildContext context, {
     required String seatNumber,
     required bool isAvailable,
+    required bool canReserve,
   }) {
     final isSelected = _selectedSeats.contains(seatNumber);
+    final isEnabled = isAvailable && canReserve;
     final color = isSelected
         ? const Color(0xFF42B66D)
-        : isAvailable
-            ? const Color(0xFF4B8EF7)
-            : const Color(0xFFC86565);
+        : !isAvailable
+        ? const Color(0xFFC86565)
+        : canReserve
+        ? const Color(0xFF4B8EF7)
+        : Theme.of(context).colorScheme.outline;
 
     return Padding(
       padding: EdgeInsets.zero,
       child: InkWell(
-        onTap: !isAvailable
+        onTap: !isEnabled
             ? null
-            : () => _toggleSeat(seatNumber, !_selectedSeats.contains(seatNumber)),
+            : () =>
+                  _toggleSeat(seatNumber, !_selectedSeats.contains(seatNumber)),
         borderRadius: BorderRadius.circular(10),
         child: Container(
           height: 34,
@@ -713,9 +778,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
           child: Text(
             seatNumber.substring(seatNumber.length - 1),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ),
@@ -740,16 +805,14 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
             Text(
               'Kabinski prtljag je ukljucen, a ovdje po potrebi dodajete dodatne kofere prije placanja.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               initialValue: _additionalBaggageCount,
               isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Odaberite ponudu',
-              ),
+              decoration: const InputDecoration(labelText: 'Odaberite ponudu'),
               selectedItemBuilder: (context) => List.generate(
                 7,
                 (index) => Align(
@@ -840,18 +903,19 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
       return const _SeatLayoutData(letters: [], rows: []);
     }
 
-    final parsedSeats = sourceSeatNumbers
-        .map(_parseSeatNumber)
-        .whereType<_ParsedSeatNumber>()
-        .toList()
-      ..sort((left, right) {
-        final rowComparison = left.rowNumber.compareTo(right.rowNumber);
-        if (rowComparison != 0) {
-          return rowComparison;
-        }
+    final parsedSeats =
+        sourceSeatNumbers
+            .map(_parseSeatNumber)
+            .whereType<_ParsedSeatNumber>()
+            .toList()
+          ..sort((left, right) {
+            final rowComparison = left.rowNumber.compareTo(right.rowNumber);
+            if (rowComparison != 0) {
+              return rowComparison;
+            }
 
-        return left.letter.compareTo(right.letter);
-      });
+            return left.letter.compareTo(right.letter);
+          });
 
     if (parsedSeats.isEmpty) {
       return const _SeatLayoutData(letters: [], rows: []);
@@ -869,20 +933,21 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
       rowsByNumber[seat.rowNumber]![seat.letter] = seat.original;
     }
 
-    final rows = rowsByNumber.entries
-        .map(
-          (entry) => _SeatRowData(
-            rowLabel: entry.key.toString(),
-            seatsByLetter: entry.value,
-          ),
-        )
-        .toList()
-      ..sort((left, right) => int.parse(left.rowLabel).compareTo(int.parse(right.rowLabel)));
+    final rows =
+        rowsByNumber.entries
+            .map(
+              (entry) => _SeatRowData(
+                rowLabel: entry.key.toString(),
+                seatsByLetter: entry.value,
+              ),
+            )
+            .toList()
+          ..sort(
+            (left, right) =>
+                int.parse(left.rowLabel).compareTo(int.parse(right.rowLabel)),
+          );
 
-    return _SeatLayoutData(
-      letters: letters,
-      rows: rows,
-    );
+    return _SeatLayoutData(letters: letters, rows: rows);
   }
 
   List<String> _generateFallbackSeatNumbers(int totalSeats) {
@@ -945,10 +1010,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
 }
 
 class _MetaBadge extends StatelessWidget {
-  const _MetaBadge({
-    required this.icon,
-    required this.label,
-  });
+  const _MetaBadge({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -974,10 +1036,7 @@ class _MetaBadge extends StatelessWidget {
 }
 
 class _HeroBadge extends StatelessWidget {
-  const _HeroBadge({
-    required this.label,
-    required this.icon,
-  });
+  const _HeroBadge({required this.label, required this.icon});
 
   final String label;
   final IconData icon;
@@ -998,9 +1057,9 @@ class _HeroBadge extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -1035,7 +1094,9 @@ class _JourneyOverviewCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.75),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.75,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1060,8 +1121,8 @@ class _JourneyOverviewCard extends StatelessWidget {
                 Text(
                   durationLabel,
                   style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -1098,20 +1159,18 @@ class _JourneyPoint extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Text(
           title,
           style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 4),
-        Text(
-          primary,
-          style: theme.textTheme.titleMedium,
-        ),
+        Text(primary, style: theme.textTheme.titleMedium),
         const SizedBox(height: 2),
         Text(
           secondary,
@@ -1124,10 +1183,7 @@ class _JourneyPoint extends StatelessWidget {
 }
 
 class _InfoBlock extends StatelessWidget {
-  const _InfoBlock({
-    required this.title,
-    required this.value,
-  });
+  const _InfoBlock({required this.title, required this.value});
 
   final String title;
   final String value;
@@ -1165,10 +1221,7 @@ class _InfoBlock extends StatelessWidget {
 }
 
 class _SeatLegendItem {
-  const _SeatLegendItem({
-    required this.color,
-    required this.label,
-  });
+  const _SeatLegendItem({required this.color, required this.label});
 
   final Color color;
   final String label;
@@ -1190,12 +1243,12 @@ class _SeatLegendCard extends StatelessWidget {
           children: items
               .map(
                 (item) => Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(999),
                   ),
@@ -1227,20 +1280,14 @@ class _SeatLegendCard extends StatelessWidget {
 }
 
 class _SeatLayoutData {
-  const _SeatLayoutData({
-    required this.letters,
-    required this.rows,
-  });
+  const _SeatLayoutData({required this.letters, required this.rows});
 
   final List<String> letters;
   final List<_SeatRowData> rows;
 }
 
 class _SeatRowData {
-  const _SeatRowData({
-    required this.rowLabel,
-    required this.seatsByLetter,
-  });
+  const _SeatRowData({required this.rowLabel, required this.seatsByLetter});
 
   final String rowLabel;
   final Map<String, String> seatsByLetter;

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using JetGo.Domain.Enums;
 
 namespace JetGo.Application.DTOs.Reservations;
@@ -23,6 +24,12 @@ public sealed class ReservationDetailsDto
     public DateTime ArrivalAtUtc { get; init; }
 
     public FlightStatus FlightStatus { get; init; }
+
+    [JsonIgnore]
+    public bool FlightAirlineIsActive { get; init; } = true;
+
+    [JsonIgnore]
+    public bool FlightDestinationIsActive { get; init; } = true;
 
     public ReservationStatus Status { get; init; }
 

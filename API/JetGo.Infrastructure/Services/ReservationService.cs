@@ -61,6 +61,7 @@ public sealed class ReservationService : IReservationService
         var normalizedSeatNumbers = NormalizeSeatNumbers(request.SeatNumbers);
 
         var flight = await _dbContext.Flights
+            .Include(x => x.Airline)
             .Include(x => x.Destination)
                 .ThenInclude(x => x.DepartureAirport)
             .Include(x => x.Destination)
@@ -73,13 +74,14 @@ public sealed class ReservationService : IReservationService
             throw new NotFoundException($"Let sa ID vrijednoscu {request.FlightId} nije pronadjen.");
         }
 
-        if (!FlightLifecycleService.CanAcceptReservations(flight.Status, flight.DepartureAtUtc, flight.ArrivalAtUtc, nowUtc))
+        var reservationAvailability = FlightLifecycleService.GetReservationAvailability(flight, nowUtc);
+        if (!reservationAvailability.IsAllowed)
         {
             throw new ValidationException(
                 "Odabrani let trenutno nije dostupan za rezervaciju.",
                 new Dictionary<string, string[]>
                 {
-                    ["flight"] = ["Rezervacija je dozvoljena samo za aktivan let prije vremena polaska. Otkazan ili zavrsen let se ne moze rezervisati."]
+                    ["flight"] = [reservationAvailability.Reason ?? "Rezervacija je dozvoljena samo za aktivan let prije vremena polaska."]
                 });
         }
 
@@ -217,6 +219,8 @@ public sealed class ReservationService : IReservationService
             .Include(x => x.Items)
                 .ThenInclude(x => x.FlightSeat)
             .Include(x => x.Flight)
+                .ThenInclude(x => x.Airline)
+            .Include(x => x.Flight)
                 .ThenInclude(x => x.Destination)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
@@ -226,6 +230,7 @@ public sealed class ReservationService : IReservationService
         }
 
         var targetFlight = await _dbContext.Flights
+            .Include(x => x.Airline)
             .Include(x => x.Destination)
             .Include(x => x.Seats)
             .SingleOrDefaultAsync(x => x.Id == request.FlightId, cancellationToken);
@@ -415,6 +420,9 @@ public sealed class ReservationService : IReservationService
                 .ThenInclude(x => x!.Transactions)
             .Include(x => x.Items)
             .Include(x => x.Flight)
+                .ThenInclude(x => x.Airline)
+            .Include(x => x.Flight)
+                .ThenInclude(x => x.Destination)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (reservation is null)
@@ -440,6 +448,17 @@ public sealed class ReservationService : IReservationService
                 new Dictionary<string, string[]>
                 {
                     ["additionalBaggageCount"] = ["Dodatni prtljag mozete mijenjati samo dok je rezervacija aktivna."]
+                });
+        }
+
+        var flightActionAvailability = FlightLifecycleService.GetCustomerActionAvailability(reservation.Flight, nowUtc);
+        if (!flightActionAvailability.IsAllowed)
+        {
+            throw new ValidationException(
+                "Dodatni prtljag trenutno nije moguce mijenjati.",
+                new Dictionary<string, string[]>
+                {
+                    ["flight"] = [flightActionAvailability.Reason ?? "Izmjena dodatnog prtljaga je dozvoljena samo prije vremena polaska leta."]
                 });
         }
 
@@ -510,6 +529,9 @@ public sealed class ReservationService : IReservationService
             .Include(x => x.Items)
                 .ThenInclude(x => x.FlightSeat)
             .Include(x => x.Flight)
+                .ThenInclude(x => x.Airline)
+            .Include(x => x.Flight)
+                .ThenInclude(x => x.Destination)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (reservation is null)
@@ -538,11 +560,8 @@ public sealed class ReservationService : IReservationService
                 });
         }
 
-        var flightAllowsUserActions = FlightLifecycleService.CanAcceptReservations(
-            reservation.Flight.Status,
-            reservation.Flight.DepartureAtUtc,
-            reservation.Flight.ArrivalAtUtc,
-            nowUtc);
+        var flightActionAvailability = FlightLifecycleService.GetCustomerActionAvailability(reservation.Flight, nowUtc);
+        var flightAllowsUserActions = flightActionAvailability.IsAllowed;
 
         if (reservation.Payment is not null)
         {
@@ -730,6 +749,8 @@ public sealed class ReservationService : IReservationService
                 DepartureAtUtc = x.Flight.DepartureAtUtc,
                 ArrivalAtUtc = x.Flight.ArrivalAtUtc,
                 FlightStatus = x.Flight.Status,
+                FlightAirlineIsActive = x.Flight.Airline.IsActive,
+                FlightDestinationIsActive = x.Flight.Destination.IsActive,
                 Status = x.Status,
                 TotalAmount = x.TotalAmount,
                 Currency = x.Currency,
@@ -808,17 +829,14 @@ public sealed class ReservationService : IReservationService
                 });
         }
 
-        if (!FlightLifecycleService.CanAcceptReservations(
-            targetFlight.Status,
-            targetFlight.DepartureAtUtc,
-            targetFlight.ArrivalAtUtc,
-            nowUtc))
+        var targetFlightAvailability = FlightLifecycleService.GetCustomerActionAvailability(targetFlight, nowUtc);
+        if (!targetFlightAvailability.IsAllowed)
         {
             throw new ValidationException(
                 "Odabrani let nije dostupan za izmjenu rezervacije.",
                 new Dictionary<string, string[]>
                 {
-                    ["flightId"] = ["Rezervaciju je moguce prebaciti samo na aktivan let prije vremena polaska."]
+                    ["flightId"] = [targetFlightAvailability.Reason ?? "Odaberite aktivan let prije vremena polaska."]
                 });
         }
     }
@@ -1171,11 +1189,14 @@ public sealed class ReservationService : IReservationService
     {
         var nowUtc = DateTime.UtcNow;
         var actualStatus = GetEffectiveReservationStatus(reservation.Status, reservation.PaymentStatus, reservation.ArrivalAtUtc, nowUtc);
-        var flightAllowsUserActions = FlightLifecycleService.CanAcceptReservations(
+        var flightActionAvailability = FlightLifecycleService.GetCustomerActionAvailability(
             reservation.FlightStatus,
             reservation.DepartureAtUtc,
             reservation.ArrivalAtUtc,
-            nowUtc);
+            nowUtc,
+            reservation.FlightAirlineIsActive,
+            reservation.FlightDestinationIsActive);
+        var flightAllowsUserActions = flightActionAvailability.IsAllowed;
         var hasCapturedPayment = reservation.HasCapturedPayment || reservation.IsPaid;
 
         return new ReservationDetailsDto

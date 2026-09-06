@@ -85,16 +85,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _startNotificationPolling() {
     _notificationPollingTimer?.cancel();
-    _notificationPollingTimer = Timer.periodic(
-      _notificationPollingInterval,
-      (_) {
-        if (!mounted || _token.isEmpty) {
-          return;
-        }
+    _notificationPollingTimer = Timer.periodic(_notificationPollingInterval, (
+      _,
+    ) {
+      if (!mounted || _token.isEmpty) {
+        return;
+      }
 
-        unawaited(_loadNotificationSummary(silent: true));
-      },
-    );
+      unawaited(_loadNotificationSummary(silent: true));
+    });
   }
 
   Future<void> _loadCurrentTab() async {
@@ -110,16 +109,15 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       switch (_currentIndex) {
         case 0:
-          final flights = await _dataService.fetchFlights(
-            token: _token,
-          );
+          final flights = await _dataService.fetchFlights(token: _token);
           _allFlights = flights.items;
           _flights = _filterFlights(_allFlights);
           unawaited(_loadRecommendations());
           break;
         case 1:
-          final reservations =
-              await _dataService.fetchMyReservations(token: _token);
+          final reservations = await _dataService.fetchMyReservations(
+            token: _token,
+          );
           _reservations = reservations.items;
           break;
         case 2:
@@ -166,15 +164,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _recommendedFlights = const [];
-        _recommendationsErrorMessage =
-            'Preporuke trenutno nisu dostupne.';
+        _recommendationsErrorMessage = 'Preporuke trenutno nisu dostupne.';
       });
     }
   }
 
   Future<void> _loadNotificationSummary({bool silent = false}) async {
     try {
-      final summary = await _dataService.fetchNotificationSummary(token: _token);
+      final summary = await _dataService.fetchNotificationSummary(
+        token: _token,
+      );
       if (!mounted) {
         return;
       }
@@ -185,9 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       if (!silent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Notifikacije trenutno nisu dostupne.'),
-          ),
+          const SnackBar(content: Text('Notifikacije trenutno nisu dostupne.')),
         );
       }
     }
@@ -235,10 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      await _dataService.fetchFlights(
-        token: _token,
-        searchText: searchText,
-      );
+      await _dataService.fetchFlights(token: _token, searchText: searchText);
 
       final recommendations = await _dataService.fetchRecommendedFlights(
         token: _token,
@@ -313,9 +307,11 @@ class _HomeScreenState extends State<HomeScreen> {
           flight.airline.code == _selectedAirlineCode;
       final departureDate = flight.departureAtUtc.toLocal();
       final matchesFromDate =
-          _departureFromDate == null || !_isBeforeDate(departureDate, _departureFromDate!);
+          _departureFromDate == null ||
+          !_isBeforeDate(departureDate, _departureFromDate!);
       final matchesToDate =
-          _departureToDate == null || !_isAfterDate(departureDate, _departureToDate!);
+          _departureToDate == null ||
+          !_isAfterDate(departureDate, _departureToDate!);
 
       return matchesDeparture &&
           matchesArrival &&
@@ -415,10 +411,8 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final changed = await Navigator.of(context).push<bool>(
         MaterialPageRoute<bool>(
-          builder: (_) => FlightDetailsScreen(
-            token: _token,
-            flightId: flight.id,
-          ),
+          builder: (_) =>
+              FlightDetailsScreen(token: _token, flightId: flight.id),
         ),
       );
 
@@ -485,10 +479,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final updated = await Navigator.of(context).push<MobileProfile>(
       MaterialPageRoute<MobileProfile>(
-        builder: (_) => EditProfileScreen(
-          token: _token,
-          profile: profile,
-        ),
+        builder: (_) => EditProfileScreen(token: _token, profile: profile),
       ),
     );
 
@@ -604,10 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Text(
-                  article.title,
-                  style: theme.textTheme.headlineSmall,
-                ),
+                Text(article.title, style: theme.textTheme.headlineSmall),
                 const SizedBox(height: 12),
                 Text(
                   'Administracija je objavila ovu novost za putnike i korisnike aplikacije.',
@@ -637,8 +625,8 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               _currentSectionTitle,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -858,10 +846,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Planirajte putovanje',
-              style: theme.textTheme.titleLarge,
-            ),
+            Text('Planirajte putovanje', style: theme.textTheme.titleLarge),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -1014,7 +999,8 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const _SectionHeader(
           title: 'Preporuceno za vas',
-          subtitle: 'Najzanimljivije opcije na osnovu pretraga i historije rezervacija.',
+          subtitle:
+              'Najzanimljivije opcije na osnovu pretraga i historije rezervacija.',
         ),
         const SizedBox(height: 12),
         GridView.builder(
@@ -1058,6 +1044,7 @@ class _HomeScreenState extends State<HomeScreen> {
             availableSeats: flight.availableSeats,
             totalSeats: flight.totalSeats,
             status: flight.status,
+            canReserve: true,
           ),
         ),
         child: Column(
@@ -1073,9 +1060,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .secondaryContainer,
+                        color: Theme.of(context).colorScheme.secondaryContainer,
                         alignment: Alignment.center,
                         child: const Icon(Icons.flight_rounded, size: 34),
                       );
@@ -1156,12 +1141,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: Text(
                           _formatShortDate(flight.departureAtUtc),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1187,9 +1172,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showRecommendationReason(
-    MobileRecommendedFlight flight,
-  ) async {
+  Future<void> _showRecommendationReason(MobileRecommendedFlight flight) async {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -1224,8 +1207,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.7),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.7,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -1251,10 +1235,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       '${_formatShortDate(flight.departureAtUtc)} u ${_formatTimeLabel(flight.departureAtUtc)}',
                 ),
                 if (signals.isNotEmpty) ...[
-                  Text(
-                    'Korisni signali',
-                    style: theme.textTheme.labelMedium,
-                  ),
+                  Text('Korisni signali', style: theme.textTheme.labelMedium),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -1295,6 +1276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           availableSeats: flight.availableSeats,
                           totalSeats: flight.totalSeats,
                           status: flight.status,
+                          canReserve: true,
                         ),
                       );
                     },
@@ -1336,7 +1318,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _EmptyState(
             icon: Icons.luggage_rounded,
             title: 'Jos nemate rezervacija',
-            message: 'Kada napravite rezervaciju, ovdje cete vidjeti historiju i statuse.',
+            message:
+                'Kada napravite rezervaciju, ovdje cete vidjeti historiju i statuse.',
           ),
         ],
       );
@@ -1408,7 +1391,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _EmptyState(
             icon: Icons.newspaper_rounded,
             title: 'Nema objavljenih novosti',
-            message: 'Kada administracija objavi obavijesti, pojavit ce se ovdje.',
+            message:
+                'Kada administracija objavi obavijesti, pojavit ce se ovdje.',
           ),
         ],
       );
@@ -1476,8 +1460,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.75),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.75,
+                ),
               ),
               child: Row(
                 children: [
@@ -1517,7 +1502,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     arrivalTime: reservation.arrivalAtUtc != null
                         ? _formatTimeLabel(reservation.arrivalAtUtc!)
                         : '--:--',
-                    middleLabel: '${reservation.departureAirportCode} -> ${reservation.arrivalAirportCode}',
+                    middleLabel:
+                        '${reservation.departureAirportCode} -> ${reservation.arrivalAirportCode}',
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -1597,9 +1583,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         }
 
                         return Container(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                           alignment: Alignment.center,
                           child: const CircularProgressIndicator(),
                         );
@@ -1672,10 +1658,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 'Dodirnite istaknutu objavu za pregled detalja i naslovne fotografije.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
@@ -1710,9 +1694,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         }
 
                         return Container(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                           alignment: Alignment.center,
                           child: const CircularProgressIndicator(),
                         );
@@ -1743,8 +1727,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).colorScheme.secondaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.secondaryContainer,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -1755,13 +1740,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            MobileDisplay.formatDateTime(article.publishedAtUtc),
+                            MobileDisplay.formatDateTime(
+                              article.publishedAtUtc,
+                            ),
                             textAlign: TextAlign.end,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                           ),
                         ),
@@ -1778,9 +1765,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       'Dodirnite karticu za pregled objave.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -1821,10 +1807,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Moj profil',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text('Moj profil', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
                 'Upravljajte licnim podacima, lozinkom, notifikacijama i kontaktom sa podrskom iz jednog mjesta.',
@@ -1837,7 +1820,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _FlightFactChip(
                     icon: Icons.person_outline_rounded,
-                    label: profile.roles.map(MobileDisplay.roleLabel).join(', '),
+                    label: profile.roles
+                        .map(MobileDisplay.roleLabel)
+                        .join(', '),
                   ),
                   _FlightFactChip(
                     icon: Icons.notifications_outlined,
@@ -1889,9 +1874,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             '@${profile.username}',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                           ),
                           const SizedBox(height: 8),
@@ -1899,9 +1884,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             profile.email,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                           ),
                         ],
@@ -1921,9 +1906,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .secondaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.secondaryContainer,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -1939,7 +1924,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
@@ -1960,8 +1947,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _ProfileInfoTile(
                         icon: Icons.notifications_none_rounded,
                         label: 'Neprocitane notifikacije',
-                        value:
-                            '${_notificationSummary?.unreadCount ?? 0}',
+                        value: '${_notificationSummary?.unreadCount ?? 0}',
                       ),
                     ],
                   ),
@@ -1982,7 +1968,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
-                _InfoRow(label: 'Korisnicko ime', value: '@${profile.username}'),
+                _InfoRow(
+                  label: 'Korisnicko ime',
+                  value: '@${profile.username}',
+                ),
                 _InfoRow(
                   label: 'Uloga',
                   value: profile.roles.map(MobileDisplay.roleLabel).join(', '),
@@ -2138,9 +2127,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Polazak ${_formatShortDate(flight.departureAtUtc)}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Wrap(
@@ -2193,20 +2181,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-enum _HomeMenuAction {
-  letovi,
-  rezervacije,
-  novosti,
-  profil,
-  podrska,
-  odjava,
-}
+enum _HomeMenuAction { letovi, rezervacije, novosti, profil, podrska, odjava }
 
 class _LabeledField extends StatelessWidget {
-  const _LabeledField({
-    required this.label,
-    required this.child,
-  });
+  const _LabeledField({required this.label, required this.child});
 
   final String label;
   final Widget child;
@@ -2218,9 +2196,9 @@ class _LabeledField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
         child,
@@ -2256,9 +2234,9 @@ class _HomeMenuItem extends StatelessWidget {
           child: Text(
             label,
             style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? theme.colorScheme.primary : null,
-                ),
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? theme.colorScheme.primary : null,
+            ),
           ),
         ),
       ],
@@ -2291,9 +2269,7 @@ class _ProfileActionButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          side: BorderSide(
-            color: theme.colorScheme.outlineVariant,
-          ),
+          side: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
         child: Row(
           children: [
@@ -2305,11 +2281,7 @@ class _ProfileActionButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               alignment: Alignment.center,
-              child: Icon(
-                icon,
-                size: 18,
-                color: theme.colorScheme.primary,
-              ),
+              child: Icon(icon, size: 18, color: theme.colorScheme.primary),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -2360,11 +2332,7 @@ class _ProfileInfoTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
-            child: Icon(
-              icon,
-              size: 18,
-              color: theme.colorScheme.primary,
-            ),
+            child: Icon(icon, size: 18, color: theme.colorScheme.primary),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -2378,10 +2346,7 @@ class _ProfileInfoTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: theme.textTheme.bodyLarge,
-                ),
+                Text(value, style: theme.textTheme.bodyLarge),
               ],
             ),
           ),
@@ -2392,10 +2357,7 @@ class _ProfileInfoTile extends StatelessWidget {
 }
 
 class _FlightOverlayBadge extends StatelessWidget {
-  const _FlightOverlayBadge({
-    required this.label,
-    required this.icon,
-  });
+  const _FlightOverlayBadge({required this.label, required this.icon});
 
   final String label;
   final IconData icon;
@@ -2416,9 +2378,9 @@ class _FlightOverlayBadge extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -2427,10 +2389,7 @@ class _FlightOverlayBadge extends StatelessWidget {
 }
 
 class _FlightFactChip extends StatelessWidget {
-  const _FlightFactChip({
-    required this.icon,
-    required this.label,
-  });
+  const _FlightFactChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -2448,16 +2407,9 @@ class _FlightFactChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 15,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall,
-          ),
+          Text(label, style: theme.textTheme.bodySmall),
         ],
       ),
     );
@@ -2501,8 +2453,8 @@ class _FlightTimeSummary extends StatelessWidget {
               Text(
                 middleLabel,
                 style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -2540,14 +2492,11 @@ class _FlightTimePoint extends StatelessWidget {
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: theme.textTheme.titleMedium,
-        ),
+        Text(value, style: theme.textTheme.titleMedium),
       ],
     );
   }
@@ -2619,10 +2568,7 @@ class _NotificationBadgeIcon extends StatelessWidget {
 }
 
 class _NewsImagePlaceholder extends StatelessWidget {
-  const _NewsImagePlaceholder({
-    required this.icon,
-    required this.message,
-  });
+  const _NewsImagePlaceholder({required this.icon, required this.message});
 
   final IconData icon;
   final String message;
@@ -2666,19 +2612,13 @@ class _StatusChip extends StatelessWidget {
         color: Theme.of(context).colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium,
-      ),
+      child: Text(label, style: Theme.of(context).textTheme.labelMedium),
     );
   }
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionHeader({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -2691,14 +2631,11 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
         const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
+        Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
       ],
     );
   }
@@ -2717,10 +2654,7 @@ class _InfoRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
+          Text(label, style: Theme.of(context).textTheme.labelMedium),
           const SizedBox(height: 4),
           Text(value, style: Theme.of(context).textTheme.bodyLarge),
         ],
