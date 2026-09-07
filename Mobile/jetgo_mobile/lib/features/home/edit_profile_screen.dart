@@ -33,6 +33,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _formErrorMessage;
   ApiException? _serverError;
 
+  String get _profileInitials {
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final firstInitial = firstName.isEmpty ? '' : firstName.substring(0, 1);
+    final lastInitial = lastName.isEmpty ? '' : lastName.substring(0, 1);
+    final initials = '$firstInitial$lastInitial'.trim().toUpperCase();
+
+    if (initials.isNotEmpty) {
+      return initials;
+    }
+
+    final username = widget.profile.username.trim();
+    return username.isEmpty ? '?' : username.substring(0, 1).toUpperCase();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -149,6 +164,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 _InlineFormError(message: _formErrorMessage!),
                 const SizedBox(height: 12),
               ],
+              ListenableBuilder(
+                listenable: _imageUrlController,
+                builder: (context, _) => _ProfileImagePreview(
+                  imageUrl: _imageUrlController.text.trim(),
+                  initials: _profileInitials,
+                ),
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _firstNameController,
                 maxLength: 100,
@@ -212,7 +235,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   hintText: 'Opcionalno',
                 ),
                 onChanged: (_) => _clearServerErrors(),
-                validator: (_) => _serverError?.fieldError('ImageUrl'),
+                validator: (value) {
+                  final serverError = _serverError?.fieldError('ImageUrl');
+                  if (serverError != null) {
+                    return serverError;
+                  }
+
+                  final trimmed = value?.trim() ?? '';
+                  if (trimmed.isEmpty) {
+                    return null;
+                  }
+
+                  final uri = Uri.tryParse(trimmed);
+                  final isSupported =
+                      uri != null &&
+                      (uri.scheme == 'http' || uri.scheme == 'https') &&
+                      uri.host.isNotEmpty;
+
+                  return isSupported
+                      ? null
+                      : 'URL slike mora poceti sa http:// ili https://.';
+                },
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
@@ -228,6 +271,91 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileImagePreview extends StatelessWidget {
+  const _ProfileImagePreview({required this.imageUrl, required this.initials});
+
+  final String imageUrl;
+  final String initials;
+
+  bool get _hasSupportedImageUrl {
+    final uri = Uri.tryParse(imageUrl);
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 96,
+                height: 96,
+                child: _hasSupportedImageUrl
+                    ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) {
+                            return child;
+                          }
+
+                          return const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildFallback(theme),
+                      )
+                    : _buildFallback(theme),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Slika profila', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text(
+                    _hasSupportedImageUrl
+                        ? 'Pregled odabrane slike'
+                        : 'Slika nije postavljena',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallback(ThemeData theme) {
+    return Container(
+      color: theme.colorScheme.surfaceContainerHighest,
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: theme.textTheme.headlineSmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

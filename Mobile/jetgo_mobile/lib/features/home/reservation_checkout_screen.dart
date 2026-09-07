@@ -54,6 +54,11 @@ class _ReservationCheckoutScreenState extends State<ReservationCheckoutScreen> {
       return;
     }
 
+    final confirmed = await _confirmReservationCreation();
+    if (!confirmed || !mounted) {
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -133,6 +138,31 @@ class _ReservationCheckoutScreenState extends State<ReservationCheckoutScreen> {
       widget.details.additionalBaggageUnitPrice * widget.additionalBaggageCount;
 
   double _reservationTotal() => _seatsTotal() + _baggageTotal();
+
+  Future<bool> _confirmReservationCreation() async {
+    final details = widget.details;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Potvrda rezervacije'),
+        content: Text(
+          'Kreirate rezervaciju za let ${MobileDisplay.flightNumberLabel(details.flightNumber)} sa sjedistima ${_passengerForms.map((item) => item.seatNumber).join(', ')}. Ukupna cijena je ${MobileDisplay.formatMoney(_reservationTotal(), details.currency)}. Nastaviti?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Kreiraj rezervaciju'),
+          ),
+        ],
+      ),
+    );
+
+    return confirmed == true;
+  }
 
   @override
   Widget build(BuildContext context) {

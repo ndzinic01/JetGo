@@ -214,6 +214,10 @@ public sealed class ReservationService : IReservationService
             throw new ForbiddenException("Nemate pravo pristupa trazenoj rezervaciji.");
         }
 
+        reservation.StatusChangedByUserDisplayName = await GetStatusChangedByDisplayNameAsync(
+            reservation.StatusChangedByUserId,
+            cancellationToken);
+
         return BuildVisibleReservationDetails(reservation, isAdmin);
     }
 
@@ -805,6 +809,7 @@ public sealed class ReservationService : IReservationService
                 CreatedAtUtc = x.CreatedAtUtc,
                 StatusChangedAtUtc = x.StatusChangedAtUtc,
                 StatusChangedByUserId = x.StatusChangedByUserId,
+                StatusChangedByUserDisplayName = null,
                 StatusReason = x.StatusReason,
                 Customer = new ReservationCustomerDto
                 {
@@ -1428,6 +1433,31 @@ public sealed class ReservationService : IReservationService
         return reservationStatus is ReservationStatus.Pending or ReservationStatus.Confirmed;
     }
 
+    private async Task<string?> GetStatusChangedByDisplayNameAsync(
+        string? userId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return null;
+        }
+
+        var profile = await _dbContext.UserProfiles.FindAsync(new object[] { userId }, cancellationToken);
+
+        if (profile is not null)
+        {
+            var fullName = string.Concat(profile.FirstName, ' ', profile.LastName).Trim();
+
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                return fullName;
+            }
+        }
+
+        var user = await _dbContext.Users.FindAsync(new object[] { userId }, cancellationToken);
+        return string.IsNullOrWhiteSpace(user?.UserName) ? null : user.UserName;
+    }
+
     private ReservationDetailsDto BuildVisibleReservationDetails(ReservationDetailsDto reservation, bool isAdmin)
     {
         var nowUtc = DateTime.UtcNow;
@@ -1468,6 +1498,7 @@ public sealed class ReservationService : IReservationService
             CreatedAtUtc = reservation.CreatedAtUtc,
             StatusChangedAtUtc = reservation.StatusChangedAtUtc,
             StatusChangedByUserId = reservation.StatusChangedByUserId,
+            StatusChangedByUserDisplayName = reservation.StatusChangedByUserDisplayName,
             StatusReason = GetDisplayStatusReason(reservation.Status, actualStatus, reservation.StatusReason),
             Customer = reservation.Customer,
             Seats = reservation.Seats,

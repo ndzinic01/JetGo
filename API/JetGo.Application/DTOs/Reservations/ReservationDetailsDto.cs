@@ -59,6 +59,8 @@ public sealed class ReservationDetailsDto
 
     public string? StatusChangedByUserId { get; init; }
 
+    public string? StatusChangedByUserDisplayName { get; set; }
+
     public string? StatusReason { get; init; }
 
     public ReservationCustomerDto Customer { get; init; } = new();

@@ -759,7 +759,7 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                   ),
                   _DetailsRow(
                     'Promijenio korisnik',
-                    details.statusChangedByUserId ?? '-',
+                    _statusChangedByLabel(details),
                   ),
                   _DetailsRow(
                     'Napomena',
@@ -794,6 +794,15 @@ class _ReservationsSectionState extends State<ReservationsSection> {
       return item.isPaid ? 'Placeno' : '-';
     }
     return item.paymentStatus!.label;
+  }
+
+  String _statusChangedByLabel(ReservationDetails details) {
+    final displayName = details.statusChangedByUserDisplayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+
+    return '-';
   }
 
   String _compactBaggageLabel(int count) {

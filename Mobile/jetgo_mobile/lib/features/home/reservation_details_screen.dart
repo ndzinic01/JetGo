@@ -505,7 +505,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                       onPressed: _isPaymentSubmitting
                           ? null
                           : hasApprovalUrl
-                          ? () => _openApprovalUrl(approvalUrl)
+                          ? () => _openApprovalUrlWithConfirmation(
+                              details,
+                              approvalUrl,
+                            )
                           : () => _initializePayment(details),
                       icon: _isPaymentSubmitting
                           ? const SizedBox(
@@ -527,7 +530,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                     OutlinedButton.icon(
                       onPressed: _isPaymentSubmitting
                           ? null
-                          : () => _confirmPayment(effectivePaymentId),
+                          : () => _confirmPayment(details, effectivePaymentId),
                       icon: const Icon(Icons.verified_rounded),
                       label: const Text('2. Zavrsi placanje'),
                     ),
@@ -659,7 +662,62 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         paymentStatus == MobilePaymentStatus.pending;
   }
 
+  Future<bool> _confirmPaymentAction({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Odustani'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+
+    return confirmed == true;
+  }
+
+  Future<void> _openApprovalUrlWithConfirmation(
+    MobileReservationDetails details,
+    String approvalUrl,
+  ) async {
+    final confirmed = await _confirmPaymentAction(
+      title: 'Potvrda placanja',
+      message:
+          'Otvarate PayPal placanje za rezervaciju ${details.reservationCode} u iznosu ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}. Nastaviti?',
+      confirmLabel: 'Otvori PayPal',
+    );
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
+    await _openApprovalUrl(approvalUrl);
+  }
+
   Future<void> _initializePayment(MobileReservationDetails details) async {
+    final confirmed = await _confirmPaymentAction(
+      title: 'Pokreni PayPal placanje',
+      message:
+          'Pokrecete PayPal placanje za rezervaciju ${details.reservationCode} u iznosu ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}. Nastaviti?',
+      confirmLabel: 'Nastavi na PayPal',
+    );
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
     setState(() {
       _isPaymentSubmitting = true;
     });
@@ -723,7 +781,21 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     }
   }
 
-  Future<void> _confirmPayment(int paymentId) async {
+  Future<void> _confirmPayment(
+    MobileReservationDetails details,
+    int paymentId,
+  ) async {
+    final confirmed = await _confirmPaymentAction(
+      title: 'Zavrsi placanje',
+      message:
+          'Potvrdite zavrsetak placanja samo ako ste PayPal odobrenje zavrsili za rezervaciju ${details.reservationCode}. Backend ce provjeriti uplatu i evidentirati status.',
+      confirmLabel: 'Zavrsi placanje',
+    );
+
+    if (!confirmed || !mounted) {
+      return;
+    }
+
     setState(() {
       _isPaymentSubmitting = true;
     });

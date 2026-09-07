@@ -90,6 +90,7 @@ class ReservationDetails {
     required this.createdAtUtc,
     required this.statusChangedAtUtc,
     required this.statusChangedByUserId,
+    required this.statusChangedByUserDisplayName,
     required this.statusReason,
     required this.customer,
     required this.seats,
@@ -126,6 +127,7 @@ class ReservationDetails {
   final DateTime createdAtUtc;
   final DateTime? statusChangedAtUtc;
   final String? statusChangedByUserId;
+  final String? statusChangedByUserDisplayName;
   final String? statusReason;
   final ReservationCustomer customer;
   final List<ReservationSeat> seats;
@@ -169,6 +171,8 @@ class ReservationDetails {
           ? null
           : DateTime.parse(json['statusChangedAtUtc'] as String),
       statusChangedByUserId: json['statusChangedByUserId'] as String?,
+      statusChangedByUserDisplayName:
+          json['statusChangedByUserDisplayName'] as String?,
       statusReason: json['statusReason'] as String?,
       customer: ReservationCustomer.fromJson(
         json['customer'] as Map<String, dynamic>? ?? const {},
