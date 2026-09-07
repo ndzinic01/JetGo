@@ -343,6 +343,60 @@ class MobileReservationSeat {
   }
 }
 
+class MobileReservationPassengerInput {
+  MobileReservationPassengerInput({
+    required this.seatNumber,
+    required this.firstName,
+    required this.lastName,
+    required this.gender,
+    required this.passportNumber,
+  });
+
+  final String seatNumber;
+  final String firstName;
+  final String lastName;
+  final int gender;
+  final String passportNumber;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'seatNumber': seatNumber,
+      'firstName': firstName,
+      'lastName': lastName,
+      'gender': gender,
+      'passportNumber': passportNumber,
+    };
+  }
+}
+
+class MobileReservationPassenger {
+  MobileReservationPassenger({
+    required this.seatNumber,
+    required this.firstName,
+    required this.lastName,
+    required this.gender,
+    required this.passportNumber,
+  });
+
+  final String seatNumber;
+  final String firstName;
+  final String lastName;
+  final int gender;
+  final String passportNumber;
+
+  String get fullName => '$firstName $lastName'.trim();
+
+  factory MobileReservationPassenger.fromJson(Map<String, dynamic> json) {
+    return MobileReservationPassenger(
+      seatNumber: json['seatNumber'] as String? ?? '',
+      firstName: json['firstName'] as String? ?? '',
+      lastName: json['lastName'] as String? ?? '',
+      gender: json['gender'] as int? ?? PassengerGender.other,
+      passportNumber: json['passportNumber'] as String? ?? '',
+    );
+  }
+}
+
 class MobileReservationDetails {
   MobileReservationDetails({
     required this.id,
@@ -365,6 +419,7 @@ class MobileReservationDetails {
     required this.createdAtUtc,
     required this.customer,
     required this.seats,
+    required this.passengers,
     required this.canBeCancelled,
     required this.canBeConfirmed,
     required this.canBeCompleted,
@@ -403,6 +458,7 @@ class MobileReservationDetails {
   final String? statusReason;
   final MobileReservationCustomer customer;
   final List<MobileReservationSeat> seats;
+  final List<MobileReservationPassenger> passengers;
   final bool canBeCancelled;
   final bool canBeConfirmed;
   final bool canBeCompleted;
@@ -446,6 +502,13 @@ class MobileReservationDetails {
           .map(
             (item) =>
                 MobileReservationSeat.fromJson(item as Map<String, dynamic>),
+          )
+          .toList(),
+      passengers: ((json['passengers'] as List<dynamic>?) ?? const [])
+          .map(
+            (item) => MobileReservationPassenger.fromJson(
+              item as Map<String, dynamic>,
+            ),
           )
           .toList(),
       canBeCancelled: json['canBeCancelled'] as bool? ?? false,

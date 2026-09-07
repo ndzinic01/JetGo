@@ -27,6 +27,7 @@ public sealed class JetGoDbContext : IdentityDbContext<AppUser, IdentityRole, st
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReservationItem> ReservationItems => Set<ReservationItem>();
+    public DbSet<ReservationPassenger> ReservationPassengers => Set<ReservationPassenger>();
     public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
     public DbSet<SearchHistory> SearchHistories => Set<SearchHistory>();
     public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();

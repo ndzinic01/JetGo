@@ -27,3 +27,9 @@ abstract final class MobileNotificationStatus {
   static const int unread = 1;
   static const int read = 2;
 }
+
+abstract final class PassengerGender {
+  static const int male = 1;
+  static const int female = 2;
+  static const int other = 3;
+}

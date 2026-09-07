@@ -4,7 +4,7 @@ import '../../core/network/api_exception.dart';
 import 'mobile_data_service.dart';
 import 'mobile_display.dart';
 import 'mobile_models.dart';
-import 'reservation_details_screen.dart';
+import 'reservation_checkout_screen.dart';
 
 class FlightDetailsScreen extends StatefulWidget {
   const FlightDetailsScreen({
@@ -91,59 +91,23 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen> {
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    try {
-      final reservation = await _dataService.createReservation(
-        token: widget.token,
-        flightId: details.id,
-        seatNumbers: _selectedSeats.toList()..sort(),
-        additionalBaggageCount: _additionalBaggageCount,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rezervacija je uspjesno kreirana.')),
-      );
-
-      await Navigator.of(context).pushReplacement<bool, bool>(
-        MaterialPageRoute<bool>(
-          builder: (_) => ReservationDetailsScreen(
-            token: widget.token,
-            reservationId: reservation.id,
-            markDirtyOnPop: true,
-          ),
+    final shouldRefresh = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ReservationCheckoutScreen(
+          token: widget.token,
+          details: details,
+          selectedSeats: _selectedSeats.toList()..sort(),
+          additionalBaggageCount: _additionalBaggageCount,
         ),
-      );
-    } on ApiException catch (error) {
-      if (!mounted) {
-        return;
-      }
+      ),
+    );
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.message)));
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
+    if (!mounted) {
+      return;
+    }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Rezervaciju trenutno nije moguce kreirati.'),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
+    if (shouldRefresh == true) {
+      Navigator.of(context).pop(true);
     }
   }
 

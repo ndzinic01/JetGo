@@ -92,6 +92,7 @@ class MobileDataService {
     required int flightId,
     required List<String> seatNumbers,
     required int additionalBaggageCount,
+    required List<MobileReservationPassengerInput> passengers,
   }) async {
     final response = await _apiClient.postJson(
       '/api/Reservations',
@@ -100,6 +101,7 @@ class MobileDataService {
         'flightId': flightId,
         'seatNumbers': seatNumbers,
         'additionalBaggageCount': additionalBaggageCount,
+        'passengers': passengers.map((item) => item.toJson()).toList(),
       },
     );
 

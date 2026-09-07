@@ -14,4 +14,9 @@ public sealed class CreateReservationRequest
 
     [Range(0, 6, ErrorMessage = "Dodatni prtljag mora biti izmedju 0 i 6 komada.")]
     public int AdditionalBaggageCount { get; init; }
+
+    [Required(ErrorMessage = "Podaci putnika su obavezni.")]
+    [MinLength(1, ErrorMessage = "Morate unijeti podatke za najmanje jednog putnika.")]
+    [MaxLength(6, ErrorMessage = "Maksimalno je dozvoljeno 6 putnika po rezervaciji.")]
+    public ReservationPassengerRequest[] Passengers { get; init; } = Array.Empty<ReservationPassengerRequest>();
 }

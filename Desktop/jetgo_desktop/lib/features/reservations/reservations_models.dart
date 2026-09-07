@@ -93,6 +93,7 @@ class ReservationDetails {
     required this.statusReason,
     required this.customer,
     required this.seats,
+    required this.passengers,
     required this.canBeCancelled,
     required this.canBeConfirmed,
     required this.canBeCompleted,
@@ -128,6 +129,7 @@ class ReservationDetails {
   final String? statusReason;
   final ReservationCustomer customer;
   final List<ReservationSeat> seats;
+  final List<ReservationPassenger> passengers;
   final bool canBeCancelled;
   final bool canBeConfirmed;
   final bool canBeCompleted;
@@ -173,6 +175,12 @@ class ReservationDetails {
       ),
       seats: (json['seats'] as List<dynamic>? ?? const [])
           .map((item) => ReservationSeat.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      passengers: (json['passengers'] as List<dynamic>? ?? const [])
+          .map(
+            (item) =>
+                ReservationPassenger.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
       canBeCancelled: json['canBeCancelled'] as bool? ?? false,
       canBeConfirmed: json['canBeConfirmed'] as bool? ?? false,
@@ -224,6 +232,34 @@ class ReservationSeat {
       flightSeatId: json['flightSeatId'] as int? ?? 0,
       seatNumber: json['seatNumber'] as String? ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+class ReservationPassenger {
+  ReservationPassenger({
+    required this.seatNumber,
+    required this.firstName,
+    required this.lastName,
+    required this.gender,
+    required this.passportNumber,
+  });
+
+  final String seatNumber;
+  final String firstName;
+  final String lastName;
+  final int gender;
+  final String passportNumber;
+
+  String get fullName => '$firstName $lastName'.trim();
+
+  factory ReservationPassenger.fromJson(Map<String, dynamic> json) {
+    return ReservationPassenger(
+      seatNumber: json['seatNumber'] as String? ?? '',
+      firstName: json['firstName'] as String? ?? '',
+      lastName: json['lastName'] as String? ?? '',
+      gender: json['gender'] as int? ?? 3,
+      passportNumber: json['passportNumber'] as String? ?? '',
     );
   }
 }

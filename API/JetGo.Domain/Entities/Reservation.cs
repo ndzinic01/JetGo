@@ -33,5 +33,7 @@ public sealed class Reservation : AuditableEntity
 
     public ICollection<ReservationItem> Items { get; set; } = new List<ReservationItem>();
 
+    public ICollection<ReservationPassenger> Passengers { get; set; } = new List<ReservationPassenger>();
+
     public Payment? Payment { get; set; }
 }

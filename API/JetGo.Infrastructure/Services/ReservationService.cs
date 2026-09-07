@@ -59,6 +59,7 @@ public sealed class ReservationService : IReservationService
         var nowUtc = DateTime.UtcNow;
         await _reservationStatusSyncService.SyncCompletedReservationsAsync(nowUtc, cancellationToken);
         var normalizedSeatNumbers = NormalizeSeatNumbers(request.SeatNumbers);
+        var passengers = NormalizePassengers(request.Passengers, normalizedSeatNumbers);
 
         var flight = await _dbContext.Flights
             .Include(x => x.Airline)
@@ -147,6 +148,18 @@ public sealed class ReservationService : IReservationService
             seat.IsReserved = true;
         }
 
+        foreach (var passenger in passengers)
+        {
+            reservation.Passengers.Add(new ReservationPassenger
+            {
+                SeatNumber = passenger.SeatNumber,
+                FirstName = passenger.FirstName,
+                LastName = passenger.LastName,
+                Gender = passenger.Gender,
+                PassportNumber = passenger.PassportNumber
+            });
+        }
+
         flight.AvailableSeats -= selectedSeats.Count;
 
         await _dbContext.Reservations.AddAsync(reservation, cancellationToken);
@@ -223,6 +236,7 @@ public sealed class ReservationService : IReservationService
                 .ThenInclude(x => x!.Transactions)
             .Include(x => x.Items)
                 .ThenInclude(x => x.FlightSeat)
+            .Include(x => x.Passengers)
             .Include(x => x.Flight)
                 .ThenInclude(x => x.Airline)
             .Include(x => x.Flight)
@@ -249,6 +263,7 @@ public sealed class ReservationService : IReservationService
         ValidateTargetFlightForChange(reservation, targetFlight, nowUtc);
 
         var selectedSeats = GetSelectedSeatsForChange(reservation, targetFlight, normalizedSeatNumbers);
+        EnsurePassengerCountMatchesSeatChange(reservation, selectedSeats.Count);
         var previousFlightNumber = reservation.Flight.FlightNumber;
         var previousTotalAmount = reservation.TotalAmount;
         var newBaggageTotalAmount = CalculateAdditionalBaggageTotal(request.AdditionalBaggageCount);
@@ -543,6 +558,7 @@ public sealed class ReservationService : IReservationService
                 .ThenInclude(x => x!.Transactions)
             .Include(x => x.Items)
                 .ThenInclude(x => x.FlightSeat)
+            .Include(x => x.Passengers)
             .Include(x => x.Flight)
                 .ThenInclude(x => x.Airline)
             .Include(x => x.Flight)
@@ -814,6 +830,17 @@ public sealed class ReservationService : IReservationService
                         SeatNumber = i.FlightSeat.SeatNumber,
                         Price = i.Price
                     })
+                    .ToArray(),
+                Passengers = x.Passengers
+                    .OrderBy(p => p.SeatNumber)
+                    .Select(p => new ReservationPassengerDto
+                    {
+                        SeatNumber = p.SeatNumber,
+                        FirstName = p.FirstName,
+                        LastName = p.LastName,
+                        Gender = p.Gender,
+                        PassportNumber = p.PassportNumber
+                    })
                     .ToArray()
             });
     }
@@ -952,6 +979,7 @@ public sealed class ReservationService : IReservationService
             seat.IsReserved = true;
         }
 
+        AlignPassengerSeatsForChange(reservation, selectedSeats);
         targetFlight.AvailableSeats = Math.Max(0, targetFlight.AvailableSeats - selectedSeats.Count);
         reservation.FlightId = targetFlight.Id;
         reservation.Flight = targetFlight;
@@ -1163,6 +1191,191 @@ public sealed class ReservationService : IReservationService
         return normalized;
     }
 
+    private static NormalizedPassenger[] NormalizePassengers(
+        IEnumerable<ReservationPassengerRequest>? passengers,
+        IReadOnlyCollection<string> selectedSeatNumbers)
+    {
+        var passengerItems = passengers?.ToArray() ?? [];
+
+        if (passengerItems.Length != selectedSeatNumbers.Count)
+        {
+            throw new ValidationException(
+                "Podaci putnika nisu uskladjeni sa odabranim sjedistima.",
+                new Dictionary<string, string[]>
+                {
+                    ["passengers"] = ["Za svako odabrano sjediste morate unijeti tacno jednog putnika."]
+                });
+        }
+
+        var selectedSeatSet = selectedSeatNumbers.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var seenSeatNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var normalized = new List<NormalizedPassenger>();
+
+        foreach (var passenger in passengerItems)
+        {
+            var seatNumber = NormalizePassengerSeatNumber(passenger.SeatNumber);
+
+            if (!selectedSeatSet.Contains(seatNumber))
+            {
+                throw new ValidationException(
+                    "Podaci putnika nisu uskladjeni sa odabranim sjedistima.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["passengers"] = ["Putnik mora biti vezan za jedno od odabranih sjedista."]
+                    });
+            }
+
+            if (!seenSeatNumbers.Add(seatNumber))
+            {
+                throw new ValidationException(
+                    "Podaci putnika nisu uskladjeni sa odabranim sjedistima.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["passengers"] = ["Isto sjediste ne moze imati vise putnika."]
+                    });
+            }
+
+            if (!Enum.IsDefined(passenger.Gender))
+            {
+                throw new ValidationException(
+                    "Spol putnika nije validan.",
+                    new Dictionary<string, string[]>
+                    {
+                        ["passengers.gender"] = ["Odaberite jednu od ponudjenih vrijednosti za spol putnika."]
+                    });
+            }
+
+            normalized.Add(new NormalizedPassenger(
+                seatNumber,
+                NormalizePassengerName(passenger.FirstName, "firstName", "Ime putnika"),
+                NormalizePassengerName(passenger.LastName, "lastName", "Prezime putnika"),
+                passenger.Gender,
+                NormalizePassportNumber(passenger.PassportNumber)));
+        }
+
+        if (!selectedSeatSet.SetEquals(seenSeatNumbers))
+        {
+            throw new ValidationException(
+                "Podaci putnika nisu uskladjeni sa odabranim sjedistima.",
+                new Dictionary<string, string[]>
+                {
+                    ["passengers"] = ["Za svako odabrano sjediste morate unijeti podatke putnika."]
+                });
+        }
+
+        return normalized
+            .OrderBy(x => x.SeatNumber, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string NormalizePassengerSeatNumber(string? value)
+    {
+        var normalized = value?.Trim().ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new ValidationException(
+                "Sjediste putnika je obavezno.",
+                new Dictionary<string, string[]>
+                {
+                    ["passengers"] = ["Svaki putnik mora biti povezan sa odabranim sjedistem."]
+                });
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizePassengerName(string? value, string key, string label)
+    {
+        var normalized = value?.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new ValidationException(
+                $"{label} je obavezno.",
+                new Dictionary<string, string[]>
+                {
+                    [$"passengers.{key}"] = [$"{label} je obavezno polje."]
+                });
+        }
+
+        if (normalized.Length is < 2 or > 50 || normalized.Any(IsInvalidPassengerNameCharacter))
+        {
+            throw new ValidationException(
+                $"{label} nije validno.",
+                new Dictionary<string, string[]>
+                {
+                    [$"passengers.{key}"] = [$"{label} mora imati 2-50 karaktera i smije sadrzavati samo slova, razmake, crticu i apostrof."]
+                });
+        }
+
+        return normalized;
+    }
+
+    private static bool IsInvalidPassengerNameCharacter(char value)
+    {
+        return !char.IsLetter(value) && value is not ' ' and not '-' and not '\'';
+    }
+
+    private static string NormalizePassportNumber(string? value)
+    {
+        var normalized = value?.Trim().ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new ValidationException(
+                "Broj pasosa je obavezan.",
+                new Dictionary<string, string[]>
+                {
+                    ["passengers.passportNumber"] = ["Broj pasosa je obavezno polje."]
+                });
+        }
+
+        if (normalized.Length is < 6 or > 20 || normalized.Any(x => !char.IsLetterOrDigit(x)))
+        {
+            throw new ValidationException(
+                "Broj pasosa nije validan.",
+                new Dictionary<string, string[]>
+                {
+                    ["passengers.passportNumber"] = ["Broj pasosa mora imati 6-20 karaktera i smije sadrzavati samo slova i brojeve."]
+                });
+        }
+
+        return normalized;
+    }
+
+    private static void EnsurePassengerCountMatchesSeatChange(Reservation reservation, int selectedSeatCount)
+    {
+        if (reservation.Passengers.Count == 0 || reservation.Passengers.Count == selectedSeatCount)
+        {
+            return;
+        }
+
+        throw new ConflictException("Broj sjedista nije moguce promijeniti jer rezervacija vec ima evidentirane putnike. Odaberite isti broj sjedista ili kreirajte novu rezervaciju.");
+    }
+
+    private static void AlignPassengerSeatsForChange(Reservation reservation, IReadOnlyCollection<FlightSeat> selectedSeats)
+    {
+        if (reservation.Passengers.Count == 0)
+        {
+            return;
+        }
+
+        var seatNumbers = selectedSeats
+            .Select(x => x.SeatNumber)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var passengers = reservation.Passengers
+            .OrderBy(x => x.SeatNumber, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        for (var index = 0; index < passengers.Length && index < seatNumbers.Length; index++)
+        {
+            passengers[index].SeatNumber = seatNumbers[index];
+        }
+    }
+
+
     private static string GenerateReservationCode()
     {
         return $"RSV-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..28].ToUpperInvariant();
@@ -1258,6 +1471,7 @@ public sealed class ReservationService : IReservationService
             StatusReason = GetDisplayStatusReason(reservation.Status, actualStatus, reservation.StatusReason),
             Customer = reservation.Customer,
             Seats = reservation.Seats,
+            Passengers = reservation.Passengers,
             CanBeCancelled = CanCancelReservation(
                 actualStatus,
                 flightAllowsUserActions,
@@ -1353,4 +1567,11 @@ public sealed class ReservationService : IReservationService
     }
 
     private readonly record struct ProviderPricing(decimal Amount, string CurrencyCode);
+
+    private sealed record NormalizedPassenger(
+        string SeatNumber,
+        string FirstName,
+        string LastName,
+        PassengerGender Gender,
+        string PassportNumber);
 }

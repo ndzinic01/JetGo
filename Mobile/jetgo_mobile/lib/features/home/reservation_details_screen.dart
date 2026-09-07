@@ -238,6 +238,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
           ],
           const SizedBox(height: 12),
           _buildPricingCard(context, details),
+          if (details.passengers.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildPassengersCard(context, details),
+          ],
           const SizedBox(height: 12),
           Card(
             child: Padding(
@@ -246,7 +250,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Putnik',
+                    'Korisnicki nalog',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
@@ -311,6 +315,54 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildPassengersCard(
+    BuildContext context,
+    MobileReservationDetails details,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Putnici', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ...details.passengers.map(
+              (passenger) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(radius: 18, child: Text(passenger.seatNumber)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            passenger.fullName.isEmpty
+                                ? 'Putnik'
+                                : passenger.fullName,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${MobileDisplay.passengerGenderLabel(passenger.gender)} | Pasos: ${passenger.passportNumber}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -704,6 +704,20 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                 ],
               ),
               const SizedBox(height: 16),
+              if (details.passengers.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _DetailsBlock(
+                  title: 'Putnici',
+                  rows: details.passengers
+                      .map(
+                        (passenger) => _DetailsRow(
+                          passenger.seatNumber,
+                          '${passenger.fullName.isEmpty ? 'Putnik' : passenger.fullName} | ${_passengerGenderLabel(passenger.gender)} | Pasos: ${passenger.passportNumber}',
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
               _DetailsBlock(
                 title: 'Placanje',
                 rows: [
@@ -760,6 +774,19 @@ class _ReservationsSectionState extends State<ReservationsSection> {
         ),
       ],
     );
+  }
+
+  String _passengerGenderLabel(int gender) {
+    switch (gender) {
+      case 1:
+        return 'Musko';
+      case 2:
+        return 'Zensko';
+      case 3:
+        return 'Drugo';
+      default:
+        return 'Nije navedeno';
+    }
   }
 
   String _paymentSummary(ReservationItem item) {

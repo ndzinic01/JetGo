@@ -65,6 +65,8 @@ public sealed class ReservationDetailsDto
 
     public IReadOnlyCollection<ReservationSeatDto> Seats { get; init; } = Array.Empty<ReservationSeatDto>();
 
+    public IReadOnlyCollection<ReservationPassengerDto> Passengers { get; init; } = Array.Empty<ReservationPassengerDto>();
+
     public bool CanBeCancelled { get; set; }
 
     public bool CanBeConfirmed { get; set; }

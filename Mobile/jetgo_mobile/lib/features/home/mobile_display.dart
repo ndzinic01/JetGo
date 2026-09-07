@@ -63,6 +63,19 @@ class MobileDisplay {
     }
   }
 
+  static String passengerGenderLabel(int? gender) {
+    switch (gender) {
+      case PassengerGender.male:
+        return 'Musko';
+      case PassengerGender.female:
+        return 'Zensko';
+      case PassengerGender.other:
+        return 'Drugo';
+      default:
+        return 'Nije navedeno';
+    }
+  }
+
   static String paymentStatusLabel(int? status) {
     switch (status) {
       case MobilePaymentStatus.pending:
