@@ -18,11 +18,11 @@ class DownloadedFileResponse {
 }
 
 class ApiClient {
+  static void Function()? onUnauthorized;
+
   static const Duration _requestTimeout = Duration(seconds: 20);
 
-  ApiClient()
-      : _httpClient = HttpClient()
-          ..connectionTimeout = _requestTimeout;
+  ApiClient() : _httpClient = HttpClient()..connectionTimeout = _requestTimeout;
 
   final HttpClient _httpClient;
 
@@ -71,12 +71,7 @@ class ApiClient {
     String? token,
     Map<String, dynamic>? body,
   }) async {
-    final data = await _send(
-      'POST',
-      path,
-      token: token,
-      body: body,
-    );
+    final data = await _send('POST', path, token: token, body: body);
 
     if (data is Map<String, dynamic>) {
       return data;
@@ -90,12 +85,7 @@ class ApiClient {
     String? token,
     Map<String, dynamic>? body,
   }) async {
-    final data = await _send(
-      'PUT',
-      path,
-      token: token,
-      body: body,
-    );
+    final data = await _send('PUT', path, token: token, body: body);
 
     if (data is Map<String, dynamic>) {
       return data;
@@ -104,15 +94,8 @@ class ApiClient {
     return <String, dynamic>{};
   }
 
-  Future<Map<String, dynamic>> delete(
-    String path, {
-    String? token,
-  }) async {
-    final data = await _send(
-      'DELETE',
-      path,
-      token: token,
-    );
+  Future<Map<String, dynamic>> delete(String path, {String? token}) async {
+    final data = await _send('DELETE', path, token: token);
 
     if (data is Map<String, dynamic>) {
       return data;
@@ -148,12 +131,12 @@ class ApiClient {
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final responseBody = utf8.decode(bytes, allowMalformed: true);
+        _notifyUnauthorizedIfNeeded(response.statusCode);
         throw _buildApiException(response.statusCode, responseBody);
       }
 
       final contentDisposition = response.headers.value('content-disposition');
-      final fileName =
-          _extractFileName(contentDisposition) ?? fallbackFileName;
+      final fileName = _extractFileName(contentDisposition) ?? fallbackFileName;
       final contentType =
           response.headers.contentType?.mimeType ?? 'application/octet-stream';
 
@@ -213,6 +196,7 @@ class ApiClient {
           .timeout(_requestTimeout);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        _notifyUnauthorizedIfNeeded(response.statusCode);
         throw _buildApiException(response.statusCode, responseBody);
       }
 
@@ -261,12 +245,19 @@ class ApiClient {
     );
   }
 
+  void _notifyUnauthorizedIfNeeded(int statusCode) {
+    if (statusCode == HttpStatus.unauthorized) {
+      onUnauthorized?.call();
+    }
+  }
+
   ApiException _buildApiException(int statusCode, String responseBody) {
     try {
       final decoded = jsonDecode(responseBody);
 
       if (decoded is Map<String, dynamic>) {
-        final baseMessage = (decoded['message'] as String?) ??
+        final baseMessage =
+            (decoded['message'] as String?) ??
             'Server je vratio gresku bez poruke.';
         final errors = decoded['errors'] as Map<String, dynamic>?;
 
@@ -299,10 +290,7 @@ class ApiClient {
     }
   }
 
-  String _composeUserMessage(
-    String baseMessage,
-    Map<String, dynamic>? errors,
-  ) {
+  String _composeUserMessage(String baseMessage, Map<String, dynamic>? errors) {
     final details = _extractErrorDetails(errors);
     if (details.isEmpty) {
       return baseMessage;

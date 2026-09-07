@@ -12,10 +12,7 @@ class AuthService {
   }) async {
     final response = await _apiClient.postJson(
       '/api/Auth/login',
-      body: <String, dynamic>{
-        'username': username,
-        'password': password,
-      },
+      body: <String, dynamic>{'username': username, 'password': password},
     );
 
     return AuthSession.fromJson(response);
@@ -26,9 +23,7 @@ class AuthService {
   }) async {
     final response = await _apiClient.postJson(
       '/api/Auth/request-password-reset',
-      body: <String, dynamic>{
-        'email': email,
-      },
+      body: <String, dynamic>{'email': email},
     );
 
     return PasswordResetRequestResult.fromJson(response);
@@ -49,5 +44,9 @@ class AuthService {
         'confirmPassword': confirmPassword,
       },
     );
+  }
+
+  Future<void> logout({required String token}) async {
+    await _apiClient.postJson('/api/Auth/logout', token: token);
   }
 }

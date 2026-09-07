@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/network/api_exception.dart';
+import '../../core/network/api_client.dart';
 import 'auth_models.dart';
 import 'auth_service.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._authService);
+  AuthController(this._authService) {
+    ApiClient.onUnauthorized = _handleUnauthorized;
+  }
 
   final AuthService _authService;
 
@@ -66,8 +69,7 @@ class AuthController extends ChangeNotifier {
       _errorMessage = error.message;
       return null;
     } catch (_) {
-      _errorMessage =
-          'Reset lozinke trenutno nije dostupan. Pokusajte ponovo.';
+      _errorMessage = 'Reset lozinke trenutno nije dostupan. Pokusajte ponovo.';
       return null;
     } finally {
       _isLoading = false;
@@ -97,8 +99,7 @@ class AuthController extends ChangeNotifier {
       _errorMessage = error.message;
       return false;
     } catch (_) {
-      _errorMessage =
-          'Reset lozinke trenutno nije dostupan. Pokusajte ponovo.';
+      _errorMessage = 'Reset lozinke trenutno nije dostupan. Pokusajte ponovo.';
       return false;
     } finally {
       _isLoading = false;
@@ -106,10 +107,18 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  void logout() {
-    _session = null;
-    _errorMessage = null;
-    notifyListeners();
+  Future<void> logout() async {
+    final token = _session?.accessToken;
+
+    try {
+      if (token != null && token.isNotEmpty) {
+        await _authService.logout(token: token);
+      }
+    } catch (_) {
+      // Local logout must still happen if the server cannot be reached.
+    } finally {
+      _clearSession();
+    }
   }
 
   void updateCurrentUser({
@@ -133,5 +142,27 @@ class AuthController extends ChangeNotifier {
     );
 
     notifyListeners();
+  }
+
+  void _handleUnauthorized() {
+    if (_session == null) {
+      return;
+    }
+
+    _clearSession(
+      message: 'Sesija je istekla ili vise nije vazeca. Prijavite se ponovo.',
+    );
+  }
+
+  void _clearSession({String? message}) {
+    _session = null;
+    _errorMessage = message;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    ApiClient.onUnauthorized = null;
+    super.dispose();
   }
 }
