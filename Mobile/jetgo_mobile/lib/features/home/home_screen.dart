@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -41,12 +41,15 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool _isLoading = true;
   bool _isLoadingMore = false;
+  bool _isLoadingMoreReturnFlights = false;
   String? _errorMessage;
 
   PagedResult<MobileFlight>? _flightPage;
+  PagedResult<MobileFlight>? _returnFlightPage;
   PagedResult<MobileReservation>? _reservationPage;
   PagedResult<NewsArticleSummary>? _newsPage;
   List<MobileFlight> _flights = const [];
+  List<MobileFlight> _returnFlights = const [];
   List<AirlineSummary> _airlineOptions = const [];
   List<MobileRecommendedFlight> _recommendedFlights = const [];
   List<MobileReservation> _reservations = const [];
@@ -54,9 +57,10 @@ class _HomeScreenState extends State<HomeScreen> {
   MobileProfile? _profile;
   MobileNotificationSummary? _notificationSummary;
   String? _recommendationsErrorMessage;
-  DateTime? _departureFromDate;
-  DateTime? _departureToDate;
+  DateTime? _departureDate;
+  DateTime? _returnDate;
   String? _selectedAirlineCode;
+  _TripType _tripType = _TripType.oneWay;
 
   String get _token => widget.authController.session?.accessToken ?? '';
 
@@ -111,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isLoading = true;
       _isLoadingMore = false;
+      _isLoadingMoreReturnFlights = false;
       _errorMessage = null;
     });
 
@@ -118,9 +123,19 @@ class _HomeScreenState extends State<HomeScreen> {
       switch (_currentIndex) {
         case 0:
           final flights = await _fetchFlightsPage(1);
+          PagedResult<MobileFlight>? returnFlights;
+          if (_shouldLoadReturnFlights) {
+            returnFlights = await _fetchReturnFlightsPage(1);
+          }
+
           _flightPage = flights;
           _flights = flights.items;
-          _airlineOptions = _mergeAirlineOptions(flights.items);
+          _returnFlightPage = returnFlights;
+          _returnFlights = returnFlights?.items ?? const [];
+          _airlineOptions = _mergeAirlineOptions([
+            ...flights.items,
+            ..._returnFlights,
+          ]);
           unawaited(_loadRecommendations());
           break;
         case 1:
@@ -243,17 +258,37 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<PagedResult<MobileFlight>> _fetchFlightsPage(int page) {
+    return _fetchTripFlightsPage(page, isReturnSegment: false);
+  }
+
+  Future<PagedResult<MobileFlight>> _fetchReturnFlightsPage(int page) {
+    return _fetchTripFlightsPage(page, isReturnSegment: true);
+  }
+
+  Future<PagedResult<MobileFlight>> _fetchTripFlightsPage(
+    int page, {
+    required bool isReturnSegment,
+  }) {
+    final tripDate = isReturnSegment ? _returnDate : _departureDate;
+
     return _dataService.fetchFlights(
       token: _token,
       page: page,
       pageSize: _flightPageSize,
-      departureSearchText: _departureSearchController.text,
-      arrivalSearchText: _arrivalSearchController.text,
+      departureSearchText: isReturnSegment
+          ? _arrivalSearchController.text
+          : _departureSearchController.text,
+      arrivalSearchText: isReturnSegment
+          ? _departureSearchController.text
+          : _arrivalSearchController.text,
       airlineCode: _selectedAirlineCode,
-      departureFromUtc: _departureFromFilterUtc(),
-      departureToUtc: _departureToFilterUtc(),
+      departureFromUtc: _startOfDayUtc(tripDate),
+      departureToUtc: _endOfDayUtc(tripDate),
     );
   }
+
+  bool get _shouldLoadReturnFlights =>
+      _tripType == _TripType.roundTrip && _returnDate != null;
 
   Future<void> _loadMoreFlights() async {
     final currentPage = _flightPage;
@@ -285,6 +320,45 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoadingMore = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMoreReturnFlights() async {
+    final currentPage = _returnFlightPage;
+    if (currentPage == null ||
+        !currentPage.hasNextPage ||
+        _isLoadingMoreReturnFlights) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMoreReturnFlights = true;
+    });
+
+    try {
+      final nextPage = await _fetchReturnFlightsPage(currentPage.page + 1);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _returnFlightPage = nextPage;
+        _returnFlights = [..._returnFlights, ...nextPage.items];
+        _airlineOptions = _mergeAirlineOptions(nextPage.items);
+      });
+    } on ApiException catch (error) {
+      _showPagingError(error.message);
+    } catch (_) {
+      _showPagingError(
+        'Naredna stranica povratnih letova trenutno nije dostupna.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMoreReturnFlights = false;
         });
       }
     }
@@ -405,8 +479,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return options;
   }
 
-  DateTime? _departureFromFilterUtc() {
-    final date = _departureFromDate;
+  DateTime? _startOfDayUtc(DateTime? date) {
     if (date == null) {
       return null;
     }
@@ -414,8 +487,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return DateTime(date.year, date.month, date.day).toUtc();
   }
 
-  DateTime? _departureToFilterUtc() {
-    final date = _departureToDate;
+  DateTime? _endOfDayUtc(DateTime? date) {
     if (date == null) {
       return null;
     }
@@ -432,22 +504,34 @@ class _HomeScreenState extends State<HomeScreen> {
     _departureSearchController.clear();
     _arrivalSearchController.clear();
     setState(() {
-      _departureFromDate = null;
-      _departureToDate = null;
+      _departureDate = null;
+      _returnDate = null;
       _selectedAirlineCode = null;
+      _tripType = _TripType.oneWay;
+      _returnFlightPage = null;
+      _returnFlights = const [];
     });
     unawaited(_loadCurrentTab());
   }
 
-  Future<void> _pickFlightDate({required bool isFromDate}) async {
-    final initialDate = isFromDate
-        ? (_departureFromDate ?? DateTime.now())
-        : (_departureToDate ?? _departureFromDate ?? DateTime.now());
+  Future<void> _pickFlightDate({required bool isReturnDate}) async {
+    final today = DateTime.now();
+    final firstDate = isReturnDate && _departureDate != null
+        ? _departureDate!
+        : today;
+    var initialDate = isReturnDate
+        ? (_returnDate ?? _departureDate ?? today)
+        : (_departureDate ?? today);
+
+    if (initialDate.isBefore(firstDate)) {
+      initialDate = firstDate;
+    }
+
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 730)),
+      firstDate: firstDate,
+      lastDate: today.add(const Duration(days: 730)),
     );
 
     if (picked == null) {
@@ -455,13 +539,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     setState(() {
-      if (isFromDate) {
-        _departureFromDate = picked;
-        if (_departureToDate != null && _departureToDate!.isBefore(picked)) {
-          _departureToDate = picked;
-        }
+      if (isReturnDate) {
+        _returnDate = picked;
       } else {
-        _departureToDate = picked;
+        _departureDate = picked;
+        if (_returnDate != null && _returnDate!.isBefore(picked)) {
+          _returnDate = picked;
+        }
       }
     });
     unawaited(_loadCurrentTab());
@@ -807,22 +891,68 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 20),
         _buildRecommendationsSection(context),
         const SizedBox(height: 20),
-        _SectionHeader(
-          title: 'Dostupni letovi',
+        _buildFlightResultsSection(
+          title: _tripType == _TripType.roundTrip
+              ? 'Odlazni letovi'
+              : 'Dostupni letovi',
           subtitle: userFriendlySearchLabel(),
+          flights: _flights,
+          page: _flightPage,
+          emptyMessage: 'Trenutno nema letova za zadane filtere.',
+          onLoadMore: _loadMoreFlights,
+          isLoadingMore: _isLoadingMore,
+          segmentLabel: _tripType == _TripType.roundTrip ? 'Odlazak' : null,
         ),
+        if (_tripType == _TripType.roundTrip) ...[
+          const SizedBox(height: 20),
+          _buildFlightResultsSection(
+            title: 'Povratni letovi',
+            subtitle: _returnDate == null
+                ? 'Odaberite datum povratka.'
+                : 'Povratni letovi za odabrani datum.',
+            flights: _returnFlights,
+            page: _returnFlightPage,
+            emptyMessage: _returnDate == null
+                ? 'Odaberite datum povratka za prikaz letova.'
+                : 'Trenutno nema povratnih letova za zadane filtere.',
+            onLoadMore: _loadMoreReturnFlights,
+            isLoadingMore: _isLoadingMoreReturnFlights,
+            segmentLabel: 'Povratak',
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFlightResultsSection({
+    required String title,
+    required String subtitle,
+    required List<MobileFlight> flights,
+    required PagedResult<MobileFlight>? page,
+    required String emptyMessage,
+    required Future<void> Function() onLoadMore,
+    required bool isLoadingMore,
+    String? segmentLabel,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(title: title, subtitle: subtitle),
         const SizedBox(height: 10),
-        if (_flights.isEmpty)
-          const _EmptyState(
+        if (flights.isEmpty)
+          _EmptyState(
             icon: Icons.flight_rounded,
             title: 'Nema rezultata',
-            message: 'Trenutno nema letova za prikaz po zadanim filterima.',
+            message: emptyMessage,
           )
         else ...[
-          ..._flights.map(_buildFlightCard),
+          ...flights.map(
+            (flight) => _buildFlightCard(flight, segmentLabel: segmentLabel),
+          ),
           _buildLoadMoreButton(
-            visible: _flightPage?.hasNextPage ?? false,
-            onPressed: _loadMoreFlights,
+            visible: page?.hasNextPage ?? false,
+            onPressed: onLoadMore,
+            isLoadingMore: isLoadingMore,
           ),
         ],
       ],
@@ -832,12 +962,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLoadMoreButton({
     required bool visible,
     required Future<void> Function() onPressed,
+    required bool isLoadingMore,
   }) {
     if (!visible) {
       return const SizedBox.shrink();
     }
 
-    final icon = _isLoadingMore
+    final icon = isLoadingMore
         ? const SizedBox(
             width: 18,
             height: 18,
@@ -849,13 +980,13 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.only(top: 12),
       child: Center(
         child: OutlinedButton.icon(
-          onPressed: _isLoadingMore
+          onPressed: isLoadingMore
               ? null
               : () {
                   unawaited(onPressed());
                 },
           icon: icon,
-          label: Text(_isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos'),
+          label: Text(isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos'),
         ),
       ),
     );
@@ -864,14 +995,22 @@ class _HomeScreenState extends State<HomeScreen> {
   String userFriendlySearchLabel() {
     final hasDeparture = _departureSearchController.text.trim().isNotEmpty;
     final hasArrival = _arrivalSearchController.text.trim().isNotEmpty;
-    final hasDate = _departureFromDate != null || _departureToDate != null;
+    final hasDate =
+        _departureDate != null ||
+        (_tripType == _TripType.roundTrip && _returnDate != null);
     final hasAirline = _selectedAirlineCode != null;
 
     if (!hasDeparture && !hasArrival && !hasDate && !hasAirline) {
-      return 'Pregled svih dostupnih letova za odabrani period.';
+      return 'Pregled dostupnih letova.';
     }
 
-    return 'Prikaz letova prema odabranim filterima i kriterijima putovanja.';
+    if (_tripType == _TripType.roundTrip) {
+      return _returnDate == null
+          ? 'Odaberite datum povratka za prikaz povratnih letova.'
+          : 'Odlazni i povratni letovi prikazani su odvojeno.';
+    }
+
+    return 'Prikaz jednosmjernih letova prema odabranim filterima.';
   }
 
   Widget _buildFlightsHero(BuildContext context) {
@@ -944,6 +1083,35 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Planirajte putovanje', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            SegmentedButton<_TripType>(
+              segments: const [
+                ButtonSegment<_TripType>(
+                  value: _TripType.oneWay,
+                  icon: Icon(Icons.trending_flat_rounded),
+                  label: Text('Jedan smjer'),
+                ),
+                ButtonSegment<_TripType>(
+                  value: _TripType.roundTrip,
+                  icon: Icon(Icons.compare_arrows_rounded),
+                  label: Text('Povratno'),
+                ),
+              ],
+              selected: {_tripType},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) {
+                final selectedType = selection.first;
+                setState(() {
+                  _tripType = selectedType;
+                  if (selectedType == _TripType.oneWay) {
+                    _returnDate = null;
+                    _returnFlightPage = null;
+                    _returnFlights = const [];
+                  }
+                });
+                unawaited(_loadCurrentTab());
+              },
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -983,23 +1151,25 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: _DateFieldButton(
-                    label: 'Od',
-                    value: _departureFromDate == null
+                    label: 'Datum odlaska',
+                    value: _departureDate == null
                         ? 'MM.DD.YYYY'
-                        : _formatShortDate(_departureFromDate!),
-                    onPressed: () => _pickFlightDate(isFromDate: true),
+                        : _formatShortDate(_departureDate!),
+                    onPressed: () => _pickFlightDate(isReturnDate: false),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _DateFieldButton(
-                    label: 'Do',
-                    value: _departureToDate == null
-                        ? 'MM.DD.YYYY'
-                        : _formatShortDate(_departureToDate!),
-                    onPressed: () => _pickFlightDate(isFromDate: false),
+                if (_tripType == _TripType.roundTrip) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _DateFieldButton(
+                      label: 'Datum povratka',
+                      value: _returnDate == null
+                          ? 'MM.DD.YYYY'
+                          : _formatShortDate(_returnDate!),
+                      onPressed: () => _pickFlightDate(isReturnDate: true),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -1478,6 +1648,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildLoadMoreButton(
           visible: _reservationPage?.hasNextPage ?? false,
           onPressed: _loadMoreReservations,
+          isLoadingMore: _isLoadingMore,
         ),
       ],
     );
@@ -1542,6 +1713,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildLoadMoreButton(
           visible: _newsPage?.hasNextPage ?? false,
           onPressed: _loadMoreNews,
+          isLoadingMore: _isLoadingMore,
         ),
       ],
     );
@@ -2116,7 +2288,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFlightCard(MobileFlight flight) {
+  Widget _buildFlightCard(MobileFlight flight, {String? segmentLabel}) {
     final imageUrl = _imageUrlOrFallback(flight.destinationImageUrl);
 
     return Card(
@@ -2240,6 +2412,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      if (segmentLabel != null)
+                        _FlightFactChip(
+                          icon: segmentLabel == 'Povratak'
+                              ? Icons.flight_land_rounded
+                              : Icons.flight_takeoff_rounded,
+                          label: segmentLabel,
+                        ),
                       _FlightFactChip(
                         icon: Icons.airlines_rounded,
                         label: flight.airline.code,
@@ -2287,6 +2466,8 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 enum _HomeMenuAction { letovi, rezervacije, novosti, profil, podrska, odjava }
+
+enum _TripType { oneWay, roundTrip }
 
 class _LabeledField extends StatelessWidget {
   const _LabeledField({required this.label, required this.child});
