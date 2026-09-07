@@ -460,7 +460,12 @@ public sealed class PaymentService : IPaymentService
             "Placanje potvrdjeno",
             $"Placanje za rezervaciju {payment.Reservation.ReservationCode} je uspjesno evidentirano kroz PayPal sandbox.",
             nowUtc,
-            cancellationToken);
+            cancellationToken,
+            NotificationType.PaymentCompleted,
+            payment.Reservation.FlightId,
+            payment.Reservation.Flight.FlightNumber,
+            payment.ReservationId,
+            payment.Reservation.ReservationCode);
 
         _logger.LogInformation("Payment {PaymentId} captured through PayPal for reservation {ReservationId}.", payment.Id, payment.ReservationId);
 
@@ -579,7 +584,12 @@ public sealed class PaymentService : IPaymentService
             "Placanje refundirano",
             $"Placanje za rezervaciju {payment.Reservation.ReservationCode} je refundirano kroz PayPal sandbox i rezervacija je otkazana. Razlog: {refundReason}",
             refundedAtUtc,
-            cancellationToken);
+            cancellationToken,
+            NotificationType.PaymentRefunded,
+            payment.Reservation.FlightId,
+            payment.Reservation.Flight.FlightNumber,
+            payment.ReservationId,
+            payment.Reservation.ReservationCode);
 
         _logger.LogInformation(
             "Payment {PaymentId} refunded through PayPal for reservation {ReservationId}; {ReleasedSeatCount} seats released.",
@@ -1168,14 +1178,24 @@ public sealed class PaymentService : IPaymentService
         string title,
         string body,
         DateTime occurredAtUtc,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        NotificationType type = NotificationType.System,
+        int? flightId = null,
+        string? flightNumber = null,
+        int? reservationId = null,
+        string? reservationCode = null)
     {
         var message = new NotificationRequestedMessage
         {
             UserId = userId,
+            Type = type,
             Title = title,
             Body = body,
-            OccurredAtUtc = occurredAtUtc
+            OccurredAtUtc = occurredAtUtc,
+            FlightId = flightId,
+            FlightNumber = flightNumber,
+            ReservationId = reservationId,
+            ReservationCode = reservationCode
         };
 
         try

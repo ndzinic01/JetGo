@@ -1,3 +1,4 @@
+using JetGo.Application.Constants;
 using JetGo.Application.Contracts.Services;
 using JetGo.Application.DTOs.Common;
 using JetGo.Application.DTOs.Notifications;
@@ -24,6 +25,15 @@ public sealed class NotificationsController : ControllerBase
     public async Task<ActionResult<PagedResponseDto<NotificationListItemDto>>> Get([FromQuery] NotificationSearchRequest request, CancellationToken cancellationToken)
     {
         var response = await _notificationService.GetMineAsync(request, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpGet("admin")]
+    [Authorize(Roles = RoleNames.Admin)]
+    [ProducesResponseType(typeof(PagedResponseDto<AdminNotificationListItemDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResponseDto<AdminNotificationListItemDto>>> GetAdmin([FromQuery] AdminNotificationSearchRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _notificationService.GetAdminPagedAsync(request, cancellationToken);
         return Ok(response);
     }
 

@@ -156,7 +156,12 @@ public sealed class ReservationService : IReservationService
             "Rezervacija kreirana",
             $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je uspjesno kreirana i ceka zavrsetak placanja.",
             nowUtc,
-            cancellationToken);
+            cancellationToken,
+            NotificationType.ReservationCreated,
+            flight.Id,
+            flight.FlightNumber,
+            reservation.Id,
+            reservation.ReservationCode);
 
         _logger.LogInformation("Reservation {ReservationCode} created for user {UserId}.", reservation.ReservationCode, currentUserId);
 
@@ -394,7 +399,12 @@ public sealed class ReservationService : IReservationService
             notificationTitle,
             notificationBody,
             nowUtc,
-            cancellationToken);
+            cancellationToken,
+            NotificationType.ReservationChanged,
+            targetFlight.Id,
+            targetFlight.FlightNumber,
+            reservation.Id,
+            reservation.ReservationCode);
 
         _logger.LogInformation(
             "Reservation {ReservationCode} changed by admin {AdminUserId}: {PreviousFlightNumber} -> {NewFlightNumber}, {PreviousAmount} -> {NewAmount} {Currency}.",
@@ -501,7 +511,12 @@ public sealed class ReservationService : IReservationService
             "Dodatni prtljag azuriran",
             $"Rezervacija {reservation.ReservationCode} sada ima {request.AdditionalBaggageCount} dodatnih komada prtljaga.",
             nowUtc,
-            cancellationToken);
+            cancellationToken,
+            NotificationType.ReservationChanged,
+            reservation.FlightId,
+            reservation.Flight.FlightNumber,
+            reservation.Id,
+            reservation.ReservationCode);
 
         return await GetByIdAsync(id, cancellationToken);
     }
@@ -611,7 +626,12 @@ public sealed class ReservationService : IReservationService
             "Rezervacija otkazana",
             $"Rezervacija {reservation.ReservationCode} je otkazana. Razlog: {request.Reason.Trim()}",
             nowUtc,
-            cancellationToken);
+            cancellationToken,
+            NotificationType.ReservationCancelled,
+            reservation.FlightId,
+            reservation.Flight.FlightNumber,
+            reservation.Id,
+            reservation.ReservationCode);
 
         _logger.LogInformation("Reservation {ReservationCode} cancelled by {UserId}.", reservation.ReservationCode, actorUserId);
 
@@ -1088,14 +1108,24 @@ public sealed class ReservationService : IReservationService
         string title,
         string body,
         DateTime occurredAtUtc,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        NotificationType type = NotificationType.System,
+        int? flightId = null,
+        string? flightNumber = null,
+        int? reservationId = null,
+        string? reservationCode = null)
     {
         var message = new NotificationRequestedMessage
         {
             UserId = userId,
+            Type = type,
             Title = title,
             Body = body,
-            OccurredAtUtc = occurredAtUtc
+            OccurredAtUtc = occurredAtUtc,
+            FlightId = flightId,
+            FlightNumber = flightNumber,
+            ReservationId = reservationId,
+            ReservationCode = reservationCode
         };
 
         try

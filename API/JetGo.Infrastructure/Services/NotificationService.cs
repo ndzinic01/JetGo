@@ -44,7 +44,11 @@ public sealed class NotificationService : INotificationService
         if (!string.IsNullOrWhiteSpace(request.SearchText))
         {
             var searchText = request.SearchText.Trim();
-            query = query.Where(x => x.Title.Contains(searchText) || x.Body.Contains(searchText));
+            query = query.Where(x =>
+                x.Title.Contains(searchText) ||
+                x.Body.Contains(searchText) ||
+                (x.FlightNumber != null && x.FlightNumber.Contains(searchText)) ||
+                (x.ReservationCode != null && x.ReservationCode.Contains(searchText)));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -64,6 +68,100 @@ public sealed class NotificationService : INotificationService
                 ReadAtUtc = x.ReadAtUtc
             })
             .ToListAsync(cancellationToken);
+
+        return PagedResponseBuilder.Build(items, request.Page, request.PageSize, totalCount);
+    }
+
+    public async Task<PagedResponseDto<AdminNotificationListItemDto>> GetAdminPagedAsync(AdminNotificationSearchRequest request, CancellationToken cancellationToken = default)
+    {
+        ValidateAdminSearchRequest(request);
+
+        var query =
+            from notification in _dbContext.Notifications.AsNoTracking()
+            join user in _dbContext.Users.AsNoTracking() on notification.UserId equals user.Id
+            join profile in _dbContext.UserProfiles.AsNoTracking() on notification.UserId equals profile.UserId into profiles
+            from profile in profiles.DefaultIfEmpty()
+            where notification.Type != NotificationType.SupportReply
+            select new
+            {
+                notification.Type,
+                notification.Title,
+                notification.Body,
+                notification.Status,
+                notification.CreatedAtUtc,
+                notification.ReadAtUtc,
+                notification.FlightNumber,
+                notification.ReservationCode,
+                UserName = user.UserName ?? string.Empty,
+                UserEmail = user.Email ?? string.Empty,
+                ProfileFirstName = profile != null ? profile.FirstName : null,
+                ProfileLastName = profile != null ? profile.LastName : null,
+                ProfileEmail = profile != null ? profile.Email : null
+            };
+
+        if (request.Status.HasValue)
+        {
+            query = query.Where(x => x.Status == request.Status.Value);
+        }
+
+        if (request.Type.HasValue)
+        {
+            query = query.Where(x => x.Type == request.Type.Value);
+        }
+
+        if (request.CreatedFromUtc.HasValue)
+        {
+            query = query.Where(x => x.CreatedAtUtc >= request.CreatedFromUtc.Value);
+        }
+
+        if (request.CreatedToUtc.HasValue)
+        {
+            query = query.Where(x => x.CreatedAtUtc <= request.CreatedToUtc.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FlightNumber))
+        {
+            var flightNumber = request.FlightNumber.Trim().ToUpperInvariant();
+            query = query.Where(x => x.FlightNumber != null && x.FlightNumber.Contains(flightNumber));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.SearchText))
+        {
+            var searchText = request.SearchText.Trim();
+            query = query.Where(x =>
+                x.Title.Contains(searchText) ||
+                x.Body.Contains(searchText) ||
+                (x.FlightNumber != null && x.FlightNumber.Contains(searchText)) ||
+                (x.ReservationCode != null && x.ReservationCode.Contains(searchText)) ||
+                x.UserName.Contains(searchText) ||
+                ((x.ProfileFirstName ?? string.Empty) + " " + (x.ProfileLastName ?? string.Empty)).Trim().Contains(searchText) ||
+                (x.ProfileEmail ?? x.UserEmail).Contains(searchText));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var rawItems = await query
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ThenByDescending(x => x.FlightNumber)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
+
+        var items = rawItems
+            .Select(x => new AdminNotificationListItemDto
+            {
+                Type = x.Type,
+                Title = x.Title,
+                Body = x.Body,
+                Status = x.Status,
+                CreatedAtUtc = x.CreatedAtUtc,
+                ReadAtUtc = x.ReadAtUtc,
+                FlightNumber = x.FlightNumber,
+                ReservationCode = x.ReservationCode,
+                RecipientName = ResolveFullName(x.ProfileFirstName, x.ProfileLastName, x.UserName),
+                RecipientEmail = x.ProfileEmail ?? x.UserEmail
+            })
+            .ToList();
 
         return PagedResponseBuilder.Build(items, request.Page, request.PageSize, totalCount);
     }
@@ -139,6 +237,45 @@ public sealed class NotificationService : INotificationService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static void ValidateAdminSearchRequest(AdminNotificationSearchRequest request)
+    {
+        if (request.CreatedFromUtc.HasValue && request.CreatedFromUtc.Value.Kind == DateTimeKind.Unspecified)
+        {
+            throw new ValidationException(
+                "Datum pocetka pretrage mora biti u UTC formatu.",
+                new Dictionary<string, string[]>
+                {
+                    ["createdFromUtc"] = ["Koristite UTC datum za CreatedFromUtc vrijednost."]
+                });
+        }
+
+        if (request.CreatedToUtc.HasValue && request.CreatedToUtc.Value.Kind == DateTimeKind.Unspecified)
+        {
+            throw new ValidationException(
+                "Datum kraja pretrage mora biti u UTC formatu.",
+                new Dictionary<string, string[]>
+                {
+                    ["createdToUtc"] = ["Koristite UTC datum za CreatedToUtc vrijednost."]
+                });
+        }
+
+        if (request.CreatedFromUtc.HasValue && request.CreatedToUtc.HasValue && request.CreatedFromUtc > request.CreatedToUtc)
+        {
+            throw new ValidationException(
+                "Raspon datuma za pretragu notifikacija nije validan.",
+                new Dictionary<string, string[]>
+                {
+                    ["createdToUtc"] = ["Datum kraja mora biti veci ili jednak datumu pocetka."]
+                });
+        }
+    }
+
+    private static string ResolveFullName(string? firstName, string? lastName, string fallbackUserName)
+    {
+        var fullName = $"{firstName ?? string.Empty} {lastName ?? string.Empty}".Trim();
+        return string.IsNullOrWhiteSpace(fullName) ? fallbackUserName : fullName;
     }
 
     private string GetRequiredCurrentUserId()

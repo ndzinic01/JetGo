@@ -14,13 +14,30 @@ public sealed class NotificationConfiguration : AuditableEntityConfiguration<Not
         builder.ToTable("Notifications");
 
         builder.Property(x => x.UserId).IsRequired().HasMaxLength(450);
+        builder.Property(x => x.Type).HasConversion<int>();
         builder.Property(x => x.Title).IsRequired().HasMaxLength(200);
         builder.Property(x => x.Body).IsRequired().HasMaxLength(2000);
         builder.Property(x => x.Status).HasConversion<int>();
+        builder.Property(x => x.FlightNumber).HasMaxLength(30);
+        builder.Property(x => x.ReservationCode).HasMaxLength(30);
+
+        builder.HasIndex(x => x.CreatedAtUtc);
+        builder.HasIndex(x => x.FlightNumber);
+        builder.HasIndex(x => x.Type);
 
         builder.HasOne<AppUser>()
             .WithMany(x => x.Notifications)
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<Flight>()
+            .WithMany()
+            .HasForeignKey(x => x.FlightId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne<Reservation>()
+            .WithMany()
+            .HasForeignKey(x => x.ReservationId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

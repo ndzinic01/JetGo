@@ -130,6 +130,11 @@ public sealed class NotificationQueueConsumer : BackgroundService
         throw lastException ?? new InvalidOperationException("Notification worker failed without a concrete exception.");
     }
 
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
     private async Task ProcessMessageAsync(string payload, CancellationToken cancellationToken)
     {
         var message = JsonSerializer.Deserialize<NotificationRequestedMessage>(payload, SerializerOptions)
@@ -154,10 +159,15 @@ public sealed class NotificationQueueConsumer : BackgroundService
         await dbContext.Notifications.AddAsync(new Notification
         {
             UserId = message.UserId,
+            Type = message.Type,
             Title = message.Title,
             Body = message.Body,
             Status = NotificationStatus.Unread,
-            CreatedAtUtc = createdAtUtc
+            CreatedAtUtc = createdAtUtc,
+            FlightId = message.FlightId,
+            FlightNumber = NormalizeOptionalText(message.FlightNumber),
+            ReservationId = message.ReservationId,
+            ReservationCode = NormalizeOptionalText(message.ReservationCode)
         }, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);

@@ -7,6 +7,7 @@ import '../flights_routes/flights_routes_section.dart';
 import '../overview/overview_section.dart';
 import '../payments/payments_section.dart';
 import '../news/news_section.dart';
+import '../notifications/notifications_section.dart';
 import '../profile/profile_section.dart';
 import '../reference_data/reference_data_section.dart';
 import '../reports/reports_section.dart';
@@ -21,6 +22,7 @@ enum AdminSection {
   network,
   reservations,
   users,
+  notifications,
   support,
   news,
   reports,
@@ -145,6 +147,14 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                           onTap: () => _selectSection(AdminSection.users),
                         ),
                         _NavButton(
+                          icon: Icons.notifications_rounded,
+                          label: 'Notifikacije',
+                          isSelected:
+                              _selectedSection == AdminSection.notifications,
+                          onTap: () =>
+                              _selectSection(AdminSection.notifications),
+                        ),
+                        _NavButton(
                           icon: Icons.support_agent_rounded,
                           label: 'Podrska',
                           isSelected: _selectedSection == AdminSection.support,
@@ -258,6 +268,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           token: widget.authController.session!.accessToken,
           currentUserId: widget.authController.session!.user.userId,
         );
+      case AdminSection.notifications:
+        return NotificationsSection(
+          token: widget.authController.session!.accessToken,
+        );
       case AdminSection.support:
         return SupportSection(
           token: widget.authController.session!.accessToken,
@@ -291,6 +305,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return Icons.calendar_month_rounded;
       case AdminSection.users:
         return Icons.group_rounded;
+      case AdminSection.notifications:
+        return Icons.notifications_active_rounded;
       case AdminSection.support:
         return Icons.support_agent_rounded;
       case AdminSection.news:
@@ -316,6 +332,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return 'Rezervacije';
       case AdminSection.users:
         return 'Upravljanje korisnicima';
+      case AdminSection.notifications:
+        return 'Notifikacije';
       case AdminSection.support:
         return 'Podrska';
       case AdminSection.news:
@@ -341,6 +359,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return 'Operativni pregled rezervacija za desktop korisnika.';
       case AdminSection.users:
         return 'Upravljanje korisnicima i pristupima.';
+      case AdminSection.notifications:
+        return 'Pregled sistemskih notifikacija poslanih korisnicima.';
       case AdminSection.support:
         return 'Pregled korisnickih upita i odgovora administracije.';
       case AdminSection.news:

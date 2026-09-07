@@ -8,6 +8,7 @@ using JetGo.Application.Exceptions;
 using JetGo.Application.Messaging.Notifications;
 using JetGo.Application.Requests.SupportMessages;
 using JetGo.Domain.Entities;
+using JetGo.Domain.Enums;
 using JetGo.Infrastructure.Persistence;
 using JetGo.Infrastructure.Services.Common;
 using Microsoft.AspNetCore.Http;
@@ -376,6 +377,7 @@ public sealed class SupportMessageService : ISupportMessageService
         var message = new NotificationRequestedMessage
         {
             UserId = userId,
+            Type = NotificationType.SupportReply,
             Title = title,
             Body = body,
             OccurredAtUtc = occurredAtUtc

@@ -52,7 +52,7 @@ public sealed class ReservationStatusSyncService
                             (t.Type == PaymentTransactionType.InitialPayment || t.Type == PaymentTransactionType.AdditionalCharge)))))
             .ToListAsync(cancellationToken);
 
-        var expiredReservationNotifications = new List<(string UserId, string ReservationCode, string FlightNumber)>();
+        var expiredReservationNotifications = new List<(string UserId, int FlightId, string FlightNumber, int ReservationId, string ReservationCode)>();
 
         foreach (var reservation in expiredReservations)
         {
@@ -85,7 +85,7 @@ public sealed class ReservationStatusSyncService
                 reservation.Payment.UpdatedAtUtc = nowUtc;
             }
 
-            expiredReservationNotifications.Add((reservation.UserId, reservation.ReservationCode, reservation.Flight.FlightNumber));
+            expiredReservationNotifications.Add((reservation.UserId, reservation.FlightId, reservation.Flight.FlightNumber, reservation.Id, reservation.ReservationCode));
         }
 
         var completedFlightNotifications = new List<NotificationRequestedMessage>();
@@ -122,13 +122,13 @@ public sealed class ReservationStatusSyncService
                 x.Flight.ArrivalAtUtc <= nowUtc)
             .ToListAsync(cancellationToken);
 
-        var completedReservations = new List<(string UserId, string ReservationCode, string FlightNumber)>();
+        var completedReservations = new List<(string UserId, int FlightId, string FlightNumber, int ReservationId, string ReservationCode)>();
 
         foreach (var reservation in reservations)
         {
             if (_stateMachine.TryAutoCompleteAfterArrival(reservation, SystemActorUserId, nowUtc))
             {
-                completedReservations.Add((reservation.UserId, reservation.ReservationCode, reservation.Flight.FlightNumber));
+                completedReservations.Add((reservation.UserId, reservation.FlightId, reservation.Flight.FlightNumber, reservation.Id, reservation.ReservationCode));
             }
         }
 
@@ -148,8 +148,10 @@ public sealed class ReservationStatusSyncService
         {
             await PublishCompletionNotificationSafelyAsync(
                 reservation.UserId,
-                reservation.ReservationCode,
+                reservation.FlightId,
                 reservation.FlightNumber,
+                reservation.ReservationId,
+                reservation.ReservationCode,
                 nowUtc,
                 cancellationToken);
         }
@@ -160,8 +162,10 @@ public sealed class ReservationStatusSyncService
         {
             await PublishExpirationNotificationSafelyAsync(
                 reservation.UserId,
-                reservation.ReservationCode,
+                reservation.FlightId,
                 reservation.FlightNumber,
+                reservation.ReservationId,
+                reservation.ReservationCode,
                 nowUtc,
                 cancellationToken);
         }
@@ -178,17 +182,24 @@ public sealed class ReservationStatusSyncService
 
     private async Task PublishCompletionNotificationSafelyAsync(
         string userId,
-        string reservationCode,
+        int flightId,
         string flightNumber,
+        int reservationId,
+        string reservationCode,
         DateTime occurredAtUtc,
         CancellationToken cancellationToken)
     {
         var message = new NotificationRequestedMessage
         {
             UserId = userId,
+            Type = NotificationType.ReservationCompleted,
             Title = "Putovanje zavrseno",
             Body = $"Rezervacija {reservationCode} za let {flightNumber} je automatski oznacena kao zavrsena jer je let stigao.",
-            OccurredAtUtc = occurredAtUtc
+            OccurredAtUtc = occurredAtUtc,
+            FlightId = flightId,
+            FlightNumber = flightNumber,
+            ReservationId = reservationId,
+            ReservationCode = reservationCode
         };
 
         try
@@ -206,17 +217,24 @@ public sealed class ReservationStatusSyncService
 
     private async Task PublishExpirationNotificationSafelyAsync(
         string userId,
-        string reservationCode,
+        int flightId,
         string flightNumber,
+        int reservationId,
+        string reservationCode,
         DateTime occurredAtUtc,
         CancellationToken cancellationToken)
     {
         var message = new NotificationRequestedMessage
         {
             UserId = userId,
+            Type = NotificationType.ReservationExpired,
             Title = "Rezervacija istekla",
             Body = $"Rezervacija {reservationCode} za let {flightNumber} je otkazana jer placanje nije zavrseno na vrijeme.",
-            OccurredAtUtc = occurredAtUtc
+            OccurredAtUtc = occurredAtUtc,
+            FlightId = flightId,
+            FlightNumber = flightNumber,
+            ReservationId = reservationId,
+            ReservationCode = reservationCode
         };
 
         try

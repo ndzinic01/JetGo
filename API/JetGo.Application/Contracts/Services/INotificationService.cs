@@ -8,6 +8,8 @@ public interface INotificationService
 {
     Task<PagedResponseDto<NotificationListItemDto>> GetMineAsync(NotificationSearchRequest request, CancellationToken cancellationToken = default);
 
+    Task<PagedResponseDto<AdminNotificationListItemDto>> GetAdminPagedAsync(AdminNotificationSearchRequest request, CancellationToken cancellationToken = default);
+
     Task<NotificationSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default);
 
     Task MarkAsReadAsync(int id, CancellationToken cancellationToken = default);

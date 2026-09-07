@@ -211,21 +211,23 @@ public sealed class FlightAdminService : IFlightAdminService
         await EnsureFlightNumberUniqueAsync(request.FlightNumber.Trim(), id, cancellationToken);
 
         var hasReservations = flight.Reservations.Count > 0;
-        var sensitiveDataChanged =
+        var previousDepartureAtUtc = flight.DepartureAtUtc;
+        var previousArrivalAtUtc = flight.ArrivalAtUtc;
+        var normalizedFlightNumber = request.FlightNumber.Trim().ToUpperInvariant();
+        var scheduleChanged = previousDepartureAtUtc != request.DepartureAtUtc || previousArrivalAtUtc != request.ArrivalAtUtc;
+        var lockedDataChanged =
             referencesChanged ||
-            !string.Equals(flight.FlightNumber, request.FlightNumber.Trim().ToUpperInvariant(), StringComparison.Ordinal) ||
-            flight.DepartureAtUtc != request.DepartureAtUtc ||
-            flight.ArrivalAtUtc != request.ArrivalAtUtc ||
+            !string.Equals(flight.FlightNumber, normalizedFlightNumber, StringComparison.Ordinal) ||
             flight.TotalSeats != request.TotalSeats;
 
-        if (hasReservations && sensitiveDataChanged)
+        if (hasReservations && lockedDataChanged)
         {
-            throw new ConflictException("Osnovni podaci leta ne mogu se mijenjati jer vec postoje rezervacije povezane sa ovim letom.");
+            throw new ConflictException("Ruta, broj leta i kapacitet ne mogu se mijenjati jer vec postoje rezervacije povezane sa ovim letom. Vrijeme leta mozete promijeniti i sistem ce obavijestiti korisnike.");
         }
 
         flight.AirlineId = request.AirlineId;
         flight.DestinationId = request.DestinationId;
-        flight.FlightNumber = request.FlightNumber.Trim().ToUpperInvariant();
+        flight.FlightNumber = normalizedFlightNumber;
         flight.DepartureAtUtc = request.DepartureAtUtc;
         flight.ArrivalAtUtc = request.ArrivalAtUtc;
         flight.BasePrice = decimal.Round(request.BasePrice, 2, MidpointRounding.AwayFromZero);
@@ -236,6 +238,9 @@ public sealed class FlightAdminService : IFlightAdminService
             actorUserId,
             nowUtc,
             cancellationToken);
+        var timeChangeNotifications = hasReservations && scheduleChanged
+            ? _flightLifecycleService.BuildTimeChangeNotifications(flight, previousDepartureAtUtc, previousArrivalAtUtc, nowUtc)
+            : [];
         flight.UpdatedAtUtc = nowUtc;
 
         if (!hasReservations && flight.TotalSeats != request.TotalSeats)
@@ -248,6 +253,7 @@ public sealed class FlightAdminService : IFlightAdminService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _flightLifecycleService.PublishNotificationsSafelyAsync(lifecycleNotifications, cancellationToken);
+        await _flightLifecycleService.PublishNotificationsSafelyAsync(timeChangeNotifications, cancellationToken);
 
         return await GetByIdAsync(flight.Id, cancellationToken);
     }

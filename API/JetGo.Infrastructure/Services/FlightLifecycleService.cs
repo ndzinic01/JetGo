@@ -1,4 +1,5 @@
-﻿using JetGo.Application.Contracts.Messaging;
+using System.Globalization;
+using JetGo.Application.Contracts.Messaging;
 using JetGo.Application.Exceptions;
 using JetGo.Application.Messaging.Notifications;
 using JetGo.Domain.Entities;
@@ -58,6 +59,34 @@ public sealed class FlightLifecycleService
             FlightStatus.Scheduled => BuildStatusChangeNotifications(flight, "Let zakazan", "Let je oznacen kao zakazan.", nowUtc),
             _ => []
         };
+    }
+
+    public IReadOnlyCollection<NotificationRequestedMessage> BuildTimeChangeNotifications(
+        Flight flight,
+        DateTime previousDepartureAtUtc,
+        DateTime previousArrivalAtUtc,
+        DateTime occurredAtUtc)
+    {
+        if (previousDepartureAtUtc == flight.DepartureAtUtc && previousArrivalAtUtc == flight.ArrivalAtUtc)
+        {
+            return [];
+        }
+
+        var body =
+            $"Vrijeme leta {flight.FlightNumber} je promijenjeno. " +
+            $"Prethodni polazak: {FormatUtc(previousDepartureAtUtc)}, novi polazak: {FormatUtc(flight.DepartureAtUtc)}. " +
+            $"Prethodni dolazak: {FormatUtc(previousArrivalAtUtc)}, novi dolazak: {FormatUtc(flight.ArrivalAtUtc)}.";
+
+        return flight.Reservations
+            .Where(x => x.Status is ReservationStatus.Pending or ReservationStatus.Confirmed)
+            .Select(x => CreateFlightNotification(
+                x,
+                flight,
+                NotificationType.FlightTimeChanged,
+                "Promjena vremena leta",
+                $"{body} Rezervacija: {x.ReservationCode}.",
+                occurredAtUtc))
+            .ToArray();
     }
 
     public async Task PublishNotificationsSafelyAsync(
@@ -215,13 +244,13 @@ public sealed class FlightLifecycleService
                 releasedSeats,
                 reservation.Id);
 
-            notifications.Add(new NotificationRequestedMessage
-            {
-                UserId = reservation.UserId,
-                Title = "Let otkazan",
-                Body = notificationBody,
-                OccurredAtUtc = nowUtc
-            });
+            notifications.Add(CreateFlightNotification(
+                reservation,
+                flight,
+                NotificationType.FlightStatusChanged,
+                "Let otkazan",
+                notificationBody,
+                nowUtc));
         }
 
         return notifications;
@@ -245,13 +274,13 @@ public sealed class FlightLifecycleService
                     nowUtc);
                 reservation.UpdatedAtUtc = nowUtc;
 
-                notifications.Add(new NotificationRequestedMessage
-                {
-                    UserId = reservation.UserId,
-                    Title = "Putovanje zavrseno",
-                    Body = $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je oznacena kao zavrsena.",
-                    OccurredAtUtc = nowUtc
-                });
+                notifications.Add(CreateFlightNotification(
+                    reservation,
+                    flight,
+                    NotificationType.FlightStatusChanged,
+                    "Putovanje zavrseno",
+                    $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je oznacena kao zavrsena.",
+                    nowUtc));
 
                 continue;
             }
@@ -276,13 +305,13 @@ public sealed class FlightLifecycleService
 
             ReleaseReservedSeats(flight, reservation);
 
-            notifications.Add(new NotificationRequestedMessage
-            {
-                UserId = reservation.UserId,
-                Title = "Rezervacija otkazana",
-                Body = $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je otkazana jer let vise nije aktivan.",
-                OccurredAtUtc = nowUtc
-            });
+            notifications.Add(CreateFlightNotification(
+                reservation,
+                flight,
+                NotificationType.FlightStatusChanged,
+                "Rezervacija otkazana",
+                $"Rezervacija {reservation.ReservationCode} za let {flight.FlightNumber} je otkazana jer let vise nije aktivan.",
+                nowUtc));
         }
 
         return notifications;
@@ -296,13 +325,13 @@ public sealed class FlightLifecycleService
     {
         return flight.Reservations
             .Where(x => x.Status is ReservationStatus.Pending or ReservationStatus.Confirmed)
-            .Select(x => new NotificationRequestedMessage
-            {
-                UserId = x.UserId,
-                Title = title,
-                Body = $"{body} Rezervacija: {x.ReservationCode}, let: {flight.FlightNumber}.",
-                OccurredAtUtc = occurredAtUtc
-            })
+            .Select(x => CreateFlightNotification(
+                x,
+                flight,
+                NotificationType.FlightStatusChanged,
+                title,
+                $"{body} Rezervacija: {x.ReservationCode}, let: {flight.FlightNumber}.",
+                occurredAtUtc))
             .ToArray();
     }
 
@@ -377,6 +406,33 @@ public sealed class FlightLifecycleService
         payment.UpdatedAtUtc = nowUtc;
     }
 
+    private static NotificationRequestedMessage CreateFlightNotification(
+        Reservation reservation,
+        Flight flight,
+        NotificationType type,
+        string title,
+        string body,
+        DateTime occurredAtUtc)
+    {
+        return new NotificationRequestedMessage
+        {
+            UserId = reservation.UserId,
+            Type = type,
+            Title = title,
+            Body = body,
+            OccurredAtUtc = occurredAtUtc,
+            FlightId = flight.Id,
+            FlightNumber = flight.FlightNumber,
+            ReservationId = reservation.Id,
+            ReservationCode = reservation.ReservationCode
+        };
+    }
+
+    private static string FormatUtc(DateTime value)
+    {
+        return value.ToUniversalTime().ToString("dd.MM.yyyy HH:mm 'UTC'", CultureInfo.InvariantCulture);
+    }
+
     private static int ReleaseReservedSeats(Flight flight, Reservation reservation)
     {
         var releasedSeats = 0;
@@ -436,6 +492,7 @@ public sealed class FlightLifecycleService
         }
     }
 }
+
 public sealed record FlightActionAvailability(bool IsAllowed, string? Reason)
 {
     public static FlightActionAvailability Allowed { get; } = new(true, null);
