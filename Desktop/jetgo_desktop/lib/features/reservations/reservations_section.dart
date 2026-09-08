@@ -686,8 +686,8 @@ class _ReservationsSectionState extends State<ReservationsSection> {
                     '${details.totalAmount.toStringAsFixed(2)} ${details.currency}',
                   ),
                   _DetailsRow(
-                    'Moze izmjena prtljaga',
-                    details.canUpdateBaggage ? 'Da' : 'Ne',
+                    'Moze izmjena leta/prtljaga',
+                    details.canChangeReservation ? 'Da' : 'Ne',
                   ),
                 ],
               ),
@@ -1035,21 +1035,25 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
 
   late int _selectedFlightId;
   late int _baggageCount;
-  late Set<String> _selectedSeats;
+  late final List<String> _originalSeatNumbers;
+  late List<String> _assignedSeatNumbers;
   FlightDetails? _flightDetails;
   bool _isLoadingFlight = false;
   String? _flightErrorMessage;
-  String? _seatErrorMessage;
 
   @override
   void initState() {
     super.initState();
     _selectedFlightId = widget.details.flightId;
     _baggageCount = widget.details.additionalBaggageCount;
-    _selectedSeats = widget.details.seats
-        .map((seat) => seat.seatNumber)
-        .where((seat) => seat.trim().isNotEmpty)
-        .toSet();
+    final seatNumbers = widget.details.seats
+        .map((seat) => seat.seatNumber.trim().toUpperCase())
+        .where((seat) => seat.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort(_compareSeatNumbers);
+    _originalSeatNumbers = seatNumbers;
+    _assignedSeatNumbers = List<String>.from(seatNumbers);
     _loadFlightDetails(_selectedFlightId);
   }
 
@@ -1077,10 +1081,7 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
 
       setState(() {
         _flightDetails = details;
-        final availableSeats = _seatOptions.toSet();
-        _selectedSeats = _selectedSeats
-            .where((seat) => availableSeats.contains(seat))
-            .toSet();
+        _assignedSeatNumbers = _calculateAssignedSeatNumbers(details);
         _isLoadingFlight = false;
       });
     } on ApiException catch (error) {
@@ -1090,6 +1091,9 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
 
       setState(() {
         _flightDetails = null;
+        _assignedSeatNumbers = _isFlightChanged
+            ? <String>[]
+            : List<String>.from(_originalSeatNumbers);
         _flightErrorMessage = error.message;
         _isLoadingFlight = false;
       });
@@ -1100,6 +1104,9 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
 
       setState(() {
         _flightDetails = null;
+        _assignedSeatNumbers = _isFlightChanged
+            ? <String>[]
+            : List<String>.from(_originalSeatNumbers);
         _flightErrorMessage =
             'Sjedista za odabrani let trenutno nisu dostupna.';
         _isLoadingFlight = false;
@@ -1107,14 +1114,26 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
     }
   }
 
-  List<String> get _seatOptions {
-    final seats = <String>{
-      ...?_flightDetails?.availableSeatNumbers,
-      if (_selectedFlightId == widget.details.flightId)
-        ...widget.details.seats.map((seat) => seat.seatNumber),
-    };
+  List<String> get _readonlySeatNumbers =>
+      List<String>.unmodifiable(_assignedSeatNumbers);
 
-    return seats.toList()..sort(_compareSeatNumbers);
+  int get _reservedSeatCount => _originalSeatNumbers.length;
+
+  bool get _isFlightChanged => _selectedFlightId != widget.details.flightId;
+
+  bool get _seatAssignmentChanged =>
+      !_sameSeatNumbers(_originalSeatNumbers, _assignedSeatNumbers);
+
+  bool get _targetFlightHasCapacity {
+    if (_flightDetails == null) {
+      return false;
+    }
+
+    if (!_isFlightChanged) {
+      return true;
+    }
+
+    return _assignedSeatNumbers.length == _reservedSeatCount;
   }
 
   double get _baggageUnitPrice {
@@ -1132,7 +1151,7 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
 
   double get _newTotalAmount {
     final seatPrice = _flightDetails?.basePrice ?? 0;
-    return (seatPrice * _selectedSeats.length) +
+    return (seatPrice * _reservedSeatCount) +
         (_baggageCount * _baggageUnitPrice);
   }
 
@@ -1185,12 +1204,9 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
                     setState(() {
                       _selectedFlightId = value;
                       _flightDetails = null;
-                      _seatErrorMessage = null;
-                      _selectedSeats = value == widget.details.flightId
-                          ? widget.details.seats
-                                .map((seat) => seat.seatNumber)
-                                .toSet()
-                          : <String>{};
+                      _assignedSeatNumbers = _isFlightChanged
+                          ? <String>[]
+                          : List<String>.from(_originalSeatNumbers);
                     });
                     _loadFlightDetails(value);
                   },
@@ -1267,7 +1283,9 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
           child: const Text('Odustani'),
         ),
         FilledButton(
-          onPressed: _isLoadingFlight ? null : _submit,
+          onPressed: _isLoadingFlight || !_targetFlightHasCapacity
+              ? null
+              : _submit,
           child: const Text('Sacuvaj izmjenu'),
         ),
       ],
@@ -1275,45 +1293,55 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
   }
 
   Widget _buildSeatPicker(BuildContext context) {
-    final seats = _seatOptions;
+    final seats = _readonlySeatNumbers;
+    final showCapacityWarning =
+        _flightDetails != null && !_targetFlightHasCapacity;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Sjedista', style: Theme.of(context).textTheme.labelLarge),
+        Text(
+          'Sjedista za odabrani let',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
         const SizedBox(height: 8),
         if (seats.isEmpty)
           Text(
-            'Odabrani let nema slobodnih sjedista.',
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+            _isLoadingFlight
+                ? 'Sjedista se ucitavaju.'
+                : 'Odabrani let nema dovoljno slobodnih mjesta za ovu rezervaciju.',
+            style: TextStyle(
+              color: showCapacityWarning
+                  ? Theme.of(context).colorScheme.error
+                  : null,
+            ),
           )
         else
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: seats
-                .map(
-                  (seat) => FilterChip(
-                    label: Text(seat),
-                    selected: _selectedSeats.contains(seat),
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedSeats.add(seat);
-                        } else {
-                          _selectedSeats.remove(seat);
-                        }
-                        _seatErrorMessage = null;
-                      });
-                    },
-                  ),
-                )
-                .toList(),
+            children: seats.map((seat) => Chip(label: Text(seat))).toList(),
           ),
-        if (_seatErrorMessage != null) ...[
+        const SizedBox(height: 8),
+        Text(
+          'Sjedista nisu rucno izmjenjiva. Ako se rezervacija premjesti na drugi let, sistem odmah prikazuje sjedista koja ce pokusati sacuvati.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        if (_isFlightChanged && _targetFlightHasCapacity) ...[
           const SizedBox(height: 8),
           Text(
-            _seatErrorMessage!,
+            _seatAssignmentChanged
+                ? 'Neka prethodna sjedista nisu slobodna na odabranom letu, pa su dodijeljena nova slobodna sjedista.'
+                : 'Ista sjedista su dostupna na odabranom letu.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ],
+        if (showCapacityWarning) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Odabrani let nema dovoljno slobodnih mjesta za $_reservedSeatCount putnika.',
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ],
@@ -1361,20 +1389,64 @@ class _ReservationChangeDialogState extends State<_ReservationChangeDialog> {
     );
   }
 
+  List<String> _calculateAssignedSeatNumbers(FlightDetails flightDetails) {
+    if (!_isFlightChanged) {
+      return List<String>.from(_originalSeatNumbers);
+    }
+
+    final availableSeats = flightDetails.availableSeatNumbers
+        .map((seat) => seat.trim().toUpperCase())
+        .where((seat) => seat.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort(_compareSeatNumbers);
+    final remainingSeats = List<String>.from(availableSeats);
+    final assignedSeats = <String>[];
+
+    for (final originalSeat in _originalSeatNumbers) {
+      final index = remainingSeats.indexWhere(
+        (seat) => seat.toUpperCase() == originalSeat.toUpperCase(),
+      );
+
+      if (index >= 0) {
+        assignedSeats.add(remainingSeats.removeAt(index));
+      }
+    }
+
+    for (final seat in remainingSeats) {
+      if (assignedSeats.length == _reservedSeatCount) {
+        break;
+      }
+
+      assignedSeats.add(seat);
+    }
+
+    assignedSeats.sort(_compareSeatNumbers);
+    return assignedSeats;
+  }
+
+  static bool _sameSeatNumbers(List<String> first, List<String> second) {
+    if (first.length != second.length) {
+      return false;
+    }
+
+    for (var index = 0; index < first.length; index++) {
+      if (first[index].toUpperCase() != second[index].toUpperCase()) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   void _submit() {
     final formValid = _formKey.currentState?.validate() ?? false;
 
-    if (_selectedSeats.isEmpty) {
-      setState(() {
-        _seatErrorMessage = 'Odaberite najmanje jedno sjediste.';
-      });
-    }
-
-    if (!formValid || _selectedSeats.isEmpty || _flightDetails == null) {
+    if (!formValid || _flightDetails == null || !_targetFlightHasCapacity) {
       return;
     }
 
-    final seats = _selectedSeats.toList()..sort(_compareSeatNumbers);
+    final seats = _readonlySeatNumbers;
     Navigator.of(context).pop(
       _ReservationChangeInput(
         flightId: _selectedFlightId,

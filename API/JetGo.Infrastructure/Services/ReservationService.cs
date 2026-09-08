@@ -896,52 +896,87 @@ public sealed class ReservationService : IReservationService
     private static List<FlightSeat> GetSelectedSeatsForChange(
         Reservation reservation,
         Flight targetFlight,
-        string[] normalizedSeatNumbers)
+        string[] preferredSeatNumbers)
     {
-        var selectedSeats = targetFlight.Seats
-            .Where(x => normalizedSeatNumbers.Contains(x.SeatNumber))
-            .ToList();
-
-        if (selectedSeats.Count != normalizedSeatNumbers.Length)
-        {
-            throw new ValidationException(
-                "Neka od odabranih sjedista nisu pronadjena za odabrani let.",
-                new Dictionary<string, string[]>
-                {
-                    ["seatNumbers"] = ["Provjerite oznake sjedista i pokusajte ponovo."]
-                });
-        }
-
+        var requiredSeatCount = preferredSeatNumbers.Length;
         var currentSeatIds = reservation.FlightId == targetFlight.Id
             ? reservation.Items.Select(x => x.FlightSeatId).ToHashSet()
             : new HashSet<int>();
+        var selectedSeats = new List<FlightSeat>();
 
-        var unavailableSeats = selectedSeats
-            .Where(x => x.IsReserved && !currentSeatIds.Contains(x.Id))
-            .Select(x => x.SeatNumber)
-            .OrderBy(x => x)
-            .ToArray();
-
-        if (unavailableSeats.Length > 0)
+        foreach (var preferredSeatNumber in preferredSeatNumbers)
         {
-            throw new ConflictException($"Sjedista su vec rezervisana: {string.Join(", ", unavailableSeats)}.");
+            var preferredSeat = targetFlight.Seats.FirstOrDefault(x =>
+                string.Equals(x.SeatNumber, preferredSeatNumber, StringComparison.OrdinalIgnoreCase));
+
+            if (preferredSeat is null)
+            {
+                continue;
+            }
+
+            if (!preferredSeat.IsReserved || currentSeatIds.Contains(preferredSeat.Id))
+            {
+                selectedSeats.Add(preferredSeat);
+            }
         }
 
-        var reusableSeatsCount = reservation.FlightId == targetFlight.Id
-            ? reservation.Items.Count
-            : 0;
+        if (selectedSeats.Count < requiredSeatCount)
+        {
+            var selectedSeatIds = selectedSeats.Select(x => x.Id).ToHashSet();
+            var replacementSeats = targetFlight.Seats
+                .Where(x => !x.IsReserved && !selectedSeatIds.Contains(x.Id))
+                .OrderBy(x => GetSeatRowNumber(x.SeatNumber))
+                .ThenBy(x => GetSeatColumnLabel(x.SeatNumber), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.SeatNumber, StringComparer.OrdinalIgnoreCase)
+                .Take(requiredSeatCount - selectedSeats.Count)
+                .ToArray();
 
-        if (targetFlight.AvailableSeats + reusableSeatsCount < selectedSeats.Count)
+            selectedSeats.AddRange(replacementSeats);
+        }
+
+        if (selectedSeats.Count < requiredSeatCount)
         {
             throw new ValidationException(
                 "Na odabranom letu nema dovoljno raspolozivih sjedista.",
                 new Dictionary<string, string[]>
                 {
-                    ["seatNumbers"] = ["Broj raspolozivih sjedista se promijenio. Osvjezite podatke i pokusajte ponovo."]
+                    ["seatNumbers"] = ["Odabrani let mora imati dovoljno slobodnih sjedista za isti broj putnika."]
                 });
         }
 
-        return selectedSeats;
+        return selectedSeats
+            .OrderBy(x => GetSeatRowNumber(x.SeatNumber))
+            .ThenBy(x => GetSeatColumnLabel(x.SeatNumber), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.SeatNumber, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static int GetSeatRowNumber(string seatNumber)
+    {
+        var normalized = seatNumber.Trim();
+        var index = 0;
+
+        while (index < normalized.Length && char.IsDigit(normalized[index]))
+        {
+            index++;
+        }
+
+        return index > 0 && int.TryParse(normalized[..index], out var row)
+            ? row
+            : int.MaxValue;
+    }
+
+    private static string GetSeatColumnLabel(string seatNumber)
+    {
+        var normalized = seatNumber.Trim();
+        var index = 0;
+
+        while (index < normalized.Length && char.IsDigit(normalized[index]))
+        {
+            index++;
+        }
+
+        return index < normalized.Length ? normalized[index..] : string.Empty;
     }
 
     private void ApplyReservationChange(
@@ -1442,7 +1477,9 @@ public sealed class ReservationService : IReservationService
             return null;
         }
 
-        var profile = await _dbContext.UserProfiles.FindAsync(new object[] { userId }, cancellationToken);
+        var profile = await _dbContext.UserProfiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
         if (profile is not null)
         {
