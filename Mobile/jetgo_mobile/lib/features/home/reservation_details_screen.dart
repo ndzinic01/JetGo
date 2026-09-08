@@ -11,6 +11,8 @@ import 'mobile_status_values.dart';
 
 enum PayPalReturnStatus { approved, cancelled }
 
+enum ReservationDetailsResult { changed, paymentConfirmed }
+
 class ReservationDetailsScreen extends StatefulWidget {
   const ReservationDetailsScreen({
     required this.token,
@@ -116,11 +118,11 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope<bool>(
+    return PopScope<ReservationDetailsResult?>(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          Navigator.of(context).pop(_markDirtyOnPop);
+          Navigator.of(context).pop(_detailsPopResult());
         }
       },
       child: Scaffold(
@@ -129,7 +131,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () {
-              Navigator.of(context).pop(_markDirtyOnPop);
+              Navigator.of(context).pop(_detailsPopResult());
             },
           ),
           actions: [
@@ -211,11 +213,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                     'Ukupno: ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}',
                   ),
                   Text(
-                    details.isPaid
-                        ? 'Placanje je evidentirano.'
-                        : 'Placanje jos nije evidentirano.',
+                    _reservationPaymentSummary(details),
                   ),
-                  if (_shouldShowPaymentCard(details) &&
+                  if (details.canInitiatePayment &&
                       !details.isPaid &&
                       !_hasPendingPayment(details)) ...[
                     const SizedBox(height: 8),
@@ -427,11 +427,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     final approvalUrl = _paymentDetails?.approvalUrl;
     final hasApprovalUrl = approvalUrl != null && approvalUrl.trim().isNotEmpty;
     final statusReason = _paymentDetails?.statusReason;
-    final canInitializePayment =
-        !details.isPaid &&
-        (details.canInitiatePayment || _hasPendingPayment(details));
+    final canInitializePayment = !details.isPaid && details.canInitiatePayment;
     final canConfirmPayment =
         !details.isPaid &&
+        details.canInitiatePayment &&
         effectivePaymentId != null &&
         effectivePaymentStatus == MobilePaymentStatus.pending;
 
@@ -456,9 +455,11 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
             Text('Iznos: ${MobileDisplay.formatMoney(amount, currency)}'),
             Text('Servis placanja: ${_paymentDetails?.provider ?? 'PayPal'}'),
             Text(
-              effectivePaymentId == null
-                  ? 'Placanje jos nije inicirano.'
-                  : 'Placanje je inicirano i ceka zavrsetak.',
+              _paymentStatusDescription(
+                effectivePaymentStatus,
+                hasPaymentId: effectivePaymentId != null,
+                isPaid: details.isPaid,
+              ),
             ),
             if (statusReason != null && statusReason.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -662,6 +663,61 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         paymentStatus == MobilePaymentStatus.pending;
   }
 
+  ReservationDetailsResult? _detailsPopResult() {
+    return _markDirtyOnPop ? ReservationDetailsResult.changed : null;
+  }
+
+  String _reservationPaymentSummary(MobileReservationDetails details) {
+    final status = _paymentDetails?.status ?? details.paymentStatus;
+
+    if (details.isPaid || status == MobilePaymentStatus.paid) {
+      return 'Placanje je evidentirano.';
+    }
+
+    if (status == MobilePaymentStatus.refunded) {
+      return 'Placanje je refundirano.';
+    }
+
+    if (status == MobilePaymentStatus.failed) {
+      return 'Placanje nije uspjesno zavrseno.';
+    }
+
+    if (details.status == MobileReservationStatus.cancelled) {
+      return 'Placanje nije aktivno jer je rezervacija otkazana.';
+    }
+
+    if (status == MobilePaymentStatus.pending) {
+      return 'Placanje je inicirano i ceka zavrsetak.';
+    }
+
+    return 'Placanje jos nije evidentirano.';
+  }
+
+  String _paymentStatusDescription(
+    int? status, {
+    required bool hasPaymentId,
+    required bool isPaid,
+  }) {
+    if (isPaid || status == MobilePaymentStatus.paid) {
+      return 'Placanje je zavrseno i evidentirano na rezervaciji.';
+    }
+
+    if (!hasPaymentId) {
+      return 'Placanje jos nije inicirano.';
+    }
+
+    switch (status) {
+      case MobilePaymentStatus.pending:
+        return 'Placanje je inicirano i ceka zavrsetak.';
+      case MobilePaymentStatus.failed:
+        return 'Placanje nije uspjesno zavrseno.';
+      case MobilePaymentStatus.refunded:
+        return 'Placanje je refundirano i rezervacija vise nije aktivna.';
+      default:
+        return 'Status placanja trenutno nije poznat.';
+    }
+  }
+
   Future<bool> _confirmPaymentAction({
     required String title,
     required String message,
@@ -786,10 +842,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     int paymentId,
   ) async {
     final confirmed = await _confirmPaymentAction(
-      title: 'Zavrsi placanje',
+      title: 'Potvrda placanja',
       message:
-          'Potvrdite zavrsetak placanja samo ako ste PayPal odobrenje zavrsili za rezervaciju ${details.reservationCode}. Backend ce provjeriti uplatu i evidentirati status.',
-      confirmLabel: 'Zavrsi placanje',
+          'Ako ste na PayPal stranici odobrili uplatu za rezervaciju ${details.reservationCode}, potvrdite zavrsetak placanja.',
+      confirmLabel: 'Potvrdi',
     );
 
     if (!confirmed || !mounted) {
@@ -816,11 +872,8 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         _markDirtyOnPop = true;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Placanje je uspjesno potvrdeno.')),
-      );
-
-      await _load();
+      Navigator.of(context).pop(ReservationDetailsResult.paymentConfirmed);
+      return;
     } on ApiException catch (error) {
       if (!mounted) {
         return;

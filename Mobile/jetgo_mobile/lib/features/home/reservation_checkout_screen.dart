@@ -5,7 +5,6 @@ import 'mobile_data_service.dart';
 import 'mobile_display.dart';
 import 'mobile_models.dart';
 import 'mobile_status_values.dart';
-import 'reservation_details_screen.dart';
 
 class ReservationCheckoutScreen extends StatefulWidget {
   const ReservationCheckoutScreen({
@@ -64,7 +63,7 @@ class _ReservationCheckoutScreenState extends State<ReservationCheckoutScreen> {
     });
 
     try {
-      final reservation = await _dataService.createReservation(
+      await _dataService.createReservation(
         token: widget.token,
         flightId: widget.details.id,
         seatNumbers: _passengerForms.map((item) => item.seatNumber).toList(),
@@ -75,7 +74,7 @@ class _ReservationCheckoutScreenState extends State<ReservationCheckoutScreen> {
                 seatNumber: item.seatNumber,
                 firstName: item.firstNameController.text.trim(),
                 lastName: item.lastNameController.text.trim(),
-                gender: item.gender ?? PassengerGender.other,
+                gender: item.gender!,
                 passportNumber: item.passportController.text.trim(),
               ),
             )
@@ -86,25 +85,7 @@ class _ReservationCheckoutScreenState extends State<ReservationCheckoutScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rezervacija je uspjesno kreirana.')),
-      );
-
-      final shouldRefresh = await Navigator.of(context).push<bool>(
-        MaterialPageRoute<bool>(
-          builder: (_) => ReservationDetailsScreen(
-            token: widget.token,
-            reservationId: reservation.id,
-            markDirtyOnPop: true,
-          ),
-        ),
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      Navigator.of(context).pop(shouldRefresh ?? true);
+      Navigator.of(context).pop(true);
     } on ApiException catch (error) {
       if (!mounted) {
         return;
@@ -335,10 +316,6 @@ class _PassengerFormCard extends StatelessWidget {
                 DropdownMenuItem<int>(
                   value: PassengerGender.male,
                   child: Text('Musko'),
-                ),
-                DropdownMenuItem<int>(
-                  value: PassengerGender.other,
-                  child: Text('Drugo'),
                 ),
               ],
               onChanged: (value) => data.gender = value,

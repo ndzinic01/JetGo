@@ -10,6 +10,7 @@ import 'flight_details_screen.dart';
 import 'mobile_data_service.dart';
 import 'mobile_display.dart';
 import 'mobile_models.dart';
+import 'mobile_status_values.dart';
 import 'notifications_screen.dart';
 import 'reservation_details_screen.dart';
 import 'support_messages_screen.dart';
@@ -561,7 +562,18 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (changed == true && mounted) {
+        setState(() {
+          _currentIndex = 1;
+        });
         await _loadCurrentTab();
+
+        if (!mounted) {
+          return;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Rezervacija je uspjesno kreirana.')),
+        );
       }
     } catch (_) {
       if (!mounted) {
@@ -577,8 +589,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openReservationDetails(MobileReservation reservation) async {
-    final changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+    final result = await Navigator.of(context).push<ReservationDetailsResult?>(
+      MaterialPageRoute<ReservationDetailsResult?>(
         builder: (_) => ReservationDetailsScreen(
           token: _token,
           reservationId: reservation.id,
@@ -586,8 +598,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    if (changed == true && mounted) {
+    if (result != null && mounted) {
       await _loadCurrentTab();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (result == ReservationDetailsResult.paymentConfirmed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Placanje je uspjesno potvrdeno.')),
+        );
+      }
     }
   }
 
@@ -1594,7 +1616,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final paidCount = _reservations.where((item) => item.isPaid).length;
     final upcomingCount = _reservations
-        .where((item) => item.departureAtUtc.isAfter(DateTime.now()))
+        .where(
+          (item) =>
+              item.departureAtUtc.isAfter(DateTime.now()) &&
+              (item.status == MobileReservationStatus.pending ||
+                  item.status == MobileReservationStatus.confirmed),
+        )
         .length;
 
     return ListView(
@@ -1806,12 +1833,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: '${reservation.seatsCount} sjed.',
                       ),
                       _FlightFactChip(
-                        icon: reservation.isPaid
-                            ? Icons.verified_rounded
-                            : Icons.schedule_rounded,
-                        label: reservation.isPaid
-                            ? 'Placanje evidentirano'
-                            : 'Ceka placanje',
+                        icon: _reservationPaymentChipIcon(reservation),
+                        label: _reservationPaymentChipLabel(reservation),
                       ),
                     ],
                   ),
@@ -2443,6 +2466,47 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  IconData _reservationPaymentChipIcon(MobileReservation reservation) {
+    final status = reservation.paymentStatus;
+
+    if (reservation.isPaid || status == MobilePaymentStatus.paid) {
+      return Icons.verified_rounded;
+    }
+
+    if (status == MobilePaymentStatus.refunded) {
+      return Icons.currency_exchange_rounded;
+    }
+
+    if (status == MobilePaymentStatus.failed ||
+        reservation.status == MobileReservationStatus.cancelled) {
+      return Icons.block_rounded;
+    }
+
+    return Icons.schedule_rounded;
+  }
+
+  String _reservationPaymentChipLabel(MobileReservation reservation) {
+    final status = reservation.paymentStatus;
+
+    if (reservation.isPaid || status == MobilePaymentStatus.paid) {
+      return 'Placanje evidentirano';
+    }
+
+    if (status == MobilePaymentStatus.refunded) {
+      return 'Refundirano';
+    }
+
+    if (status == MobilePaymentStatus.failed) {
+      return 'Placanje neuspjelo';
+    }
+
+    if (reservation.status == MobileReservationStatus.cancelled) {
+      return 'Placanje nije aktivno';
+    }
+
+    return 'Ceka placanje';
   }
 
   String _imageUrlOrFallback(String? imageUrl) {

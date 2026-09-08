@@ -391,7 +391,7 @@ class MobileReservationPassenger {
       seatNumber: json['seatNumber'] as String? ?? '',
       firstName: json['firstName'] as String? ?? '',
       lastName: json['lastName'] as String? ?? '',
-      gender: json['gender'] as int? ?? PassengerGender.other,
+      gender: json['gender'] as int? ?? 0,
       passportNumber: json['passportNumber'] as String? ?? '',
     );
   }

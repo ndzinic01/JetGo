@@ -69,8 +69,6 @@ class MobileDisplay {
         return 'Musko';
       case PassengerGender.female:
         return 'Zensko';
-      case PassengerGender.other:
-        return 'Drugo';
       default:
         return 'Nije navedeno';
     }

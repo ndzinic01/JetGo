@@ -96,8 +96,8 @@ class _JetGoMobileAppState extends State<JetGoMobileApp> {
 
     _lastHandledPayPalLink = link.rawValue;
 
-    await navigator.push<bool>(
-      MaterialPageRoute<bool>(
+    final result = await navigator.push<ReservationDetailsResult?>(
+      MaterialPageRoute<ReservationDetailsResult?>(
         builder: (_) => ReservationDetailsScreen(
           token: token,
           reservationId: link.reservationId!,
@@ -108,6 +108,15 @@ class _JetGoMobileAppState extends State<JetGoMobileApp> {
         ),
       ),
     );
+
+    if (result == ReservationDetailsResult.paymentConfirmed) {
+      final context = _navigatorKey.currentContext;
+      if (context != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Placanje je uspjesno potvrdeno.')),
+        );
+      }
+    }
   }
 
   @override
