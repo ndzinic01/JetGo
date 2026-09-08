@@ -34,12 +34,12 @@ public sealed class SearchHistoryConfiguration : AuditableEntityConfiguration<Se
         builder.HasOne(x => x.DepartureAirport)
             .WithMany()
             .HasForeignKey(x => x.DepartureAirportId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(x => x.ArrivalAirport)
             .WithMany()
             .HasForeignKey(x => x.ArrivalAirportId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(x => x.Airline)
             .WithMany()

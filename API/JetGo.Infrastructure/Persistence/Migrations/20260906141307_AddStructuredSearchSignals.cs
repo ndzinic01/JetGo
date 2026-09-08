@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -66,7 +66,7 @@ namespace JetGo.Infrastructure.Persistence.Migrations
                 column: "ArrivalAirportId",
                 principalTable: "Airports",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.NoAction);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_SearchHistories_Airports_DepartureAirportId",
@@ -74,7 +74,7 @@ namespace JetGo.Infrastructure.Persistence.Migrations
                 column: "DepartureAirportId",
                 principalTable: "Airports",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.NoAction);
         }
 
         /// <inheritdoc />
