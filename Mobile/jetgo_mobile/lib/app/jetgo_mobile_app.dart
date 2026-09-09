@@ -20,6 +20,7 @@ class JetGoMobileApp extends StatefulWidget {
 class _JetGoMobileAppState extends State<JetGoMobileApp> {
   late final AuthController _authController;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final ValueNotifier<int> _reservationRefreshSignal = ValueNotifier<int>(0);
   late final AppLinks _appLinks;
 
   StreamSubscription<Uri>? _deepLinkSubscription;
@@ -40,6 +41,7 @@ class _JetGoMobileAppState extends State<JetGoMobileApp> {
     _deepLinkSubscription?.cancel();
     _authController.removeListener(_handleAuthStateChanged);
     _authController.dispose();
+    _reservationRefreshSignal.dispose();
     super.dispose();
   }
 
@@ -95,6 +97,7 @@ class _JetGoMobileAppState extends State<JetGoMobileApp> {
     }
 
     _lastHandledPayPalLink = link.rawValue;
+    navigator.popUntil((route) => route.isFirst);
 
     final result = await navigator.push<ReservationDetailsResult?>(
       MaterialPageRoute<ReservationDetailsResult?>(
@@ -108,6 +111,10 @@ class _JetGoMobileAppState extends State<JetGoMobileApp> {
         ),
       ),
     );
+
+    if (result != null) {
+      _reservationRefreshSignal.value++;
+    }
 
     if (result == ReservationDetailsResult.paymentConfirmed) {
       final context = _navigatorKey.currentContext;
@@ -130,7 +137,10 @@ class _JetGoMobileAppState extends State<JetGoMobileApp> {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.themeData,
           home: _authController.isAuthenticated
-              ? HomeScreen(authController: _authController)
+              ? HomeScreen(
+                  authController: _authController,
+                  reservationRefreshSignal: _reservationRefreshSignal,
+                )
               : LoginScreen(authController: _authController),
         );
       },

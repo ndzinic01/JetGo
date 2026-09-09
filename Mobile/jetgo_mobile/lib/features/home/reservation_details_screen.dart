@@ -44,6 +44,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   bool _hasOpenedPayPalApproval = false;
   String? _errorMessage;
   bool _markDirtyOnPop = false;
+  bool _paymentConfirmedLocally = false;
 
   @override
   void initState() {
@@ -85,6 +86,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
       setState(() {
         _details = details;
+        _paymentConfirmedLocally =
+            _paymentConfirmedLocally ||
+            details.isPaid ||
+            details.paymentStatus == MobilePaymentStatus.paid;
         if (_paymentDetails != null &&
             _paymentDetails!.id != details.paymentId) {
           _paymentDetails = null;
@@ -119,19 +124,14 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope<ReservationDetailsResult?>(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
-          Navigator.of(context).pop(_detailsPopResult());
-        }
-      },
+      canPop: true,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Detalji rezervacije'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () {
-              Navigator.of(context).pop(_detailsPopResult());
+              _closeWithResult(_detailsPopResult());
             },
           ),
           actions: [
@@ -166,6 +166,12 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
       return const Center(child: Text('Rezervacija nije pronadjena.'));
     }
 
+    final visibleReservationStatus =
+        _paymentConfirmedLocally &&
+            details.status == MobileReservationStatus.pending
+        ? MobileReservationStatus.confirmed
+        : details.status;
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -188,7 +194,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                       ),
                       _StatusChip(
                         label: MobileDisplay.reservationStatusLabel(
-                          details.status,
+                          visibleReservationStatus,
                         ),
                       ),
                     ],
@@ -212,10 +218,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
                   Text(
                     'Ukupno: ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}',
                   ),
-                  Text(
-                    _reservationPaymentSummary(details),
-                  ),
+                  Text(_reservationPaymentSummary(details)),
                   if (details.canInitiatePayment &&
+                      !_paymentConfirmedLocally &&
                       !details.isPaid &&
                       !_hasPendingPayment(details)) ...[
                     const SizedBox(height: 8),
@@ -228,7 +233,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               ),
             ),
           ),
-          if (details.canBeCancelled) ...[
+          if (details.canBeCancelled && !_paymentConfirmedLocally) ...[
             const SizedBox(height: 12),
             _buildCancellationCard(context, details),
           ],
@@ -417,8 +422,15 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     MobileReservationDetails details,
   ) {
     final effectivePaymentId = _paymentDetails?.id ?? details.paymentId;
-    final effectivePaymentStatus =
-        _paymentDetails?.status ?? details.paymentStatus;
+    final isPaymentSettled =
+        _paymentConfirmedLocally ||
+        details.isPaid ||
+        (_paymentDetails?.isPaid ?? false) ||
+        _paymentDetails?.status == MobilePaymentStatus.paid ||
+        details.paymentStatus == MobilePaymentStatus.paid;
+    final effectivePaymentStatus = isPaymentSettled
+        ? MobilePaymentStatus.paid
+        : _paymentDetails?.status ?? details.paymentStatus;
     final paymentStatusLabel = MobileDisplay.paymentStatusLabel(
       effectivePaymentStatus,
     );
@@ -427,9 +439,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     final approvalUrl = _paymentDetails?.approvalUrl;
     final hasApprovalUrl = approvalUrl != null && approvalUrl.trim().isNotEmpty;
     final statusReason = _paymentDetails?.statusReason;
-    final canInitializePayment = !details.isPaid && details.canInitiatePayment;
+    final canInitializePayment =
+        !isPaymentSettled && details.canInitiatePayment;
     final canConfirmPayment =
-        !details.isPaid &&
+        !isPaymentSettled &&
         details.canInitiatePayment &&
         effectivePaymentId != null &&
         effectivePaymentStatus == MobilePaymentStatus.pending;
@@ -458,14 +471,14 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               _paymentStatusDescription(
                 effectivePaymentStatus,
                 hasPaymentId: effectivePaymentId != null,
-                isPaid: details.isPaid,
+                isPaid: isPaymentSettled,
               ),
             ),
             if (statusReason != null && statusReason.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(statusReason),
             ],
-            if (details.canUpdateBaggage && !details.isPaid) ...[
+            if (details.canUpdateBaggage && !isPaymentSettled) ...[
               const SizedBox(height: 8),
               Text(
                 'Ako promijenite dodatni prtljag, ukupni iznos ce se preracunati. Ako je PayPal placanje vec bilo pokrenuto, trebate ga otvoriti ponovo za novi iznos.',
@@ -547,7 +560,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
               )
             else
               Text(
-                details.isPaid
+                isPaymentSettled
                     ? 'Placanje je zavrseno i evidentirano na rezervaciji.'
                     : 'Trenutno nema dostupnih payment akcija za ovu rezervaciju.',
                 style: Theme.of(context).textTheme.bodySmall,
@@ -657,10 +670,22 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   }
 
   bool _hasPendingPayment(MobileReservationDetails details) {
+    if (_paymentConfirmedLocally) {
+      return false;
+    }
+
     final paymentStatus = _paymentDetails?.status ?? details.paymentStatus;
     return details.paymentId != null &&
         !details.isPaid &&
         paymentStatus == MobilePaymentStatus.pending;
+  }
+
+  void _closeWithResult(ReservationDetailsResult? result) {
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pop(result);
   }
 
   ReservationDetailsResult? _detailsPopResult() {
@@ -670,7 +695,9 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
   String _reservationPaymentSummary(MobileReservationDetails details) {
     final status = _paymentDetails?.status ?? details.paymentStatus;
 
-    if (details.isPaid || status == MobilePaymentStatus.paid) {
+    if (_paymentConfirmedLocally ||
+        details.isPaid ||
+        status == MobilePaymentStatus.paid) {
       return 'Placanje je evidentirano.';
     }
 
@@ -749,10 +776,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     String approvalUrl,
   ) async {
     final confirmed = await _confirmPaymentAction(
-      title: 'Potvrda placanja',
+      title: 'Potvrdite pokretanje placanja',
       message:
-          'Otvarate PayPal placanje za rezervaciju ${details.reservationCode} u iznosu ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}. Nastaviti?',
-      confirmLabel: 'Otvori PayPal',
+          'Potvrdite da zelite nastaviti na PayPal za rezervaciju ${details.reservationCode} u iznosu ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}.',
+      confirmLabel: 'Nastavi na PayPal',
     );
 
     if (!confirmed || !mounted) {
@@ -764,10 +791,10 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
 
   Future<void> _initializePayment(MobileReservationDetails details) async {
     final confirmed = await _confirmPaymentAction(
-      title: 'Pokreni PayPal placanje',
+      title: 'Potvrdite pokretanje placanja',
       message:
-          'Pokrecete PayPal placanje za rezervaciju ${details.reservationCode} u iznosu ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}. Nastaviti?',
-      confirmLabel: 'Nastavi na PayPal',
+          'Potvrdite da zelite pokrenuti PayPal placanje za rezervaciju ${details.reservationCode} u iznosu ${MobileDisplay.formatMoney(details.totalAmount, details.currency)}.',
+      confirmLabel: 'Pokreni placanje',
     );
 
     if (!confirmed || !mounted) {
@@ -788,11 +815,20 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         return;
       }
 
+      final paymentIsAlreadyConfirmed =
+          payment.isPaid || payment.status == MobilePaymentStatus.paid;
+
       setState(() {
-        _paymentDetails = payment;
+        _paymentConfirmedLocally = paymentIsAlreadyConfirmed;
+        _paymentDetails = paymentIsAlreadyConfirmed ? null : payment;
         _hasOpenedPayPalApproval = false;
         _markDirtyOnPop = true;
       });
+
+      if (paymentIsAlreadyConfirmed) {
+        _closeWithResult(ReservationDetailsResult.paymentConfirmed);
+        return;
+      }
 
       final approvalUrl = payment.approvalUrl?.trim();
       if (approvalUrl != null && approvalUrl.isNotEmpty) {
@@ -857,7 +893,7 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
     });
 
     try {
-      final payment = await _dataService.confirmPayment(
+      await _dataService.confirmPayment(
         token: widget.token,
         paymentId: paymentId,
       );
@@ -866,13 +902,31 @@ class _ReservationDetailsScreenState extends State<ReservationDetailsScreen> {
         return;
       }
 
+      MobileReservationDetails? updatedDetails;
+      try {
+        updatedDetails = await _dataService.fetchReservationDetails(
+          token: widget.token,
+          reservationId: details.id,
+        );
+      } catch (_) {
+        updatedDetails = null;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _paymentDetails = payment;
+        if (updatedDetails != null) {
+          _details = updatedDetails;
+        }
+        _paymentConfirmedLocally = true;
+        _paymentDetails = null;
         _hasOpenedPayPalApproval = false;
         _markDirtyOnPop = true;
       });
 
-      Navigator.of(context).pop(ReservationDetailsResult.paymentConfirmed);
+      _closeWithResult(ReservationDetailsResult.paymentConfirmed);
       return;
     } on ApiException catch (error) {
       if (!mounted) {

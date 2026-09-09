@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
@@ -16,9 +17,14 @@ import 'reservation_details_screen.dart';
 import 'support_messages_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({required this.authController, super.key});
+  const HomeScreen({
+    required this.authController,
+    this.reservationRefreshSignal,
+    super.key,
+  });
 
   final AuthController authController;
+  final ValueListenable<int>? reservationRefreshSignal;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -83,16 +89,49 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    widget.reservationRefreshSignal?.addListener(
+      _handleReservationRefreshSignal,
+    );
     _loadCurrentTab();
     _startNotificationPolling();
   }
 
   @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.reservationRefreshSignal != widget.reservationRefreshSignal) {
+      oldWidget.reservationRefreshSignal?.removeListener(
+        _handleReservationRefreshSignal,
+      );
+      widget.reservationRefreshSignal?.addListener(
+        _handleReservationRefreshSignal,
+      );
+    }
+  }
+
+  @override
   void dispose() {
+    widget.reservationRefreshSignal?.removeListener(
+      _handleReservationRefreshSignal,
+    );
     _notificationPollingTimer?.cancel();
     _departureSearchController.dispose();
     _arrivalSearchController.dispose();
     super.dispose();
+  }
+
+  void _handleReservationRefreshSignal() {
+    if (!mounted || _token.isEmpty) {
+      return;
+    }
+
+    if (_currentIndex != 1) {
+      setState(() {
+        _currentIndex = 1;
+      });
+    }
+
+    unawaited(_loadCurrentTab());
   }
 
   void _startNotificationPolling() {
@@ -599,6 +638,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (result != null && mounted) {
+      if (result == ReservationDetailsResult.paymentConfirmed &&
+          _currentIndex != 1) {
+        setState(() {
+          _currentIndex = 1;
+        });
+      }
+
       await _loadCurrentTab();
 
       if (!mounted) {
@@ -2147,18 +2193,9 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        MobileDisplay.initials(profile.fullName),
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+                    _ProfileAvatar(
+                      imageUrl: profile.imageUrl,
+                      initials: MobileDisplay.initials(profile.fullName),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -2590,6 +2627,54 @@ class _HomeMenuItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.imageUrl, required this.initials});
+
+  final String? imageUrl;
+  final String initials;
+
+  bool get _hasSupportedImageUrl {
+    final value = imageUrl?.trim();
+    if (value == null || value.isEmpty) {
+      return false;
+    }
+
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final imageValue = imageUrl?.trim() ?? '';
+
+    return ClipOval(
+      child: SizedBox(
+        width: 72,
+        height: 72,
+        child: _hasSupportedImageUrl
+            ? Image.network(
+                imageValue,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildInitials(theme),
+              )
+            : _buildInitials(theme),
+      ),
+    );
+  }
+
+  Widget _buildInitials(ThemeData theme) {
+    return Container(
+      color: theme.colorScheme.secondaryContainer,
+      alignment: Alignment.center,
+      child: Text(initials, style: theme.textTheme.titleLarge),
     );
   }
 }
