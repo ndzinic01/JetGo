@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/network/api_exception.dart';
 import 'reports_models.dart';
@@ -443,13 +443,17 @@ class _ReportsSectionState extends State<ReportsSection> {
         _lastReports[type] = file;
       });
 
-      await _service.printReport(file.filePath);
+      final printResult = await _service.printReport(file.filePath);
 
       if (!mounted) {
         return;
       }
 
-      _showMessage('${type.title} je poslan na ispis.');
+      if (printResult == ReportPrintResult.sentToPrinter) {
+        _showMessage('${type.title} je poslan na ispis.');
+      } else {
+        _showMessage('PDF je otvoren. U PDF pregledniku pokrenite ispis.');
+      }
     } on ApiException catch (error) {
       if (!mounted) {
         return;
@@ -464,7 +468,8 @@ class _ReportsSectionState extends State<ReportsSection> {
       }
 
       setState(() {
-        _errorMessage = 'PDF je generisan, ali ga nije moguce automatski poslati na ispis.';
+        _errorMessage =
+            'PDF je generisan, ali ga nije moguce automatski otvoriti za ispis. Koristite dugme Folder i pokrenite ispis iz PDF preglednika.';
       });
     } finally {
       if (mounted) {

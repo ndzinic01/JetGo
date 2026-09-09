@@ -1,7 +1,9 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import '../../core/network/api_client.dart';
 import 'reports_models.dart';
+
+enum ReportPrintResult { sentToPrinter, openedForManualPrint }
 
 class ReportsService {
   ReportsService({ApiClient? apiClient})
@@ -29,9 +31,9 @@ class ReportsService {
     return _saveReport(response);
   }
 
-  Future<void> printReport(String filePath) async {
+  Future<ReportPrintResult> printReport(String filePath) async {
     if (filePath.trim().isEmpty) {
-      return;
+      return ReportPrintResult.openedForManualPrint;
     }
 
     if (Platform.isWindows) {
@@ -48,17 +50,35 @@ class ReportsService {
       );
 
       if (result.exitCode != 0) {
-        throw const FileSystemException('PDF nije moguce poslati na ispis.');
+        await openReportFile(filePath);
+        return ReportPrintResult.openedForManualPrint;
       }
 
-      return;
+      return ReportPrintResult.sentToPrinter;
     }
 
     final result = await Process.run('lp', [filePath]);
 
     if (result.exitCode != 0) {
-      throw const FileSystemException('PDF nije moguce poslati na ispis.');
+      await openReportFile(filePath);
+      return ReportPrintResult.openedForManualPrint;
     }
+
+    return ReportPrintResult.sentToPrinter;
+  }
+
+  Future<void> openReportFile(String filePath) async {
+    if (filePath.trim().isEmpty) {
+      return;
+    }
+
+    if (Platform.isWindows) {
+      final normalizedPath = filePath.replaceAll('/', r'\');
+      await Process.start('explorer.exe', [normalizedPath]);
+      return;
+    }
+
+    await Process.start('xdg-open', [filePath]);
   }
 
   Future<void> openContainingFolder(String filePath) async {
