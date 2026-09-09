@@ -250,6 +250,7 @@ public sealed class AuthService : IAuthService
             FirstName = userProfile?.FirstName ?? string.Empty,
             LastName = userProfile?.LastName ?? string.Empty,
             PhoneNumber = userProfile?.PhoneNumber ?? user.PhoneNumber,
+            ImageUrl = userProfile?.ImageUrl,
             Roles = userRoles.ToArray()
         };
     }

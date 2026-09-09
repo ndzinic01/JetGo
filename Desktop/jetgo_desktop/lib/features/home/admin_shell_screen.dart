@@ -97,6 +97,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     fullName: user.fullName,
                     username: user.username,
                     email: user.email,
+                    imageUrl: user.imageUrl,
                   ),
                   const SizedBox(height: 20),
                   Expanded(
@@ -106,16 +107,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                         _NavButton(
                           icon: Icons.space_dashboard_rounded,
                           label: 'Kontrolna tabla',
-                          isSelected:
-                              _selectedSection == AdminSection.overview,
-                          onTap: () =>
-                              _selectSection(AdminSection.overview),
+                          isSelected: _selectedSection == AdminSection.overview,
+                          onTap: () => _selectSection(AdminSection.overview),
                         ),
                         _NavButton(
                           icon: Icons.person_rounded,
                           label: 'Moj profil',
-                          isSelected:
-                              _selectedSection == AdminSection.profile,
+                          isSelected: _selectedSection == AdminSection.profile,
                           onTap: () => _selectSection(AdminSection.profile),
                         ),
                         _NavButton(
@@ -277,9 +275,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           token: widget.authController.session!.accessToken,
         );
       case AdminSection.news:
-        return NewsSection(
-          token: widget.authController.session!.accessToken,
-        );
+        return NewsSection(token: widget.authController.session!.accessToken);
       case AdminSection.reports:
         return ReportsSection(
           token: widget.authController.session!.accessToken,
@@ -410,8 +406,8 @@ class _TopBar extends StatelessWidget {
         Text(
           subtitle,
           style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -423,11 +419,13 @@ class _AdminProfileCard extends StatelessWidget {
     required this.fullName,
     required this.username,
     required this.email,
+    this.imageUrl,
   });
 
   final String fullName;
   final String username;
   final String email;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -438,30 +436,72 @@ class _AdminProfileCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.42),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: Colors.white,
-            child: Text(
-              fullName.isNotEmpty ? fullName.trim()[0].toUpperCase() : 'A',
-            ),
+          _AdminProfileAvatar(
+            imageUrl: imageUrl,
+            initials: fullName.isNotEmpty
+                ? fullName.trim()[0].toUpperCase()
+                : 'A',
           ),
           const SizedBox(height: 12),
           Text(fullName, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text('@$username'),
           const SizedBox(height: 4),
-          Text(
-            email,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text(email, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
+    );
+  }
+}
+
+class _AdminProfileAvatar extends StatelessWidget {
+  const _AdminProfileAvatar({required this.imageUrl, required this.initials});
+
+  final String? imageUrl;
+  final String initials;
+
+  bool get _hasSupportedImageUrl {
+    final value = imageUrl?.trim();
+    if (value == null || value.isEmpty) {
+      return false;
+    }
+
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = imageUrl?.trim() ?? '';
+
+    return ClipOval(
+      child: SizedBox(
+        width: 42,
+        height: 42,
+        child: _hasSupportedImageUrl
+            ? Image.network(
+                value,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildFallback(context),
+              )
+            : _buildFallback(context),
+      ),
+    );
+  }
+
+  Widget _buildFallback(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      alignment: Alignment.center,
+      child: Text(initials),
     );
   }
 }
@@ -501,19 +541,16 @@ class _NavButton extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  size: 20,
-                  color: theme.colorScheme.primary,
-                ),
+                Icon(icon, size: 20, color: theme.colorScheme.primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     label,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: const Color(0xFF2F5F97),
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                     ),
                   ),
                 ),

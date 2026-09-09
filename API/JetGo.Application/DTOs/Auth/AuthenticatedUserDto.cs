@@ -14,5 +14,7 @@ public sealed class AuthenticatedUserDto
 
     public string? PhoneNumber { get; init; }
 
+    public string? ImageUrl { get; init; }
+
     public IReadOnlyCollection<string> Roles { get; init; } = Array.Empty<string>();
 }

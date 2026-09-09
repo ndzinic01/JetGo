@@ -126,6 +126,7 @@ class AuthController extends ChangeNotifier {
     required String lastName,
     required String email,
     String? phoneNumber,
+    String? imageUrl,
   }) {
     final session = _session;
     if (session == null) {
@@ -138,6 +139,8 @@ class AuthController extends ChangeNotifier {
         lastName: lastName,
         email: email,
         phoneNumber: phoneNumber,
+        imageUrl: imageUrl,
+        clearImageUrl: imageUrl == null || imageUrl.trim().isEmpty,
       ),
     );
 

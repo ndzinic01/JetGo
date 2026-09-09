@@ -102,6 +102,7 @@ class _ProfileSectionState extends State<ProfileSection> {
       lastName: updated.lastName,
       email: updated.email,
       phoneNumber: updated.phoneNumber,
+      imageUrl: updated.imageUrl,
     );
 
     _showMessage('Profil je uspjesno azuriran.');
@@ -263,6 +264,25 @@ class _ProfileSectionState extends State<ProfileSection> {
   }
 }
 
+String _buildProfileInitials(String value, {String fallback = 'JG'}) {
+  final parts = value
+      .split(' ')
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+
+  if (parts.isEmpty) {
+    return fallback;
+  }
+
+  if (parts.length == 1) {
+    return parts.first.substring(0, 1).toUpperCase();
+  }
+
+  return '${parts.first.substring(0, 1)}${parts.last.substring(0, 1)}'
+      .toUpperCase();
+}
+
 String _roleLabel(String value) {
   switch (value.trim().toLowerCase()) {
     case 'admin':
@@ -281,38 +301,79 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = _buildInitials(profile.fullName);
-    final imageUrl = profile.imageUrl?.trim();
+    return _ProfileImage(
+      imageUrl: profile.imageUrl,
+      initials: _buildProfileInitials(profile.fullName),
+      size: 68,
+    );
+  }
+}
 
-    return CircleAvatar(
-      radius: 34,
-      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-      backgroundImage: imageUrl != null && imageUrl.isNotEmpty
-          ? NetworkImage(imageUrl)
-          : null,
-      child: imageUrl != null && imageUrl.isNotEmpty
-          ? null
-          : Text(initials, style: Theme.of(context).textTheme.titleMedium),
+class _ProfileImage extends StatelessWidget {
+  const _ProfileImage({
+    required this.imageUrl,
+    required this.initials,
+    required this.size,
+  });
+
+  final String? imageUrl;
+  final String initials;
+  final double size;
+
+  bool get _hasSupportedImageUrl {
+    final value = imageUrl?.trim();
+    if (value == null || value.isEmpty) {
+      return false;
+    }
+
+    final uri = Uri.tryParse(value);
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final value = imageUrl?.trim() ?? '';
+
+    return ClipOval(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: _hasSupportedImageUrl
+            ? Image.network(
+                value,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) {
+                    return child;
+                  }
+
+                  return const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildFallback(theme),
+              )
+            : _buildFallback(theme),
+      ),
     );
   }
 
-  String _buildInitials(String value) {
-    final parts = value
-        .split(' ')
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) {
-      return 'JG';
-    }
-
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-
-    return '${parts.first.substring(0, 1)}${parts.last.substring(0, 1)}'
-        .toUpperCase();
+  Widget _buildFallback(ThemeData theme) {
+    return Container(
+      color: theme.colorScheme.secondaryContainer,
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: theme.colorScheme.onSecondaryContainer,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }
 
@@ -341,6 +402,17 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   bool _isSubmitting = false;
   String? _errorMessage;
   ApiException? _serverError;
+
+  String get _profileInitials {
+    final typedName = '${_firstNameController.text} ${_lastNameController.text}'
+        .trim();
+    final username = widget.profile.username.trim();
+    final fallback = username.isEmpty
+        ? '?'
+        : username.substring(0, 1).toUpperCase();
+
+    return _buildProfileInitials(typedName, fallback: fallback);
+  }
 
   @override
   void initState() {
@@ -466,6 +538,14 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                   _InlineError(message: _errorMessage!),
                   const SizedBox(height: 12),
                 ],
+                ListenableBuilder(
+                  listenable: _imageUrlController,
+                  builder: (context, _) => _ProfileImagePreview(
+                    imageUrl: _imageUrlController.text,
+                    initials: _profileInitials,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
@@ -537,7 +617,27 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                     hintText: 'Opcionalno',
                   ),
                   onChanged: (_) => _clearServerErrors(),
-                  validator: (_) => _serverError?.fieldError('ImageUrl'),
+                  validator: (value) {
+                    final serverError = _serverError?.fieldError('ImageUrl');
+                    if (serverError != null) {
+                      return serverError;
+                    }
+
+                    final trimmed = value?.trim() ?? '';
+                    if (trimmed.isEmpty) {
+                      return null;
+                    }
+
+                    final uri = Uri.tryParse(trimmed);
+                    final isSupported =
+                        uri != null &&
+                        (uri.scheme == 'http' || uri.scheme == 'https') &&
+                        uri.host.isNotEmpty;
+
+                    return isSupported
+                        ? null
+                        : 'URL slike mora poceti sa http:// ili https://.';
+                  },
                 ),
               ],
             ),
@@ -767,6 +867,60 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           label: const Text('Sacuvaj novu lozinku'),
         ),
       ],
+    );
+  }
+}
+
+class _ProfileImagePreview extends StatelessWidget {
+  const _ProfileImagePreview({required this.imageUrl, required this.initials});
+
+  final String imageUrl;
+  final String initials;
+
+  bool get _hasSupportedImageUrl {
+    final uri = Uri.tryParse(imageUrl.trim());
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.45,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          _ProfileImage(imageUrl: imageUrl, initials: initials, size: 76),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Slika profila', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  _hasSupportedImageUrl
+                      ? 'Pregled odabrane slike'
+                      : 'Slika nije postavljena',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

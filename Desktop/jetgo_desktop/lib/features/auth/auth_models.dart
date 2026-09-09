@@ -31,15 +31,14 @@ class AuthSession {
 }
 
 class PasswordResetRequestResult {
-  PasswordResetRequestResult({
-    required this.message,
-  });
+  PasswordResetRequestResult({required this.message});
 
   final String message;
 
   factory PasswordResetRequestResult.fromJson(Map<String, dynamic> json) {
     return PasswordResetRequestResult(
-      message: json['message'] as String? ??
+      message:
+          json['message'] as String? ??
           'Ako korisnik sa ovom email adresom postoji, instrukcije za reset lozinke su poslane.',
     );
   }
@@ -54,6 +53,7 @@ class AuthUser {
     required this.lastName,
     required this.roles,
     this.phoneNumber,
+    this.imageUrl,
   });
 
   final String userId;
@@ -62,6 +62,7 @@ class AuthUser {
   final String firstName;
   final String lastName;
   final String? phoneNumber;
+  final String? imageUrl;
   final List<String> roles;
 
   AuthUser copyWith({
@@ -71,6 +72,8 @@ class AuthUser {
     String? firstName,
     String? lastName,
     String? phoneNumber,
+    String? imageUrl,
+    bool clearImageUrl = false,
     List<String>? roles,
   }) {
     return AuthUser(
@@ -80,6 +83,7 @@ class AuthUser {
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      imageUrl: clearImageUrl ? null : imageUrl ?? this.imageUrl,
       roles: roles ?? this.roles,
     );
   }
@@ -99,6 +103,7 @@ class AuthUser {
       firstName: json['firstName'] as String? ?? '',
       lastName: json['lastName'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String?,
+      imageUrl: json['imageUrl'] as String?,
       roles: ((json['roles'] as List<dynamic>?) ?? const [])
           .map((role) => role.toString())
           .toList(),
