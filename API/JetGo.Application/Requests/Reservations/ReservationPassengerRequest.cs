@@ -19,7 +19,7 @@ public sealed class ReservationPassengerRequest
     [RegularExpression(@"^[\p{L}]+(?:[ '\-][\p{L}]+)*$", ErrorMessage = "Prezime putnika smije sadrzavati samo slova, razmake, crticu i apostrof.")]
     public string LastName { get; init; } = string.Empty;
 
-    [Range(1, 3, ErrorMessage = "Odaberite spol putnika.")]
+    [Range(1, 2, ErrorMessage = "Odaberite spol putnika.")]
     public PassengerGender Gender { get; init; }
 
     [Required(ErrorMessage = "Broj pasosa je obavezan.")]

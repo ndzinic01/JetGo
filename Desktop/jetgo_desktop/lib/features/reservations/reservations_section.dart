@@ -782,8 +782,6 @@ class _ReservationsSectionState extends State<ReservationsSection> {
         return 'Musko';
       case 2:
         return 'Zensko';
-      case 3:
-        return 'Drugo';
       default:
         return 'Nije navedeno';
     }
