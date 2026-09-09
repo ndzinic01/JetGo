@@ -303,6 +303,16 @@ internal static class JetGoSeedData
             ImageUrl = "https://images.pexels.com/photos/31725340/pexels-photo-31725340.jpeg?cs=srgb&dl=pexels-bidbtc-31725340.jpg&fm=jpg",
             IsActive = true,
             CreatedAtUtc = SeedTimestampUtc
+        },
+        new Destination
+        {
+            Id = 7,
+            DepartureAirportId = 7,
+            ArrivalAirportId = 2,
+            RouteCode = "IST-OMO",
+            ImageUrl = "https://images.pexels.com/photos/28879119/pexels-photo-28879119.jpeg?cs=srgb&dl=pexels-reojuve-28879119.jpg&fm=jpg",
+            IsActive = true,
+            CreatedAtUtc = SeedTimestampUtc
         }
     ];
 
@@ -391,6 +401,20 @@ internal static class JetGoSeedData
             AvailableSeats = 6,
             Status = FlightStatus.Scheduled,
             CreatedAtUtc = SeedTimestampUtc
+        },
+        new Flight
+        {
+            Id = 7,
+            AirlineId = 4,
+            DestinationId = 7,
+            FlightNumber = "JG108",
+            DepartureAtUtc = Utc(2026, 12, 16, 10, 0),
+            ArrivalAtUtc = Utc(2026, 12, 16, 12, 30),
+            BasePrice = 179.00m,
+            TotalSeats = 6,
+            AvailableSeats = 6,
+            Status = FlightStatus.Scheduled,
+            CreatedAtUtc = SeedTimestampUtc
         }
     ];
 
@@ -400,7 +424,8 @@ internal static class JetGoSeedData
         (3, StandardSeatNumbers),
         (4, StandardSeatNumbers),
         (5, StandardSeatNumbers),
-        (6, StandardSeatNumbers));
+        (6, StandardSeatNumbers),
+        (7, StandardSeatNumbers));
 
     internal static NewsArticle[] NewsArticles { get; } =
     [
