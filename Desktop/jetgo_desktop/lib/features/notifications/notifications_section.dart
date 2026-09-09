@@ -17,11 +17,14 @@ class NotificationsSection extends StatefulWidget {
 
 class _NotificationsSectionState extends State<NotificationsSection> {
   static const int _pageSize = 100;
+  static final RegExp _flightNumberPattern = RegExp(
+    r'\bJG(?:-[A-Z]+)*-?\d+\b',
+    caseSensitive: false,
+  );
 
   final NotificationsService _service = NotificationsService();
-  final TextEditingController _searchController = TextEditingController();
   final TextEditingController _flightNumberController = TextEditingController();
-  Timer? _searchDebounce;
+  Timer? _filterDebounce;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -34,28 +37,24 @@ class _NotificationsSectionState extends State<NotificationsSection> {
 
   DateTime? _createdFrom;
   DateTime? _createdTo;
-  NotificationStatusValue? _statusFilter;
-  NotificationTypeValue? _typeFilter;
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_handleFilterTextChanged);
     _flightNumberController.addListener(_handleFilterTextChanged);
     _loadNotifications();
   }
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
+    _filterDebounce?.cancel();
     _flightNumberController.dispose();
     super.dispose();
   }
 
   void _handleFilterTextChanged() {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+    _filterDebounce?.cancel();
+    _filterDebounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) {
         return;
       }
@@ -79,10 +78,7 @@ class _NotificationsSectionState extends State<NotificationsSection> {
     try {
       final response = await _service.fetchNotifications(
         token: widget.token,
-        searchText: _searchController.text,
         flightNumber: _flightNumberController.text,
-        status: _statusFilter,
-        type: _typeFilter,
         createdFromUtc: _createdFrom == null
             ? null
             : DateTime(
@@ -171,14 +167,11 @@ class _NotificationsSectionState extends State<NotificationsSection> {
   }
 
   void _clearFilters() {
-    _searchDebounce?.cancel();
-    _searchController.clear();
+    _filterDebounce?.cancel();
     _flightNumberController.clear();
     setState(() {
       _createdFrom = null;
       _createdTo = null;
-      _statusFilter = null;
-      _typeFilter = null;
     });
     _loadNotifications(page: 1);
   }
@@ -206,123 +199,43 @@ class _NotificationsSectionState extends State<NotificationsSection> {
   }
 
   Widget _buildToolbar() {
-    return Column(
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: TextField(
-                controller: _flightNumberController,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Broj leta',
-                  hintText: 'npr. JG101',
-                  prefixIcon: Icon(Icons.flight_takeoff_rounded),
-                ),
-                onSubmitted: (_) => _loadNotifications(page: 1),
-              ),
+        SizedBox(
+          width: 280,
+          child: TextField(
+            controller: _flightNumberController,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              labelText: 'Broj leta',
+              hintText: 'npr. JG101',
+              prefixIcon: Icon(Icons.flight_takeoff_rounded),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 3,
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  labelText: 'Pretraga notifikacija',
-                  hintText: 'Tip, poruka, korisnik ili email',
-                  prefixIcon: Icon(Icons.search_rounded),
-                ),
-                onSubmitted: (_) => _loadNotifications(page: 1),
-              ),
-            ),
-            const SizedBox(width: 12),
-            IconButton(
-              tooltip: 'Osvjezi',
-              onPressed: _handleRefresh,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ],
+            onSubmitted: (_) => _loadNotifications(page: 1),
+          ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            SizedBox(
-              width: 210,
-              child: DropdownButtonFormField<NotificationTypeValue?>(
-                key: ValueKey<NotificationTypeValue?>(_typeFilter),
-                initialValue: _typeFilter,
-                decoration: const InputDecoration(labelText: 'Tip'),
-                items: [
-                  const DropdownMenuItem<NotificationTypeValue?>(
-                    value: null,
-                    child: Text('Svi tipovi'),
-                  ),
-                  ...NotificationTypeValue.values
-                      .where((item) => item != NotificationTypeValue.supportReply)
-                      .map(
-                        (item) => DropdownMenuItem<NotificationTypeValue?>(
-                          value: item,
-                          child: Text(item.label),
-                        ),
-                      ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _typeFilter = value;
-                  });
-                  _loadNotifications(page: 1);
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 170,
-              child: DropdownButtonFormField<NotificationStatusValue?>(
-                key: ValueKey<NotificationStatusValue?>(_statusFilter),
-                initialValue: _statusFilter,
-                decoration: const InputDecoration(labelText: 'Status'),
-                items: const [
-                  DropdownMenuItem<NotificationStatusValue?>(
-                    value: null,
-                    child: Text('Svi statusi'),
-                  ),
-                  DropdownMenuItem<NotificationStatusValue?>(
-                    value: NotificationStatusValue.unread,
-                    child: Text('Neprocitano'),
-                  ),
-                  DropdownMenuItem<NotificationStatusValue?>(
-                    value: NotificationStatusValue.read,
-                    child: Text('Procitano'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _statusFilter = value;
-                  });
-                  _loadNotifications(page: 1);
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            _DateFilterButton(
-              label: 'Od datuma',
-              value: _formatDate(_createdFrom),
-              onPressed: () => _pickDate(isStartDate: true),
-            ),
-            const SizedBox(width: 12),
-            _DateFilterButton(
-              label: 'Do datuma',
-              value: _formatDate(_createdTo),
-              onPressed: () => _pickDate(isStartDate: false),
-            ),
-            const SizedBox(width: 12),
-            OutlinedButton.icon(
-              onPressed: _clearFilters,
-              icon: const Icon(Icons.filter_alt_off_rounded),
-              label: const Text('Ocisti'),
-            ),
-          ],
+        _DateFilterButton(
+          label: 'Od datuma',
+          value: _formatDate(_createdFrom),
+          onPressed: () => _pickDate(isStartDate: true),
+        ),
+        _DateFilterButton(
+          label: 'Do datuma',
+          value: _formatDate(_createdTo),
+          onPressed: () => _pickDate(isStartDate: false),
+        ),
+        OutlinedButton.icon(
+          onPressed: _clearFilters,
+          icon: const Icon(Icons.filter_alt_off_rounded),
+          label: const Text('Ocisti'),
+        ),
+        IconButton(
+          tooltip: 'Osvjezi',
+          onPressed: _handleRefresh,
+          icon: const Icon(Icons.refresh_rounded),
         ),
       ],
     );
@@ -345,7 +258,7 @@ class _NotificationsSectionState extends State<NotificationsSection> {
       return const _CenteredMessage(
         icon: Icons.notifications_none_rounded,
         title: 'Nema notifikacija za prikaz',
-        message: 'Pokusajte drugi broj leta, datum ili tip notifikacije.',
+        message: 'Pokusajte drugi broj leta ili datumski period.',
       );
     }
 
@@ -358,13 +271,15 @@ class _NotificationsSectionState extends State<NotificationsSection> {
               'Sistemske notifikacije ($_totalCount)',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const Spacer(),
-            Text(
-              'Stranica $_page od $_totalPages',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
+            if (_totalPages > 1) ...[
+              const Spacer(),
+              Text(
+                'Stranica $_page od $_totalPages',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 12),
@@ -387,8 +302,8 @@ class _NotificationsSectionState extends State<NotificationsSection> {
                     return DataRow(
                       cells: [
                         DataCell(Text(_formatDateTime(item.createdAtUtc))),
-                        DataCell(Text(item.flightNumber ?? '-')),
-                        DataCell(_TypeBadge(label: item.type.label)),
+                        DataCell(Text(_displayFlightNumber(item))),
+                        DataCell(_TypeBadge(label: _displayTypeLabel(item))),
                         DataCell(
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 210),
@@ -425,12 +340,24 @@ class _NotificationsSectionState extends State<NotificationsSection> {
           ),
         ),
         const SizedBox(height: 12),
-        _buildPagination(),
+        _buildFooter(),
       ],
     );
   }
 
-  Widget _buildPagination() {
+  Widget _buildFooter() {
+    if (_totalPages <= 1) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Text(
+          'Prikazano ${_notifications.length} od $_totalCount',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+
     return Row(
       children: [
         OutlinedButton.icon(
@@ -452,11 +379,36 @@ class _NotificationsSectionState extends State<NotificationsSection> {
         Text(
           'Prikazano ${_notifications.length} od $_totalCount',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
+  }
+
+  String _displayTypeLabel(AdminNotificationItem item) {
+    if (item.type != NotificationTypeValue.system) {
+      return item.type.label;
+    }
+
+    final title = item.title.trim();
+    return title.isEmpty ? item.type.label : title;
+  }
+
+  String _displayFlightNumber(AdminNotificationItem item) {
+    final storedFlightNumber = item.flightNumber?.trim();
+    if (storedFlightNumber != null && storedFlightNumber.isNotEmpty) {
+      return storedFlightNumber;
+    }
+
+    return _extractFlightNumber(item.title) ??
+        _extractFlightNumber(item.body) ??
+        '-';
+  }
+
+  String? _extractFlightNumber(String value) {
+    final match = _flightNumberPattern.firstMatch(value.toUpperCase());
+    return match?.group(0);
   }
 
   String _formatDate(DateTime? value) {
@@ -501,14 +453,8 @@ class _DateFilterButton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-            Text(
-              value,
-              overflow: TextOverflow.ellipsis,
-            ),
+            Text(label, style: Theme.of(context).textTheme.labelSmall),
+            Text(value, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),

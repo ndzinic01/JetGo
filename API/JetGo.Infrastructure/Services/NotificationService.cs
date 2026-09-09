@@ -122,7 +122,10 @@ public sealed class NotificationService : INotificationService
         if (!string.IsNullOrWhiteSpace(request.FlightNumber))
         {
             var flightNumber = request.FlightNumber.Trim().ToUpperInvariant();
-            query = query.Where(x => x.FlightNumber != null && x.FlightNumber.Contains(flightNumber));
+            query = query.Where(x =>
+                (x.FlightNumber != null && x.FlightNumber.ToUpper().Contains(flightNumber)) ||
+                x.Title.ToUpper().Contains(flightNumber) ||
+                x.Body.ToUpper().Contains(flightNumber));
         }
 
         if (!string.IsNullOrWhiteSpace(request.SearchText))
